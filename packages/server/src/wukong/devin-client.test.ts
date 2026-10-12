@@ -10,8 +10,8 @@ import {
   hideInjectedInstructions,
   injectInstructionsIntoFirstPrompt,
   instructionBlock,
+  paseoCommandLineGuide,
   withoutInjectedInstructions,
-  withUniqueMcpServerNames,
 } from "./devin-client.js";
 
 function sessionWithConnection() {
@@ -25,7 +25,8 @@ function sessionWithConnection() {
     session,
     calls,
     prompt,
-    connection: (session as unknown as { connection: { prompt: unknown } }).connection,
+    connection: (session as unknown as { connection: { prompt: unknown } })
+      .connection,
   };
 }
 
@@ -68,7 +69,9 @@ describe("Devin system prompt delivery", () => {
       const { session, calls, prompt, connection } = sessionWithConnection();
       injectInstructionsIntoFirstPrompt(session, systemPrompt);
       expect(connection.prompt).toBe(prompt);
-      await (connection.prompt as (p: unknown) => Promise<unknown>)({ prompt: userBlocks("hi") });
+      await (connection.prompt as (p: unknown) => Promise<unknown>)({
+        prompt: userBlocks("hi"),
+      });
       expect(calls[0]).toEqual({ prompt: userBlocks("hi") });
     }
   });
@@ -76,7 +79,7 @@ describe("Devin system prompt delivery", () => {
   it("warns, and does not throw, when the session has no connection to wrap", () => {
     const warn = vi.fn();
     expect(() =>
-      injectInstructionsIntoFirstPrompt({} as AgentSession, "x", { warn }),
+      injectInstructionsIntoFirstPrompt({} as AgentSession, "x", { warn })
     ).not.toThrow();
     expect(warn).toHaveBeenCalledOnce();
   });
@@ -96,7 +99,7 @@ describe("Devin system prompt delivery", () => {
       expect(DEVIN_COMMANDS_WAIT_MS).toBeGreaterThan(1_500);
       expect(
         (client as unknown as { initialCommandsWaitTimeoutMs: number })
-          .initialCommandsWaitTimeoutMs,
+          .initialCommandsWaitTimeoutMs
       ).toBe(DEVIN_COMMANDS_WAIT_MS);
       expect(createWukongAcpClient("cursor", options)).toBeUndefined();
     } finally {
@@ -107,9 +110,11 @@ describe("Devin system prompt delivery", () => {
   describe("the replay after a resume", () => {
     it("cuts our block out of the first user message and keeps what was typed", () => {
       const block = instructionBlock("Your name is Zorblax.\nBe brief.").text;
-      expect(withoutInjectedInstructions(`${block}What is your name?`)).toBe("What is your name?");
+      expect(withoutInjectedInstructions(`${block}What is your name?`)).toBe(
+        "What is your name?"
+      );
       expect(withoutInjectedInstructions(`${block}\nline one\nline two`)).toBe(
-        "\nline one\nline two",
+        "\nline one\nline two"
       );
     });
 
@@ -158,36 +163,42 @@ describe("Devin system prompt delivery", () => {
     });
   });
 
-  describe("MCP server names", () => {
-    const paseo = {
-      type: "http",
-      url: "http://127.0.0.1:6899/mcp/agents?callerAgentId=a1",
-    } as const;
-    const bots = { type: "stdio", command: "node", args: ["bots.js"] } as const;
-
-    it("renames every server with the same new suffix and keeps what each one is", () => {
-      const config = { cwd: "/x", mcpServers: { paseo, bots } };
-      const out = withUniqueMcpServerNames(config, "1a2b3c4d");
-      expect(out.cwd).toBe("/x");
-      expect(Object.keys(out.mcpServers)).toEqual(["paseo-1a2b3c4d", "bots-1a2b3c4d"]);
-      expect(out.mcpServers["paseo-1a2b3c4d"]).toBe(paseo);
-      expect(out.mcpServers["bots-1a2b3c4d"]).toBe(bots);
+  describe("Paseo's tools from the shell", () => {
+    it("names the wukong commands and the agent's own ID", () => {
+      const guide = paseoCommandLineGuide("a1b2c3d4-0000");
+      for (const command of [
+        "wukong agent ls",
+        "wukong send",
+        "wukong logs",
+        "wukong wait",
+        "wukong run",
+      ]) {
+        expect(guide).toContain(command);
+      }
+      expect(guide).toContain("--prompt-file");
+      expect(guide).toContain("a1b2c3d4-0000");
+      expect(guide).toContain("PASEO_AGENT_ID");
     });
 
-    it("leaves the input alone and picks a different suffix each time", () => {
-      const config = { mcpServers: { paseo } };
-      const first = withUniqueMcpServerNames(config);
-      const second = withUniqueMcpServerNames(config);
-      expect(Object.keys(config.mcpServers)).toEqual(["paseo"]);
-      expect(Object.keys(first.mcpServers)[0]).toMatch(/^paseo-[0-9a-f]{8}$/u);
-      expect(Object.keys(first.mcpServers)[0]).not.toBe(Object.keys(second.mcpServers)[0]);
+    it("still reads well when the agent's ID is not known yet", () => {
+      const guide = paseoCommandLineGuide();
+      expect(guide).toContain("wukong send");
+      expect(guide).not.toContain("Your own agent ID");
     });
 
-    it("returns a config without servers as it is", () => {
-      const none = { cwd: "/x" };
-      expect(withUniqueMcpServerNames(none)).toBe(none);
-      const empty = { cwd: "/x", mcpServers: {} };
-      expect(withUniqueMcpServerNames(empty)).toBe(empty);
+    it("rides in the first prompt together with the system prompt", async () => {
+      const { session, calls, connection } = sessionWithConnection();
+      injectInstructionsIntoFirstPrompt(
+        session,
+        ["Your name is Zorblax.", paseoCommandLineGuide("abc")].join("\n\n")
+      );
+      await (connection.prompt as (p: unknown) => Promise<unknown>)({
+        prompt: userBlocks("hi"),
+      });
+      const text =
+        (calls[0] as { prompt: Array<{ text: string }> }).prompt[0]?.text ?? "";
+      expect(text).toContain("Your name is Zorblax.");
+      expect(text).toContain("wukong send");
     });
   });
 });

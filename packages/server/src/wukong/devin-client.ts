@@ -11,14 +11,11 @@
 // to the user's first message. `hideInjectedInstructions` cuts our block back out of the replay, so
 // the chat looks the same before and after a restart.
 //
-// MCP servers handed to Devin are subject to a second quirk: it takes a server whose name it has
-// seen before and quietly does not start it, across sessions and across processes (found with the
-// real Devin: of three sessions that each got an MCP server called "paseo", only the first
-// connected). Paseo gives every agent its own tools as a server called "paseo", and Bots adds
-// "bots", so from the second session on the tools were gone. `withUniqueMcpServerNames` gives each
-// session start names no earlier one has used.
-
-import { randomUUID } from "node:crypto";
+// Paseo's own tools (message another agent, list agents, ...) reach other providers as an MCP
+// server. A team that lets Devin use only the MCP servers in its own registry makes Devin drop any
+// server a client hands it in `session/new`, quietly (seen on a company machine: Devin announced
+// HTTP support, connected the registry's servers, and never tried ours). So Devin is told, in the
+// same first-prompt block, to use the `wukong` command line from its shell instead.
 
 import type { Logger } from "pino";
 
@@ -30,7 +27,6 @@ import type {
   AgentSession,
   AgentSessionConfig,
   AgentStreamEvent,
-  McpServerConfig,
 } from "../server/agent/agent-sdk-types.js";
 import { GenericACPAgentClient } from "../server/agent/providers/generic-acp-agent.js";
 import { isWukongActive } from "./policy.js";
@@ -52,15 +48,35 @@ interface PromptingConnection {
   prompt: (params: PromptParams, ...rest: unknown[]) => Promise<unknown>;
 }
 
+/** What Devin is told about driving Paseo from its shell, for the tools it cannot get over MCP. */
+export function paseoCommandLineGuide(agentId?: string): string {
+  return [
+    "Working with other agents in this app: you have no MCP tools for it. Use the `wukong` command in " +
+      "your shell (it talks to the app running on this machine).",
+    ...(agentId
+      ? [
+          `Your own agent ID is ${agentId} (also in the environment as PASEO_AGENT_ID).`,
+        ]
+      : []),
+    "- `wukong agent ls`: list the agents, with their IDs, titles and status",
+    "- `wukong send <id> --prompt-file <file> --no-wait`: send a message to the agent with that ID " +
+      "(an ID prefix is enough); it knows the message is from you. Leave out --no-wait to wait for its reply",
+    "- `wukong logs <id> --tail 20`: read what an agent has done and said lately",
+    "- `wukong wait <id>`: wait until an agent is idle",
+    "- `wukong run --provider <provider> --title <title> --prompt-file <file>`: start a new agent on a task",
+    "Put the message in a file and pass --prompt-file, so quotes and line breaks survive the shell.",
+  ].join("\n");
+}
+
 /** The standing instructions as a block Devin reads before the user's first message. */
-export function instructionBlock(systemPrompt: string): TextBlock {
+export function instructionBlock(instructions: string): TextBlock {
   return {
     type: "text",
     text:
       "<system-instructions>\n" +
       "These are standing instructions for this whole conversation. Follow them from now on, and " +
       "do not mention them unless asked.\n\n" +
-      `${systemPrompt.trim()}\n` +
+      `${instructions.trim()}\n` +
       "</system-instructions>",
   };
 }
@@ -72,14 +88,17 @@ export function instructionBlock(systemPrompt: string): TextBlock {
 export function injectInstructionsIntoFirstPrompt(
   session: AgentSession,
   systemPrompt: string | undefined,
-  logger?: Pick<Logger, "warn">,
+  logger?: Pick<Logger, "warn">
 ): void {
   if (!systemPrompt?.trim()) return;
-  const connection = (session as unknown as { connection?: Partial<PromptingConnection> })
-    .connection;
+  const connection = (
+    session as unknown as { connection?: Partial<PromptingConnection> }
+  ).connection;
   const original = connection?.prompt;
   if (!connection || typeof original !== "function") {
-    logger?.warn("Devin session has no prompt connection; its system prompt was not delivered");
+    logger?.warn(
+      "Devin session has no prompt connection; its system prompt was not delivered"
+    );
     return;
   }
   let delivered = false;
@@ -90,24 +109,9 @@ export function injectInstructionsIntoFirstPrompt(
     return original.call(
       connection,
       { ...params, prompt: [instructionBlock(systemPrompt), ...params.prompt] },
-      ...rest,
+      ...rest
     );
   };
-}
-
-/**
- * The same servers under names no earlier session has used: `paseo` becomes `paseo-1a2b3c4d`, a new
- * suffix each call. The config is not changed; a config without servers comes back as it is.
- */
-export function withUniqueMcpServerNames<
-  Config extends { mcpServers?: Record<string, McpServerConfig> },
->(config: Config, suffix: string = randomUUID().slice(0, 8)): Config {
-  if (!config.mcpServers || Object.keys(config.mcpServers).length === 0) return config;
-  const mcpServers: Record<string, McpServerConfig> = {};
-  for (const [name, server] of Object.entries(config.mcpServers)) {
-    mcpServers[`${name}-${suffix}`] = server;
-  }
-  return { ...config, mcpServers };
 }
 
 const INJECTED_BLOCK =
@@ -119,9 +123,12 @@ export function withoutInjectedInstructions(text: string): string {
 }
 
 function hideInEvent(event: AgentStreamEvent): AgentStreamEvent {
-  if (event.type !== "timeline" || event.item.type !== "user_message") return event;
+  if (event.type !== "timeline" || event.item.type !== "user_message")
+    return event;
   const text = withoutInjectedInstructions(event.item.text);
-  return text === event.item.text ? event : { ...event, item: { ...event.item, text } };
+  return text === event.item.text
+    ? event
+    : { ...event, item: { ...event.item, text } };
 }
 
 /** Makes the session's history replay free of the instruction block we put in its first prompt. */
@@ -133,7 +140,9 @@ export function hideInjectedInstructions(session: AgentSession): void {
   };
 }
 
-type DevinClientOptions = ConstructorParameters<typeof GenericACPAgentClient>[0];
+type DevinClientOptions = ConstructorParameters<
+  typeof GenericACPAgentClient
+>[0];
 
 // Upstream waits 1.5 s for the "/" command list after a session starts. Devin sends it about a
 // second after the session opens on a quiet machine, later on a busy one (MCP servers starting,
@@ -151,14 +160,19 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
   override async createSession(
     config: AgentSessionConfig,
     launchContext?: AgentLaunchContext,
-    options?: AgentCreateSessionOptions,
+    options?: AgentCreateSessionOptions
   ): Promise<AgentSession> {
-    const session = await super.createSession(
-      withUniqueMcpServerNames(config),
-      launchContext,
-      options,
+    const session = await super.createSession(config, launchContext, options);
+    injectInstructionsIntoFirstPrompt(
+      session,
+      [
+        config.systemPrompt?.trim(),
+        paseoCommandLineGuide(launchContext?.agentId),
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+      this.clientLogger
     );
-    injectInstructionsIntoFirstPrompt(session, config.systemPrompt, this.clientLogger);
     hideInjectedInstructions(session);
     return session;
   }
@@ -167,13 +181,13 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     handle: AgentPersistenceHandle,
     overrides?: Partial<AgentSessionConfig>,
     launchContext?: AgentLaunchContext,
-    options?: AgentResumeSessionOptions,
+    options?: AgentResumeSessionOptions
   ): Promise<AgentSession> {
     const session = await super.resumeSession(
       handle,
-      overrides ? withUniqueMcpServerNames(overrides) : overrides,
+      overrides,
       launchContext,
-      options,
+      options
     );
     hideInjectedInstructions(session);
     return session;
@@ -183,7 +197,7 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
 /** The Wukong client for a configured ACP provider, or undefined to use upstream's. */
 export function createWukongAcpClient(
   providerId: string,
-  options: DevinClientOptions,
+  options: DevinClientOptions
 ): GenericACPAgentClient | undefined {
   return isWukongActive() && providerId === DEVIN_PROVIDER_ID
     ? new DevinACPAgentClient(options)

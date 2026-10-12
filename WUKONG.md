@@ -114,13 +114,18 @@ you add one, add it to the table below. `rg "Wukong:"` finds every marker.
   in each bot's own folder and, for a Devin chat in that folder, does not pass `systemPrompt`, so the two
   never both deliver the same text. Devin fixes a session's rules when it is created, and caps each
   always-on rule file at 32 KiB.
-  **Paseo's agent tools in Devin:** the same client renames each session's MCP servers with a random
-  suffix (`paseo` -> `paseo-1a2b3c4d`) on `session/new` and `session/load`, because Devin ignores a
-  server whose name it has seen before, across sessions and processes (verified; unique names always
-  connect, also on resume). Wukong homes also default `daemon.mcp.injectIntoAgents` to true (upstream's
-  daemon default is false while its Settings page shows on when unset); a value the user set is kept.
-  Needs Devin >= 3000.11.1: older builds report `mcpCapabilities` http/sse false and cannot take a
-  session-supplied HTTP server at all. `wukong/scripts/devin-mcp-probe.mjs` tells which case a machine is.
+  **Paseo's agent tools in Devin:** Paseo hands other providers its tools (message an agent, list
+  agents, ...) as an MCP server. On a company machine Devin drops it: with a team MCP registry Devin
+  connects only the registry's servers and silently ignores the ones a client passes in `session/new`
+  (seen in its log: "Fetched 123 servers from 1 MCP registries", the registry's servers connected, ours
+  never tried; `devin-mcp-probe.mjs` and `devin-mcp-log.ps1` in `wukong/scripts` show it). So the same
+  first-prompt block also tells Devin to use the `wukong` command from its shell (`agent ls`, `send`,
+  `logs`, `wait`, `run`; the CLI reads `PASEO_AGENT_ID` so a message says who sent it). Verified with the
+  real Devin: it ran `wukong agent ls` and answered; each shell command asks for the usual approval. Only
+  a new session gets the block, so a Devin chat made before this stays without it. Devin also ignores
+  a server whose name it has seen before; a rename fix was tried and dropped as it helps only where
+  MCP is allowed (it is in git history, commit `f7cec3d70`). Wukong homes default
+  `daemon.mcp.injectIntoAgents` to true, which serves Claude Code.
 - **Providers:** removed from the registry, not merely disabled. Terminal profiles are fixed to
   Claude Code. The Providers page and Add provider catalog are hidden.
 - **Plugins:** local folders only. npm, Git and registry sources are switched off because they run
