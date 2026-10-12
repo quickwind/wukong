@@ -49,6 +49,7 @@ import { TraeACPAgentClient } from "./providers/trae-acp-agent.js";
 import { MockLoadTestAgentClient } from "./providers/mock-load-test-agent.js";
 import { MockSlowProviderClient } from "./providers/mock-slow-provider.js";
 import { ToolPolicyUnsupportedError, mergeProviderOptions } from "./provider-options.js";
+import { createWukongAcpClient } from "../../wukong/devin-client.js"; // Wukong
 import { restrictToWukongProviders, withWukongProviderOverrides } from "../../wukong/providers.js"; // Wukong
 import {
   AGENT_PROVIDER_DEFINITIONS,
@@ -853,6 +854,10 @@ function addDerivedProviders(
           }
           if (providerId === "traecli") {
             return new TraeACPAgentClient(acpOptions);
+          }
+          const wukongClient = createWukongAcpClient(providerId, acpOptions); // Wukong
+          if (wukongClient) {
+            return wukongClient;
           }
           return new GenericACPAgentClient(acpOptions);
         },
