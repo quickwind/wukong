@@ -161,15 +161,23 @@ wukong plugin install D:\plugins\<plugin>
 
 `paseo-bots-<version>.zip` is the Bots plugin with everything that connects to the internet removed
 (connected apps, OpenAI avatars, GitHub imports, testing of remote MCP servers). It installs without git, npm or
-internet:
+internet. Use the file name of the zip you were given in place of `<version>` below:
 
 ```powershell
-Expand-Archive .\paseo-bots-0.2.0-offline.7.zip -DestinationPath D:\plugins
-wukong plugin install D:\plugins\paseo-bots-0.2.0-offline.7
+Expand-Archive .\paseo-bots-<version>.zip -DestinationPath D:\plugins
+wukong plugin install D:\plugins\paseo-bots-<version>
 ```
 
-Check the download first if you like: `(Get-FileHash .\paseo-bots-0.2.0-offline.7.zip).Hash` should equal the
+Check the download first if you like: `(Get-FileHash .\paseo-bots-<version>.zip).Hash` should equal the
 hash in the `.sha256` file. Skills import from a folder on the machine, not from GitHub.
+
+**Bots on Devin.** Devin has no system prompt, so a bot's identity and soul reach it as an always-on
+Devin rule: the plugin keeps `.devin/rules/bot-identity.md` in each bot's own folder, for every bot, and
+refreshes it before a chat starts. Chats started from the Bots page and ordinary new chats in the bot's
+workspace both pick it up. A bot with a custom working folder gets its instructions through Wukong's
+first-message block instead, and nothing is written into that folder. Devin truncates an always-on rule
+file at 32 KiB; the plugin splits a longer identity into several files and says so on the bot's
+Overview page. A chat keeps the rules it had when it was created.
 
 ## Run it in the background, and at sign-in
 

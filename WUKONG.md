@@ -110,6 +110,10 @@ you add one, add it to the table below. `rg "Wukong:"` finds every marker.
   of `streamHistory`. Verified with the real Devin: it answers with the instruction, the chat shows
   only what was typed before and after a daemon restart, and later messages need no re-injection.
   It also waits up to 10 s, not 1.5 s, for the "/" command list (a hedge; not shown to be needed).
+  For bots the Bots plugin goes one better: it keeps an always-on Devin rule (`.devin/rules/bot-identity.md`)
+  in each bot's own folder and, for a Devin chat in that folder, does not pass `systemPrompt`, so the two
+  never both deliver the same text. Devin fixes a session's rules when it is created, and caps each
+  always-on rule file at 32 KiB.
 - **Providers:** removed from the registry, not merely disabled. Terminal profiles are fixed to
   Claude Code. The Providers page and Add provider catalog are hidden.
 - **Plugins:** local folders only. npm, Git and registry sources are switched off because they run
