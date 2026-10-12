@@ -59,12 +59,14 @@ export function paseoCommandLineGuide(agentId?: string): string {
         ]
       : []),
     "- `wukong agent ls`: list the agents, with their IDs, titles and status",
-    "- `wukong send <id> --prompt-file <file> --no-wait`: send a message to the agent with that ID " +
-      "(an ID prefix is enough); it knows the message is from you. Leave out --no-wait to wait for its reply",
+    '- `wukong send <id> "<message>" --no-wait`: send a message to the agent with that ID (an ID ' +
+      "prefix is enough); it knows the message is from you. Leave out --no-wait to wait for its reply",
     "- `wukong logs <id> --tail 20`: read what an agent has done and said lately",
     "- `wukong wait <id>`: wait until an agent is idle",
-    "- `wukong run --provider <provider> --title <title> --prompt-file <file>`: start a new agent on a task",
-    "Put the message in a file and pass --prompt-file, so quotes and line breaks survive the shell.",
+    '- `wukong run --provider <provider> --title <title> "<task>"`: start a new agent on a task',
+    "Pass the message straight on the command line; do not write it to a file in the project. Keep it on " +
+      "one line and avoid double quotes inside it. Only if it truly needs line breaks or quotes, write it " +
+      "to a file in the system temp folder (not the project), pass --prompt-file, and delete the file after.",
   ].join("\n");
 }
 

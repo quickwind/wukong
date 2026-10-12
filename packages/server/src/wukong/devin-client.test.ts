@@ -176,6 +176,8 @@ describe("Devin system prompt delivery", () => {
         expect(guide).toContain(command);
       }
       expect(guide).toContain("--prompt-file");
+      expect(guide).toContain("system temp folder");
+      expect(guide).not.toContain("--prompt-file <file>");
       expect(guide).toContain("a1b2c3d4-0000");
       expect(guide).toContain("PASEO_AGENT_ID");
     });
