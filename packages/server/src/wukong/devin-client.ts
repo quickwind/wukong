@@ -54,9 +54,7 @@ export function paseoCommandLineGuide(agentId?: string): string {
     "Working with other agents in this app: you have no MCP tools for it. Use the `wukong` command in " +
       "your shell (it talks to the app running on this machine).",
     ...(agentId
-      ? [
-          `Your own agent ID is ${agentId} (also in the environment as PASEO_AGENT_ID).`,
-        ]
+      ? [`Your own agent ID is ${agentId} (also in the environment as PASEO_AGENT_ID).`]
       : []),
     "- `wukong agent ls`: list the agents, with their IDs, titles and status",
     '- `wukong send <id> "<message>" --no-wait`: send a message to the agent with that ID (an ID ' +
@@ -96,17 +94,14 @@ export function instructionBlock(instructions: string): TextBlock {
 export function injectInstructionsIntoFirstPrompt(
   session: AgentSession,
   systemPrompt: string | undefined,
-  logger?: Pick<Logger, "warn">
+  logger?: Pick<Logger, "warn">,
 ): void {
   if (!systemPrompt?.trim()) return;
-  const connection = (
-    session as unknown as { connection?: Partial<PromptingConnection> }
-  ).connection;
+  const connection = (session as unknown as { connection?: Partial<PromptingConnection> })
+    .connection;
   const original = connection?.prompt;
   if (!connection || typeof original !== "function") {
-    logger?.warn(
-      "Devin session has no prompt connection; its system prompt was not delivered"
-    );
+    logger?.warn("Devin session has no prompt connection; its system prompt was not delivered");
     return;
   }
   let delivered = false;
@@ -117,7 +112,7 @@ export function injectInstructionsIntoFirstPrompt(
     return original.call(
       connection,
       { ...params, prompt: [instructionBlock(systemPrompt), ...params.prompt] },
-      ...rest
+      ...rest,
     );
   };
 }
@@ -131,12 +126,9 @@ export function withoutInjectedInstructions(text: string): string {
 }
 
 function hideInEvent(event: AgentStreamEvent): AgentStreamEvent {
-  if (event.type !== "timeline" || event.item.type !== "user_message")
-    return event;
+  if (event.type !== "timeline" || event.item.type !== "user_message") return event;
   const text = withoutInjectedInstructions(event.item.text);
-  return text === event.item.text
-    ? event
-    : { ...event, item: { ...event.item, text } };
+  return text === event.item.text ? event : { ...event, item: { ...event.item, text } };
 }
 
 /** Makes the session's history replay free of the instruction block we put in its first prompt. */
@@ -148,9 +140,7 @@ export function hideInjectedInstructions(session: AgentSession): void {
   };
 }
 
-type DevinClientOptions = ConstructorParameters<
-  typeof GenericACPAgentClient
->[0];
+type DevinClientOptions = ConstructorParameters<typeof GenericACPAgentClient>[0];
 
 // Upstream waits 1.5 s for the "/" command list after a session starts. Devin sends it about a
 // second after the session opens on a quiet machine, later on a busy one (MCP servers starting,
@@ -168,18 +158,15 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
   override async createSession(
     config: AgentSessionConfig,
     launchContext?: AgentLaunchContext,
-    options?: AgentCreateSessionOptions
+    options?: AgentCreateSessionOptions,
   ): Promise<AgentSession> {
     const session = await super.createSession(config, launchContext, options);
     injectInstructionsIntoFirstPrompt(
       session,
-      [
-        config.systemPrompt?.trim(),
-        paseoCommandLineGuide(launchContext?.agentId),
-      ]
+      [config.systemPrompt?.trim(), paseoCommandLineGuide(launchContext?.agentId)]
         .filter(Boolean)
         .join("\n\n"),
-      this.clientLogger
+      this.clientLogger,
     );
     hideInjectedInstructions(session);
     return session;
@@ -189,14 +176,9 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     handle: AgentPersistenceHandle,
     overrides?: Partial<AgentSessionConfig>,
     launchContext?: AgentLaunchContext,
-    options?: AgentResumeSessionOptions
+    options?: AgentResumeSessionOptions,
   ): Promise<AgentSession> {
-    const session = await super.resumeSession(
-      handle,
-      overrides,
-      launchContext,
-      options
-    );
+    const session = await super.resumeSession(handle, overrides, launchContext, options);
     hideInjectedInstructions(session);
     return session;
   }
@@ -205,7 +187,7 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
 /** The Wukong client for a configured ACP provider, or undefined to use upstream's. */
 export function createWukongAcpClient(
   providerId: string,
-  options: DevinClientOptions
+  options: DevinClientOptions,
 ): GenericACPAgentClient | undefined {
   return isWukongActive() && providerId === DEVIN_PROVIDER_ID
     ? new DevinACPAgentClient(options)

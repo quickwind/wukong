@@ -25,8 +25,7 @@ function sessionWithConnection() {
     session,
     calls,
     prompt,
-    connection: (session as unknown as { connection: { prompt: unknown } })
-      .connection,
+    connection: (session as unknown as { connection: { prompt: unknown } }).connection,
   };
 }
 
@@ -79,7 +78,7 @@ describe("Devin system prompt delivery", () => {
   it("warns, and does not throw, when the session has no connection to wrap", () => {
     const warn = vi.fn();
     expect(() =>
-      injectInstructionsIntoFirstPrompt({} as AgentSession, "x", { warn })
+      injectInstructionsIntoFirstPrompt({} as AgentSession, "x", { warn }),
     ).not.toThrow();
     expect(warn).toHaveBeenCalledOnce();
   });
@@ -99,7 +98,7 @@ describe("Devin system prompt delivery", () => {
       expect(DEVIN_COMMANDS_WAIT_MS).toBeGreaterThan(1_500);
       expect(
         (client as unknown as { initialCommandsWaitTimeoutMs: number })
-          .initialCommandsWaitTimeoutMs
+          .initialCommandsWaitTimeoutMs,
       ).toBe(DEVIN_COMMANDS_WAIT_MS);
       expect(createWukongAcpClient("cursor", options)).toBeUndefined();
     } finally {
@@ -110,11 +109,9 @@ describe("Devin system prompt delivery", () => {
   describe("the replay after a resume", () => {
     it("cuts our block out of the first user message and keeps what was typed", () => {
       const block = instructionBlock("Your name is Zorblax.\nBe brief.").text;
-      expect(withoutInjectedInstructions(`${block}What is your name?`)).toBe(
-        "What is your name?"
-      );
+      expect(withoutInjectedInstructions(`${block}What is your name?`)).toBe("What is your name?");
       expect(withoutInjectedInstructions(`${block}\nline one\nline two`)).toBe(
-        "\nline one\nline two"
+        "\nline one\nline two",
       );
     });
 
@@ -195,13 +192,12 @@ describe("Devin system prompt delivery", () => {
       const { session, calls, connection } = sessionWithConnection();
       injectInstructionsIntoFirstPrompt(
         session,
-        ["Your name is Zorblax.", paseoCommandLineGuide("abc")].join("\n\n")
+        ["Your name is Zorblax.", paseoCommandLineGuide("abc")].join("\n\n"),
       );
       await (connection.prompt as (p: unknown) => Promise<unknown>)({
         prompt: userBlocks("hi"),
       });
-      const text =
-        (calls[0] as { prompt: Array<{ text: string }> }).prompt[0]?.text ?? "";
+      const text = (calls[0] as { prompt: Array<{ text: string }> }).prompt[0]?.text ?? "";
       expect(text).toContain("Your name is Zorblax.");
       expect(text).toContain("wukong send");
     });
