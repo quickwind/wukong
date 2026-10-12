@@ -10,6 +10,15 @@
 // Devin replays that history when a session is resumed, and the replay joins the instruction block
 // to the user's first message. `hideInjectedInstructions` cuts our block back out of the replay, so
 // the chat looks the same before and after a restart.
+//
+// MCP servers handed to Devin are subject to a second quirk: it takes a server whose name it has
+// seen before and quietly does not start it, across sessions and across processes (found with the
+// real Devin: of three sessions that each got an MCP server called "paseo", only the first
+// connected). Paseo gives every agent its own tools as a server called "paseo", and Bots adds
+// "bots", so from the second session on the tools were gone. `withUniqueMcpServerNames` gives each
+// session start names no earlier one has used.
+
+import { randomUUID } from "node:crypto";
 
 import type { Logger } from "pino";
 
@@ -21,6 +30,7 @@ import type {
   AgentSession,
   AgentSessionConfig,
   AgentStreamEvent,
+  McpServerConfig,
 } from "../server/agent/agent-sdk-types.js";
 import { GenericACPAgentClient } from "../server/agent/providers/generic-acp-agent.js";
 import { isWukongActive } from "./policy.js";
@@ -85,6 +95,21 @@ export function injectInstructionsIntoFirstPrompt(
   };
 }
 
+/**
+ * The same servers under names no earlier session has used: `paseo` becomes `paseo-1a2b3c4d`, a new
+ * suffix each call. The config is not changed; a config without servers comes back as it is.
+ */
+export function withUniqueMcpServerNames<
+  Config extends { mcpServers?: Record<string, McpServerConfig> },
+>(config: Config, suffix: string = randomUUID().slice(0, 8)): Config {
+  if (!config.mcpServers || Object.keys(config.mcpServers).length === 0) return config;
+  const mcpServers: Record<string, McpServerConfig> = {};
+  for (const [name, server] of Object.entries(config.mcpServers)) {
+    mcpServers[`${name}-${suffix}`] = server;
+  }
+  return { ...config, mcpServers };
+}
+
 const INJECTED_BLOCK =
   /^<system-instructions>\nThese are standing instructions for this whole conversation\.[\s\S]*?<\/system-instructions>/u;
 
@@ -128,7 +153,11 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     launchContext?: AgentLaunchContext,
     options?: AgentCreateSessionOptions,
   ): Promise<AgentSession> {
-    const session = await super.createSession(config, launchContext, options);
+    const session = await super.createSession(
+      withUniqueMcpServerNames(config),
+      launchContext,
+      options,
+    );
     injectInstructionsIntoFirstPrompt(session, config.systemPrompt, this.clientLogger);
     hideInjectedInstructions(session);
     return session;
@@ -140,7 +169,12 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     launchContext?: AgentLaunchContext,
     options?: AgentResumeSessionOptions,
   ): Promise<AgentSession> {
-    const session = await super.resumeSession(handle, overrides, launchContext, options);
+    const session = await super.resumeSession(
+      handle,
+      overrides ? withUniqueMcpServerNames(overrides) : overrides,
+      launchContext,
+      options,
+    );
     hideInjectedInstructions(session);
     return session;
   }

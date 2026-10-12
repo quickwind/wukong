@@ -114,6 +114,13 @@ you add one, add it to the table below. `rg "Wukong:"` finds every marker.
   in each bot's own folder and, for a Devin chat in that folder, does not pass `systemPrompt`, so the two
   never both deliver the same text. Devin fixes a session's rules when it is created, and caps each
   always-on rule file at 32 KiB.
+  **Paseo's agent tools in Devin:** the same client renames each session's MCP servers with a random
+  suffix (`paseo` -> `paseo-1a2b3c4d`) on `session/new` and `session/load`, because Devin ignores a
+  server whose name it has seen before, across sessions and processes (verified; unique names always
+  connect, also on resume). Wukong homes also default `daemon.mcp.injectIntoAgents` to true (upstream's
+  daemon default is false while its Settings page shows on when unset); a value the user set is kept.
+  Needs Devin >= 3000.11.1: older builds report `mcpCapabilities` http/sse false and cannot take a
+  session-supplied HTTP server at all. `wukong/scripts/devin-mcp-probe.mjs` tells which case a machine is.
 - **Providers:** removed from the registry, not merely disabled. Terminal profiles are fixed to
   Claude Code. The Providers page and Add provider catalog are hidden.
 - **Plugins:** local folders only. npm, Git and registry sources are switched off because they run

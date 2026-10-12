@@ -179,6 +179,12 @@ first-message block instead, and nothing is written into that folder. Devin trun
 file at 32 KiB; the plugin splits a longer identity into several files and says so on the bot's
 Overview page. A chat keeps the rules it had when it was created.
 
+**Paseo's tools in Devin (message another agent by ID, create agents, ...).** Wukong turns on
+`daemon.mcp.injectIntoAgents` in `config.json` when the key is absent, and hands Devin the tools as an MCP
+server. This needs Devin 3000.11.1 or newer, and your company may only allow approved MCP servers. To
+find out which applies, run `node devin-mcp-probe.mjs --out probe-mcp.txt` (the script is in the
+distribution folder) and send the file back.
+
 ## Run it in the background, and at sign-in
 
 `wukong daemon start` hides the daemon (no console window) and returns as soon as it is ready, so

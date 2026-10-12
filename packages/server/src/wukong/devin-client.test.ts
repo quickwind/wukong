@@ -11,6 +11,7 @@ import {
   injectInstructionsIntoFirstPrompt,
   instructionBlock,
   withoutInjectedInstructions,
+  withUniqueMcpServerNames,
 } from "./devin-client.js";
 
 function sessionWithConnection() {
@@ -154,6 +155,39 @@ describe("Devin system prompt delivery", () => {
         events[1],
         events[2],
       ]);
+    });
+  });
+
+  describe("MCP server names", () => {
+    const paseo = {
+      type: "http",
+      url: "http://127.0.0.1:6899/mcp/agents?callerAgentId=a1",
+    } as const;
+    const bots = { type: "stdio", command: "node", args: ["bots.js"] } as const;
+
+    it("renames every server with the same new suffix and keeps what each one is", () => {
+      const config = { cwd: "/x", mcpServers: { paseo, bots } };
+      const out = withUniqueMcpServerNames(config, "1a2b3c4d");
+      expect(out.cwd).toBe("/x");
+      expect(Object.keys(out.mcpServers)).toEqual(["paseo-1a2b3c4d", "bots-1a2b3c4d"]);
+      expect(out.mcpServers["paseo-1a2b3c4d"]).toBe(paseo);
+      expect(out.mcpServers["bots-1a2b3c4d"]).toBe(bots);
+    });
+
+    it("leaves the input alone and picks a different suffix each time", () => {
+      const config = { mcpServers: { paseo } };
+      const first = withUniqueMcpServerNames(config);
+      const second = withUniqueMcpServerNames(config);
+      expect(Object.keys(config.mcpServers)).toEqual(["paseo"]);
+      expect(Object.keys(first.mcpServers)[0]).toMatch(/^paseo-[0-9a-f]{8}$/u);
+      expect(Object.keys(first.mcpServers)[0]).not.toBe(Object.keys(second.mcpServers)[0]);
+    });
+
+    it("returns a config without servers as it is", () => {
+      const none = { cwd: "/x" };
+      expect(withUniqueMcpServerNames(none)).toBe(none);
+      const empty = { cwd: "/x", mcpServers: {} };
+      expect(withUniqueMcpServerNames(empty)).toBe(empty);
     });
   });
 });
