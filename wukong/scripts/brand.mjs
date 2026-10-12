@@ -32,17 +32,34 @@ const GUARDED_OVERLAYS = {
 // Files with no user-visible product name.
 const I18N_WITHOUT_NAME = new Set(["plugin-settings.ts"]);
 
+// The skills Paseo installs for agents show commands as `paseo <command>`; Wukong's command is
+// `wukong`. Only a real command is rewritten, so prose such as "the paseo skill" stays. A skill not
+// listed here has no command in it; a listed one that loses its commands upstream fails the run.
+const CLI_COMMANDS =
+  "ls|run|import|clone|attach|logs|stop|delete|send|inspect|wait|archive|onboard|start|hooks|status|" +
+  "restart|reload|pair|agent|daemon|hub|terminal|script|schedule|heartbeat|permit|provider|usage|" +
+  "plugin|speech|project|workspace|<cmd>|--help|--version";
+const SKILL_COMMAND = new RegExp(
+  `\\bpaseo (?=(?:${CLI_COMMANDS})(?![\\w-]))`,
+  "gu"
+);
+const SKILLS_WITH_COMMANDS = new Set(["paseo", "paseo-help", "paseo-plugin"]);
+
 // Hashes the text with LF line endings: Git for Windows checks files out with CRLF by default,
 // and that must not read as an upstream change.
 const sha256 = (buffer) =>
-  createHash("sha256").update(buffer.toString("utf8").replaceAll("\r\n", "\n")).digest("hex");
+  createHash("sha256")
+    .update(buffer.toString("utf8").replaceAll("\r\n", "\n"))
+    .digest("hex");
 
 function listOverlayFiles(directory = OVERLAY_ROOT) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     // Finder and Explorer leave these behind in any folder they open.
     if (entry.name === ".DS_Store" || entry.name === "Thumbs.db") return [];
     const full = path.join(directory, entry.name);
-    return entry.isDirectory() ? listOverlayFiles(full) : [path.relative(OVERLAY_ROOT, full)];
+    return entry.isDirectory()
+      ? listOverlayFiles(full)
+      : [path.relative(OVERLAY_ROOT, full)];
   });
 }
 
@@ -56,8 +73,18 @@ function textRules(root) {
       replacement: BRAND,
       optional: I18N_WITHOUT_NAME.has(file),
     }));
+  const skills = readdirSync(path.join(root, "skills"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({
+      file: `skills/${entry.name}/SKILL.md`,
+      pattern: SKILL_COMMAND,
+      replacement: "wukong ",
+      applied: "wukong ",
+      optional: !SKILLS_WITH_COMMANDS.has(entry.name),
+    }));
   return [
     ...i18n,
+    ...skills,
     {
       file: "packages/app/public/manifest.json",
       pattern: /"(name|short_name)": "Paseo"/gu,
@@ -105,10 +132,13 @@ function applyTextRule(root, rule, dryRun, log) {
     // Already branded (a second run) is fine; a target that never had the name is not. A rule
     // for a file that already mentions Wukong in its own comments names what it adds in `applied`.
     if (rule.optional || text.includes(rule.applied ?? BRAND)) return;
-    throw new Error(`Brand rule found nothing to replace in ${rule.file} (${rule.pattern})`);
+    throw new Error(
+      `Brand rule found nothing to replace in ${rule.file} (${rule.pattern})`
+    );
   }
   log(`text    ${rule.file} (${matches})`);
-  if (!dryRun) writeFileSync(target, text.replace(rule.pattern, rule.replacement));
+  if (!dryRun)
+    writeFileSync(target, text.replace(rule.pattern, rule.replacement));
 }
 
 function applyOverlay(root, relative, dryRun, log) {
@@ -118,13 +148,15 @@ function applyOverlay(root, relative, dryRun, log) {
   const guard = GUARDED_OVERLAYS[relative.split(path.sep).join("/")];
   const isNewFile = relative.endsWith("wukong-logo-geometry.ts");
   if (!isNewFile && !existsSync(target)) {
-    throw new Error(`Brand overlay target is missing (renamed or removed upstream?): ${relative}`);
+    throw new Error(
+      `Brand overlay target is missing (renamed or removed upstream?): ${relative}`
+    );
   }
   if (guard && existsSync(target)) {
     const current = sha256(readFileSync(target));
     if (current !== guard && current !== sha256(replacement)) {
       throw new Error(
-        `Upstream changed ${relative}. Review the change, update wukong/brand/files and the hash in brand.mjs.`,
+        `Upstream changed ${relative}. Review the change, update wukong/brand/files and the hash in brand.mjs.`
       );
     }
   }
@@ -141,7 +173,9 @@ function ensureWukongBin(root, dryRun, log) {
   const file = path.join(root, "packages/cli/package.json");
   const manifest = JSON.parse(readFileSync(file, "utf8"));
   if (!manifest.bin?.paseo && !manifest.bin?.wukong) {
-    throw new Error("packages/cli/package.json has no `paseo` bin to replace with `wukong`");
+    throw new Error(
+      "packages/cli/package.json has no `paseo` bin to replace with `wukong`"
+    );
   }
   if (!existsSync(path.join(root, "packages/cli/bin/wukong"))) {
     throw new Error("packages/cli/bin/wukong is missing");
@@ -155,17 +189,32 @@ function ensureWukongBin(root, dryRun, log) {
   }
 }
 
-export function applyBrand({ root = REPO_ROOT, dryRun = false, log = () => {} } = {}) {
+export function applyBrand({
+  root = REPO_ROOT,
+  dryRun = false,
+  log = () => {},
+} = {}) {
   for (const rule of textRules(root)) applyTextRule(root, rule, dryRun, log);
-  for (const relative of listOverlayFiles()) applyOverlay(root, relative, dryRun, log);
+  for (const relative of listOverlayFiles())
+    applyOverlay(root, relative, dryRun, log);
   ensureWukongBin(root, dryRun, log);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   const args = process.argv.slice(2);
   const rootIndex = args.indexOf("--root");
-  const root = rootIndex === -1 ? REPO_ROOT : path.resolve(args[rootIndex + 1] ?? "");
+  const root =
+    rootIndex === -1 ? REPO_ROOT : path.resolve(args[rootIndex + 1] ?? "");
   const dryRun = args.includes("--dry-run");
-  applyBrand({ root, dryRun, log: (line) => process.stdout.write(`${line}\n`) });
-  process.stdout.write(`${dryRun ? "Checked" : "Applied"} the ${BRAND} brand in ${root}\n`);
+  applyBrand({
+    root,
+    dryRun,
+    log: (line) => process.stdout.write(`${line}\n`),
+  });
+  process.stdout.write(
+    `${dryRun ? "Checked" : "Applied"} the ${BRAND} brand in ${root}\n`
+  );
 }

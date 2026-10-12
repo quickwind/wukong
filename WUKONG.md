@@ -126,6 +126,12 @@ you add one, add it to the table below. `rg "Wukong:"` finds every marker.
   a server whose name it has seen before; a rename fix was tried and dropped as it helps only where
   MCP is allowed (it is in git history, commit `f7cec3d70`). Wukong homes default
   `daemon.mcp.injectIntoAgents` to true, which serves Claude Code.
+  Two gaps the guide covers: an agent started or messaged from the CLI does not notify its caller when
+  it finishes (only the MCP tools arm that; verified, the child's `ParentAgentId` is set but no message
+  comes back), so Devin is told to wait or to ask the agent to `wukong send` its answer back; and the
+  skills Paseo installs for agents name MCP tools, so Devin is told to map them to `wukong` commands.
+  `brand.mjs` rewrites `paseo <command>` to `wukong <command>` in those skills at pack time, since
+  Wukong ships no `paseo` command. Paseo's `browser_*` tools have no CLI, so Devin has none.
 - **Providers:** removed from the registry, not merely disabled. Terminal profiles are fixed to
   Claude Code. The Providers page and Add provider catalog are hidden.
 - **Plugins:** local folders only. npm, Git and registry sources are switched off because they run

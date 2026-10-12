@@ -64,6 +64,12 @@ export function paseoCommandLineGuide(agentId?: string): string {
     "- `wukong logs <id> --tail 20`: read what an agent has done and said lately",
     "- `wukong wait <id>`: wait until an agent is idle",
     '- `wukong run --provider <provider> --title <title> "<task>"`: start a new agent on a task',
+    "You are not told when an agent you started or messaged finishes. To get its answer, leave out " +
+      "--no-wait (the command returns when the agent is done), or for long work ask it in the message " +
+      "to report back with `wukong send <your ID> ...` when it is finished.",
+    "A skill or instruction that names Paseo tools (list_agents, create_agent, send_agent_prompt, " +
+      "get_agent_activity, wait_for_agent, list_profiles, ...) means these commands: use `wukong --help` " +
+      "and `wukong <command> --help` to find the matching one. Write `wukong`, never `paseo`.",
     "Pass the message straight on the command line; do not write it to a file in the project. Keep it on " +
       "one line and avoid double quotes inside it. Only if it truly needs line breaks or quotes, write it " +
       "to a file in the system temp folder (not the project), pass --prompt-file, and delete the file after.",

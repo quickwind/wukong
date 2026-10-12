@@ -180,6 +180,9 @@ describe("Devin system prompt delivery", () => {
       expect(guide).not.toContain("--prompt-file <file>");
       expect(guide).toContain("a1b2c3d4-0000");
       expect(guide).toContain("PASEO_AGENT_ID");
+      expect(guide).toContain("create_agent");
+      expect(guide).toContain("never `paseo`");
+      expect(guide).toContain("report back");
     });
 
     it("still reads well when the agent's ID is not known yet", () => {
