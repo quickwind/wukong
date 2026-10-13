@@ -126,6 +126,11 @@ you add one, add it to the table below. `rg "Wukong:"` finds every marker.
   a server whose name it has seen before; a rename fix was tried and dropped as it helps only where
   MCP is allowed (it is in git history, commit `f7cec3d70`). Wukong homes default
   `daemon.mcp.injectIntoAgents` to true, which serves Claude Code.
+  On Windows a quoted message run by Devin (`wukong send <id> "What are you doing?"`) reached the CLI cut at
+  the spaces with the quote marks still on, so the receiver got `"What`. `bin/wukong` now passes the
+  arguments through `mendSplitQuotedArgs` (`packages/cli/src/wukong/argv.ts`), which joins an opening
+  quote and its later closing quote back into one message. The cause on the Windows side (which shell
+  Devin runs commands in) is not known; only the symptom is handled.
   Two gaps the guide covers: an agent started or messaged from the CLI does not notify its caller when
   it finishes (only the MCP tools arm that; verified, the child's `ParentAgentId` is set but no message
   comes back), so Devin is told to wait or to ask the agent to `wukong send` its answer back; and the

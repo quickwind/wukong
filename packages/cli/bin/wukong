@@ -1,5 +1,7 @@
 #!/usr/bin/env -S node --disable-warning=DEP0040
+import { mendSplitQuotedArgs } from "../dist/wukong/argv.js";
 import { applyWukongDefaults } from "../dist/wukong/defaults.js";
 
+process.argv = [...process.argv.slice(0, 2), ...mendSplitQuotedArgs(process.argv.slice(2))];
 applyWukongDefaults();
 await import("../dist/index.js");
