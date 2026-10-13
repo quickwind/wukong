@@ -86,3 +86,30 @@ export const pollPickFolderRpc = defineRpc({
     error: z.string().nullable(),
   }),
 });
+
+export const FolderShortcutSchema = z.object({ label: z.string(), path: z.string() });
+
+/**
+ * Lists the folders inside one folder on the machine the daemon runs on, for the Open folder
+ * screen. A browser cannot report a folder's real path, so the screen browses the disk through
+ * the daemon instead. On Windows the empty path lists the drives.
+ */
+export const listFoldersRpc = defineRpc({
+  name: "wukong.fs.list-folders",
+  /** Omit `path` to start in the home folder. */
+  input: z.object({ path: z.string().max(4096).optional() }),
+  output: z.object({
+    /** The folder listed; empty when the Windows drive list is shown. */
+    path: z.string(),
+    /** The folder above, or `null` at the top (a Windows drive list, or `/`). */
+    parent: z.string().nullable(),
+    folders: z.array(z.object({ name: z.string(), path: z.string() })),
+    shortcuts: z.array(FolderShortcutSchema),
+  }),
+});
+
+export const createFolderRpc = defineRpc({
+  name: "wukong.fs.create-folder",
+  input: z.object({ parent: z.string().min(1).max(4096), name: z.string().min(1).max(255) }),
+  output: z.object({ path: z.string() }),
+});

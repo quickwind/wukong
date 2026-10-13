@@ -153,8 +153,14 @@ you add one, add it to the table below. `rg "Wukong:"` finds every marker.
 - **Add project:** upstream's dialog is kept (search a directory, New directory). Its GitHub entry
   becomes Clone from GitLab, which opens the plugin screen with search, Clone and Fork clone
   (fork, wait, clone your fork, add `upstream`; shown for any project outside your namespace) and
-  a progress dialog. **Open folder** pops the OS folder dialog from the daemon because a browser
-  cannot learn a real path. Plugin RPCs time out after 30 s, so long jobs are start + poll.
+  a progress dialog. **Open folder** shows an in-app folder dialog (`app/wukong/folder-picker-dialog.tsx`, mounted in
+  `add-project-flow.tsx`) that browses the disk through the daemon (`wukong.fs.list-folders`,
+  `wukong.fs.create-folder`), because a browser cannot learn a real path. The OS folder dialog it
+  replaced (`pick-folder.ts`) started slowly, was the old tree-style one on Windows, and needs
+  PowerShell, which company policy may restrict; it is kept but no longer reached. The dialog
+  is drawn inside Add project's own modal on purpose: Add project is a react-native-web `Modal` that
+  traps focus, and a dialog in the app's overlay root (`AdaptiveModalSheet`, a second `Modal`) makes
+  the two pull focus back and forth forever and freezes the page. Plugin RPCs time out after 30 s, so long jobs are start + poll.
 - **Devin usage** (`plugins/wukong-devin-usage`): Devin has no public per-member quota API. The
   plugin makes the call the CLI's `/usage` makes (`GetUserStatus`, from the host in the CLI's own
   `credentials.toml`) and sends the key only to an allowlisted https host. The allowlist exists in

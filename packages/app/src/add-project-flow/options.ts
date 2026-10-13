@@ -47,7 +47,7 @@ export function buildAddProjectMethods(host: AddProjectHost): AddProjectMethodOp
       id: "browse",
       label: WUKONG_BUILD ? "Open folder" : "Browse", // Wukong
       description: WUKONG_BUILD
-        ? "Choose a folder with the system dialog"
+        ? "Browse and choose a folder"
         : "Choose or create a directory in Finder",
     });
   }

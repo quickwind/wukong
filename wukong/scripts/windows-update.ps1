@@ -6,6 +6,7 @@
 #
 # The steps, in order:
 #   1. wukong daemon stop    Windows locks the files of a running daemon, so stop it first.
+#                            Skipped when wukong is not installed or the daemon is not running.
 #   2. npm uninstall -g ...  Removes the old seven packages so no old files are left behind.
 #   3. npm install -g ...    All seven tarballs together, so npm never fetches upstream packages.
 #   4. wukong daemon start   Starts the daemon hidden in the background and returns.
@@ -20,27 +21,83 @@ param(
 $ErrorActionPreference = "Stop"
 $packages = "cli", "server", "client", "protocol", "relay", "plugin", "highlight"
 
-$files = @(Get-ChildItem -Path $Path -Filter "wukong-*.tgz" | ForEach-Object { $_.FullName })
+# Only the seven packages, and one file for each. A folder such as ~/wukong-dist also holds other
+# wukong-*.tgz files (a plugin bundle, say), and a folder an earlier bundle was unzipped into holds
+# older builds of the same packages; the newest of each package is the one installed.
+$files = @(
+  foreach ($package in $packages) {
+    Get-ChildItem -Path $Path -Filter "wukong-$package-*.tgz" |
+      Where-Object { $_.Name -match "^wukong-$package-\d" } |
+      Sort-Object -Property LastWriteTime -Descending |
+      Select-Object -First 1 -ExpandProperty FullName
+  }
+)
 if ($files.Count -ne $packages.Count) {
-  throw "Expected $($packages.Count) wukong-*.tgz files in '$Path' (one per package), found $($files.Count). All seven must be installed together."
+  $missing = $packages | Where-Object { -not ($files -match "wukong-$_-\d") }
+  throw "Expected one wukong-<package>-<version>.tgz for each of $($packages -join ', ') in '$Path'. Missing: $($missing -join ', '). All seven must be installed together."
 }
 
 function Step([string]$Title, [scriptblock]$Action, [switch]$MayFail) {
   Write-Host "==> $Title"
   if ($DryRun) { return }
-  & $Action
-  if ($LASTEXITCODE -ne 0 -and -not $MayFail) { throw "'$Title' failed (exit code $LASTEXITCODE)" }
+  # A native command that writes to stderr (a daemon that is not running says so there) is an
+  # error under "Stop" in Windows PowerShell 5.1, and a missing command is one in any version. A
+  # step that may fail must survive both; the other steps must report them.
+  $previous = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
   $global:LASTEXITCODE = 0
+  try {
+    & $Action
+    $failed = $LASTEXITCODE -ne 0
+    $reason = "exit code $LASTEXITCODE"
+  } catch {
+    $failed = $true
+    $reason = $_.Exception.Message
+  } finally {
+    $ErrorActionPreference = $previous
+  }
+  $global:LASTEXITCODE = 0
+  if ($failed -and $MayFail) { Write-Host "    (skipped: $reason)" }
+  elseif ($failed) { throw "'$Title' failed ($reason)" }
 }
 
-# Nothing is running or installed on a first install, so these two may fail without stopping us.
-Step "wukong daemon stop" { wukong daemon stop } -MayFail
+function Has([string]$Command) { [bool](Get-Command $Command -ErrorAction SilentlyContinue) }
+
+if (-not (Has "npm")) {
+  throw "npm was not found. Install Node.js first (see INSTALL-WINDOWS.md), then open a new PowerShell window."
+}
+
+# First install, or Wukong already uninstalled: there is no command to stop a daemon with, and
+# nothing to uninstall. A daemon that is still running without its command would keep Windows
+# from replacing its files, so say so rather than fail later with an obscure npm error.
+if (Has "wukong") {
+  Step "wukong daemon stop" { wukong daemon stop } -MayFail
+} else {
+  Write-Host "==> wukong is not installed; nothing to stop"
+  $listener = $null
+  try {
+    $listener = Get-NetTCPConnection -LocalPort 6899 -State Listen -ErrorAction Stop |
+      Select-Object -First 1
+  } catch {
+    # Nothing listens there, or the check is unavailable: either way there is nothing to warn about.
+  }
+  if ($listener) {
+    Write-Warning "Something is listening on port 6899 (process id $($listener.OwningProcess)), probably an old Wukong daemon whose command is gone. If the install below fails with EBUSY or EPERM, stop it: Stop-Process -Id $($listener.OwningProcess)"
+  }
+}
 Step "npm uninstall -g (old packages)" {
   npm uninstall -g ($packages | ForEach-Object { "@wukong/$_" })
 } -MayFail
 
 $env:ONNXRUNTIME_NODE_INSTALL = "skip"
 Step "npm install -g ($($files.Count) tarballs)" { npm install -g $files }
+
+# npm's global folder is on PATH for most Node.js installs, but not for every one; on a first
+# install this is where it shows.
+if (-not $DryRun -and -not (Has "wukong")) {
+  $prefix = (npm prefix -g).Trim()
+  throw "Installed, but the wukong command is not on PATH. Add '$prefix' to your PATH (or open a new PowerShell window), then run: wukong daemon start"
+}
 Step "wukong --version" { wukong --version }
 Step "wukong daemon start" { wukong daemon start }
 

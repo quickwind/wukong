@@ -2,6 +2,8 @@ import type { PluginServerContext } from "@getpaseo/plugin/server";
 import {
   pollCloneRpc,
   pollPickFolderRpc,
+  createFolderRpc,
+  listFoldersRpc,
   searchProjectsRpc,
   startCloneRpc,
   startPickFolderRpc,
@@ -9,6 +11,7 @@ import {
 } from "./shared/rpc.js";
 import { pickFolder } from "./server/pick-folder.js";
 import { createFolderPickerSessions } from "./server/pick-folder-sessions.js";
+import { createFolder, listFolders } from "./server/list-folders.js";
 import { createJobs } from "./server/jobs.js";
 import { runClone, search } from "./server/projects.js";
 
@@ -29,6 +32,8 @@ const cloneJobs = createJobs<CloneResult>();
 
 export default function contribute(server: PluginServerContext) {
   server.handle(searchProjectsRpc, search);
+  server.handle(listFoldersRpc, ({ path }) => listFolders(path));
+  server.handle(createFolderRpc, ({ parent, name }) => createFolder(parent, name));
   server.handle(startCloneRpc, (input) => ({
     id: cloneJobs.start((report) => runClone(input, report), "Starting…"),
   }));

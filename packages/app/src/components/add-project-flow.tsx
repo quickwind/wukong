@@ -82,7 +82,8 @@ import { useIsLocalDaemon, useLocalDaemonServerId } from "@/hooks/use-is-local-d
 import { useCloneGithubProject, useOpenProject } from "@/hooks/use-open-project";
 import { WUKONG_BUILD } from "@/wukong/build"; // Wukong
 import { useOpenGitLabProjects } from "@/wukong/open-gitlab-projects"; // Wukong
-import { pickDirectoryOnDaemon } from "@/wukong/pick-directory"; // Wukong
+import { FolderPickerHost } from "@/wukong/folder-picker-dialog"; // Wukong
+import { pickFolderInDialog } from "@/wukong/folder-picker"; // Wukong
 import {
   OverlayLayerProvider,
   useGlobalWebOverlayLayer,
@@ -515,7 +516,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
     if (!hostId || (!isLocalDaemon && !WUKONG_BUILD) || browseInFlightRef.current) return; // Wukong
     browseInFlightRef.current = true;
     try {
-      const path = WUKONG_BUILD ? await pickDirectoryOnDaemon(client) : await pickDirectory(); // Wukong
+      const path = WUKONG_BUILD ? await pickFolderInDialog(client) : await pickDirectory(); // Wukong
       if (path) await openAddedProject(path, "method");
     } catch {
       setState((current) =>
@@ -968,6 +969,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
             <FlowHint keys={ESCAPE_HINT_KEYS} action={state.pages.length > 1 ? "Back" : "Close"} />
           </View>
         </View>
+        {WUKONG_BUILD ? <FolderPickerHost /> : null}
       </View>
     </Modal>
   );
