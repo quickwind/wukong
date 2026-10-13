@@ -288,8 +288,8 @@ export function HostAgentsPage({ serverId }: { serverId: string }) {
     <View>
       {isConnected ? (
         <SettingsSection title={t("settings.hostSections.agents")}>
-          <InjectPaseoToolsCard serverId={serverId} />
-          <BrowserToolsOptInCard serverId={serverId} />
+          <OfferedInjectPaseoToolsCard serverId={serverId} />
+          <OfferedBrowserToolsOptInCard serverId={serverId} />
           <AppendSystemPromptCard serverId={serverId} />
         </SettingsSection>
       ) : (
@@ -297,7 +297,7 @@ export function HostAgentsPage({ serverId }: { serverId: string }) {
           <Text style={styles.emptyText}>{t("settings.host.agents.unavailable")}</Text>
         </View>
       )}
-      <AgentSkillsSection serverId={serverId} />
+      <OfferedAgentSkillsSection serverId={serverId} />
       <AgentProfilesSection serverId={serverId} />
     </View>
   );
@@ -380,7 +380,7 @@ export function HostSettingsPage({
 
       {!isLocalDaemon ? <OfferedUpdateDaemonCard key={host.serverId} host={host} /> : null}
 
-      <RemoveHostSection host={host} isLocalDaemon={isLocalDaemon} onRemoved={onHostRemoved} />
+      <RemoveHost host={host} isLocalDaemon={isLocalDaemon} onRemoved={onHostRemoved} />
     </View>
   );
 }
@@ -861,6 +861,10 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
 }
 
 const OfferedUpdateDaemonCard = upstreamOnly(UpdateDaemonCard); // Wukong: no self-update
+// Wukong: the agent tools and skills are fixed by its config, and the host cannot be removed.
+const OfferedInjectPaseoToolsCard = upstreamOnly(InjectPaseoToolsCard);
+const OfferedBrowserToolsOptInCard = upstreamOnly(BrowserToolsOptInCard);
+const OfferedAgentSkillsSection = upstreamOnly(AgentSkillsSection);
 
 function InjectPaseoToolsCard({ serverId }: { serverId: string }) {
   const { t } = useTranslation();
@@ -1313,6 +1317,8 @@ function RemoveHostSection({
 // ---------------------------------------------------------------------------
 // Terminal Profiles
 // ---------------------------------------------------------------------------
+
+const RemoveHost = upstreamOnly(RemoveHostSection); // Wukong
 
 function generateProfileId(): string {
   return `profile_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
