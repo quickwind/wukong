@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { FolderDialog } from "./folder-dialog.js";
 import {
   pollCloneRpc,
   searchProjectsRpc,
@@ -322,6 +323,7 @@ export function AddFromGitLabScreen({ theme, layout }: PluginScreenProps) {
   const [query, setQuery] = useState("");
   const [folder, setFolder] = useState("");
   const [localFolder, setLocalFolder] = useState("");
+  const [browsing, setBrowsing] = useState(false);
   const debouncedQuery = useDebounced(query);
   const paseo = usePaseo();
 
@@ -336,6 +338,16 @@ export function AddFromGitLabScreen({ theme, layout }: PluginScreenProps) {
   const openLocal = useMutation({
     mutationFn: async (directory: string) => (await paseo.workspaces.open(directory)).directory,
   });
+  const openBrowsed = useCallback(
+    (directory: string) => {
+      setBrowsing(false);
+      setLocalFolder(directory);
+      openLocal.mutate(directory);
+    },
+    [openLocal],
+  );
+  const startBrowsing = useCallback(() => setBrowsing(true), []);
+  const stopBrowsing = useCallback(() => setBrowsing(false), []);
   const openLocalFolder = useCallback(() => {
     const directory = localFolder.trim();
     if (directory) openLocal.mutate(directory);
@@ -389,6 +401,18 @@ export function AddFromGitLabScreen({ theme, layout }: PluginScreenProps) {
       >
         <Text style={styles.buttonText}>Open folder</Text>
       </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Browse for a local folder"
+        style={styles.secondaryButton}
+        disabled={openLocal.isPending}
+        onPress={startBrowsing}
+      >
+        <Text style={styles.secondaryButtonText}>Browse…</Text>
+      </Pressable>
+      {browsing ? (
+        <FolderDialog theme={theme} onSelect={openBrowsed} onClose={stopBrowsing} />
+      ) : null}
       {openLocal.error ? <Text style={styles.error}>{messageOf(openLocal.error)}</Text> : null}
       {openLocal.data ? <Text style={styles.success}>Opened {openLocal.data}</Text> : null}
 
