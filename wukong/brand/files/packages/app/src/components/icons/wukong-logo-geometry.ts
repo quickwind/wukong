@@ -1,33 +1,31 @@
-// Internal edition: the Wukong line-art head (hair tufts, headband, ears, peach-shaped
-// face, eyes) on a 700×700 canvas. The logo component and the web splash mask both
-// draw from these paths so the mark is defined once.
+// Internal edition: the Wukong line-art head (spiky flame hair, double-curl
+// golden circlet, ears, peach-shaped face) on a 512×512 canvas.
+// The logo component and splash mask draw from these paths so the mark is defined once.
 
-export const WUKONG_LOGO_VIEWBOX = "0 0 700 700";
-export const WUKONG_LOGO_STROKE_WIDTH = 34;
+export const WUKONG_LOGO_VIEWBOX = "0 0 512 512";
+export const WUKONG_LOGO_STROKE_WIDTH = 32;
 
 export const WUKONG_LOGO_STROKE_PATHS: readonly string[] = [
-  // Ears
-  "M160 360 C112 346 96 381 96 409 C96 439 116 472 160 460",
-  "M540 360 C588 346 604 381 604 409 C604 439 584 472 540 460",
-  // Head with flame-like hair tufts
-  "M170 300 C172 232 204 186 258 166 L290 112 L330 160 L350 92 L370 160 L410 112 L442 166 C496 186 528 232 530 300 C540 330 540 360 540 386 C540 524 454 610 350 610 C246 610 160 524 160 386 C160 360 160 330 170 300 Z",
-  // Headband
-  "M170 300 C246 252 454 252 530 300",
-  // Peach-shaped face
-  "M350 350 C328 318 254 314 244 374 C236 426 268 454 270 496 C272 552 312 580 350 580 C388 580 428 552 430 496 C432 454 464 426 456 374 C446 314 372 318 350 350 Z",
+  // Left ear
+  "M 62 295 A 46 46 0 1 0 154 295 A 46 46 0 1 0 62 295",
+  // Right ear
+  "M 358 295 A 46 46 0 1 0 450 295 A 46 46 0 1 0 358 295",
+  // 5-spike flame hair
+  "M 140 225 L 168 150 L 198 190 L 227 120 L 256 180 L 285 120 L 314 190 L 344 150 L 372 225",
+  // Head & chin silhouette
+  "M 140 225 C 130 320, 160 415, 215 442 C 235 452, 277 452, 297 442 C 352 415, 382 320, 372 225",
+  // Headband left curl
+  "M 125 236 Q 185 222, 222 220 C 234 192, 251 182, 254 202 C 255 214, 245 222, 236 218",
+  // Headband right curl
+  "M 387 236 Q 327 222, 290 220 C 278 192, 261 182, 258 202 C 257 214, 267 222, 276 218",
+  // Peach face mask contour
+  "M 256 250 C 236 220, 182 226, 178 285 C 174 340, 224 395, 256 410 C 288 395, 338 340, 334 285 C 330 226, 276 220, 256 250 Z",
 ];
 
-export const WUKONG_LOGO_EYES: readonly { cx: number; cy: number; r: number }[] = [
-  { cx: 302, cy: 410, r: 17 },
-  { cx: 398, cy: 410, r: 17 },
-];
+export const WUKONG_LOGO_EYES: readonly { cx: number; cy: number; r: number }[] = [];
 
 /** Standalone SVG markup, for CSS masks and data URIs. */
 export function wukongLogoSvgMarkup(input: { size: number; color: string }): string {
   const strokes = WUKONG_LOGO_STROKE_PATHS.map((d) => `<path d='${d}'/>`).join("");
-  const eyes = WUKONG_LOGO_EYES.map(
-    (eye) =>
-      `<circle cx='${eye.cx}' cy='${eye.cy}' r='${eye.r}' fill='${input.color}' stroke='none'/>`,
-  ).join("");
-  return `<svg xmlns='http://www.w3.org/2000/svg' width='${input.size}' height='${input.size}' viewBox='${WUKONG_LOGO_VIEWBOX}' fill='none' stroke='${input.color}' stroke-width='${WUKONG_LOGO_STROKE_WIDTH}' stroke-linecap='round' stroke-linejoin='round'>${strokes}${eyes}</svg>`;
+  return `<svg xmlns='http://www.w3.org/2000/svg' width='${input.size}' height='${input.size}' viewBox='${WUKONG_LOGO_VIEWBOX}' fill='none' stroke='${input.color}' stroke-width='${WUKONG_LOGO_STROKE_WIDTH}' stroke-linecap='round' stroke-linejoin='round'>${strokes}</svg>`;
 }

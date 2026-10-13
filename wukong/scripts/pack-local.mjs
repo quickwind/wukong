@@ -167,6 +167,21 @@ export function main(argv) {
     cwd: repo,
   });
 
+  // Copy uncommitted changes from the working tree so local adjustments (such as brand assets)
+  // are included in the local package build.
+  const modifiedLines = capture("git", ["status", "--porcelain"], { cwd: repo })
+    .split(/\r?\n/u)
+    .filter(Boolean);
+  for (const line of modifiedLines) {
+    const rel = line.slice(3).trim();
+    const src = path.join(repo, rel);
+    const dest = path.join(work, rel);
+    if (existsSync(src)) {
+      mkdirSync(path.dirname(dest), { recursive: true });
+      cpSync(src, dest, { force: true, recursive: true });
+    }
+  }
+
   try {
     const env = { ...process.env, EXPO_PUBLIC_WUKONG: "1", ONNXRUNTIME_NODE_INSTALL: "skip" };
     const node = process.execPath;
