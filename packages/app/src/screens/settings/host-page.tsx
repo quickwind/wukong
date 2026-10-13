@@ -380,7 +380,7 @@ export function HostSettingsPage({
 
       {!isLocalDaemon ? <OfferedUpdateDaemonCard key={host.serverId} host={host} /> : null}
 
-      <RemoveHost host={host} isLocalDaemon={isLocalDaemon} onRemoved={onHostRemoved} />
+      <RemoveHostSection host={host} isLocalDaemon={isLocalDaemon} onRemoved={onHostRemoved} />
     </View>
   );
 }
@@ -861,7 +861,7 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
 }
 
 const OfferedUpdateDaemonCard = upstreamOnly(UpdateDaemonCard); // Wukong: no self-update
-// Wukong: the agent tools and skills are fixed by its config, and the host cannot be removed.
+// Wukong: the agent tools and skills are fixed by its config.
 const OfferedInjectPaseoToolsCard = upstreamOnly(InjectPaseoToolsCard);
 const OfferedBrowserToolsOptInCard = upstreamOnly(BrowserToolsOptInCard);
 const OfferedAgentSkillsSection = upstreamOnly(AgentSkillsSection);
@@ -1248,7 +1248,8 @@ function RemoveHostSection({
     >
       <RestartDaemonCard host={host} />
 
-      <View style={settingsStyles.card}>
+      <View style={WUKONG_BUILD ? HIDDEN_ROW_STYLE : settingsStyles.card}>
+        {/* Wukong: no Remove host */}
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
             <Text style={settingsStyles.rowTitle}>
@@ -1317,8 +1318,6 @@ function RemoveHostSection({
 // ---------------------------------------------------------------------------
 // Terminal Profiles
 // ---------------------------------------------------------------------------
-
-const RemoveHost = upstreamOnly(RemoveHostSection); // Wukong
 
 function generateProfileId(): string {
   return `profile_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;

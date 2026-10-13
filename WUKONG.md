@@ -74,25 +74,25 @@ you add one, add it to the table below. `rg "Wukong:"` finds every marker.
 `upstream-footprint.mjs` is the source of truth; this is the why. Paths are under `packages/`
 (`server/src/...`, `app/src/...`) unless they start with `CLAUDE.md`.
 
-| File                                                                                                                       | Why                                                                                   |
-| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `CLAUDE.md` (`AGENTS.md` links to it)                                                                                      | One line at the top pointing agents here                                              |
-| `server/daemon-worker.ts`                                                                                                  | Imports the edition entry first (egress guard, policy)                                |
-| `server/config.ts`                                                                                                         | Terminal profiles fixed to Claude Code                                                |
-| `server/session.ts`                                                                                                        | Clone requests only from the company GitLab                                           |
-| `server/agent/provider-registry.ts`                                                                                        | Restrict to Claude and Devin; Devin as configured ACP, with Wukong's Devin client     |
-| `server/plugins/index.ts`                                                                                                  | No managed sources; only Wukong's bundled plugins                                     |
-| `server/plugins/compiler.ts`                                                                                               | Lets plugins written for `@getpaseo/plugin` build here                                |
-| `server/services/forge-registry.ts`                                                                                        | GitLab is the only forge                                                              |
-| `server/scripts/supervisor.ts`                                                                                             | `windowsHide` so Windows shows no daemon console window                               |
-| `server/session/daemon/daemon-self-updater.ts`                                                                             | Refuses "Update daemon": it would install upstream's packages from npm                |
-| `app/screens/settings/host-page.tsx`                                                                                       | Hides Update daemon, the agent tools, browser tools and skills cards, and Remove host |
-| `app/add-project-flow/options.ts`, `components/add-project-flow.tsx`                                                       | "Clone from GitLab" in place of GitHub                                                |
-| `app/components/sidebar/sidebar-help-menu.tsx`, `community-links.tsx`, `changelog/.../changelog-source.ts`                 | No upstream links, no What's new request                                              |
-| `app/components/add-host-method-modal.tsx`                                                                                 | No pairing-link option (it reaches the public relay)                                  |
-| `app/composer/input-mode.ts`                                                                                               | No dictation or voice mode                                                            |
-| `app/screens/settings-screen.tsx`, `settings/host-page.tsx`, `settings/providers-section.tsx`, `settings/plugins-page.tsx` | No pairing, locked providers and terminal profiles, local-folder plugin text          |
-| `app/usage/queries.ts`                                                                                                     | Pinned usage re-reads on a timer (Wukong builds only)                                 |
+| File                                                                                                                       | Why                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `CLAUDE.md` (`AGENTS.md` links to it)                                                                                      | One line at the top pointing agents here                                                                     |
+| `server/daemon-worker.ts`                                                                                                  | Imports the edition entry first (egress guard, policy)                                                       |
+| `server/config.ts`                                                                                                         | Terminal profiles fixed to Claude Code                                                                       |
+| `server/session.ts`                                                                                                        | Clone requests only from the company GitLab                                                                  |
+| `server/agent/provider-registry.ts`                                                                                        | Restrict to Claude and Devin; Devin as configured ACP, with Wukong's Devin client                            |
+| `server/plugins/index.ts`                                                                                                  | No managed sources; only Wukong's bundled plugins                                                            |
+| `server/plugins/compiler.ts`                                                                                               | Lets plugins written for `@getpaseo/plugin` build here                                                       |
+| `server/services/forge-registry.ts`                                                                                        | GitLab is the only forge                                                                                     |
+| `server/scripts/supervisor.ts`                                                                                             | `windowsHide` so Windows shows no daemon console window                                                      |
+| `server/session/daemon/daemon-self-updater.ts`                                                                             | Refuses "Update daemon": it would install upstream's packages from npm                                       |
+| `app/screens/settings/host-page.tsx`                                                                                       | Hides Update daemon, the agent tools, browser tools and skills cards, and Remove host (Restart daemon stays) |
+| `app/add-project-flow/options.ts`, `components/add-project-flow.tsx`                                                       | "Clone from GitLab" in place of GitHub                                                                       |
+| `app/components/sidebar/sidebar-help-menu.tsx`, `community-links.tsx`, `changelog/.../changelog-source.ts`                 | No upstream links, no What's new request                                                                     |
+| `app/components/add-host-method-modal.tsx`                                                                                 | No pairing-link option (it reaches the public relay)                                                         |
+| `app/composer/input-mode.ts`                                                                                               | No dictation or voice mode                                                                                   |
+| `app/screens/settings-screen.tsx`, `settings/host-page.tsx`, `settings/providers-section.tsx`, `settings/plugins-page.tsx` | No pairing, locked providers and terminal profiles, local-folder plugin text                                 |
+| `app/usage/queries.ts`                                                                                                     | Pinned usage re-reads on a timer (Wukong builds only)                                                        |
 
 ## Design decisions, and why
 
