@@ -22,7 +22,7 @@ import {
   DEFAULT_TERMINAL_PROFILES,
 } from "@getpaseo/protocol/terminal-profiles";
 import { AgentProfilesSection } from "@/agent-profiles";
-import { HIDDEN_ROW_STYLE, WUKONG_BUILD } from "@/wukong/build"; // Wukong
+import { HIDDEN_ROW_STYLE, upstreamOnly, WUKONG_BUILD } from "@/wukong/build"; // Wukong
 import { AgentSkillsSection } from "@/agent-skills";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { SettingsTextAreaCard } from "@/components/settings-textarea";
@@ -378,7 +378,7 @@ export function HostSettingsPage({
 
       {isLocalDaemon ? <LocalDaemonSection /> : null}
 
-      {!isLocalDaemon ? <UpdateDaemonCard key={host.serverId} host={host} /> : null}
+      {!isLocalDaemon ? <OfferedUpdateDaemonCard key={host.serverId} host={host} /> : null}
 
       <RemoveHostSection host={host} isLocalDaemon={isLocalDaemon} onRemoved={onHostRemoved} />
     </View>
@@ -859,6 +859,8 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
     </View>
   );
 }
+
+const OfferedUpdateDaemonCard = upstreamOnly(UpdateDaemonCard); // Wukong: no self-update
 
 function InjectPaseoToolsCard({ serverId }: { serverId: string }) {
   const { t } = useTranslation();

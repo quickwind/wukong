@@ -6,6 +6,7 @@ import {
   type DaemonInstallOriginRuntime,
 } from "./install-origin.js";
 import { npmGlobalPaseoCli, type NpmGlobalPaseoCli } from "./npm-global-cli.js";
+import { selfUpdateRefusal } from "../../../wukong/update-policy.js"; // Wukong
 
 export type DaemonSelfUpdatePhase = "starting" | "downloading" | "installing" | "complete";
 
@@ -56,6 +57,9 @@ export class DaemonSelfUpdater {
     if (input.desktopManaged) {
       return { success: false, error: DESKTOP_MANAGED_UPDATE_ERROR, newVersion: null };
     }
+
+    const refusal = selfUpdateRefusal(); // Wukong
+    if (refusal) return { success: false, error: refusal, newVersion: null }; // Wukong
 
     if (this.inProgress) {
       throw new DaemonSelfUpdateInProgressError();

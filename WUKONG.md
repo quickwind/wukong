@@ -85,6 +85,8 @@ you add one, add it to the table below. `rg "Wukong:"` finds every marker.
 | `server/plugins/compiler.ts`                                                                                               | Lets plugins written for `@getpaseo/plugin` build here                            |
 | `server/services/forge-registry.ts`                                                                                        | GitLab is the only forge                                                          |
 | `server/scripts/supervisor.ts`                                                                                             | `windowsHide` so Windows shows no daemon console window                           |
+| `server/session/daemon/daemon-self-updater.ts`                                                                             | Refuses "Update daemon": it would install upstream's packages from npm            |
+| `app/screens/settings/host-page.tsx`                                                                                       | Hides the Update daemon card                                                      |
 | `app/add-project-flow/options.ts`, `components/add-project-flow.tsx`                                                       | "Clone from GitLab" in place of GitHub                                            |
 | `app/components/sidebar/sidebar-help-menu.tsx`, `community-links.tsx`, `changelog/.../changelog-source.ts`                 | No upstream links, no What's new request                                          |
 | `app/components/add-host-method-modal.tsx`                                                                                 | No pairing-link option (it reaches the public relay)                              |
