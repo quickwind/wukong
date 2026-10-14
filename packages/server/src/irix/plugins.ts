@@ -14,7 +14,6 @@ export function irixManagedSources(
 }
 
 export const IRIX_BUILTIN_PLUGINS: readonly string[] = ["irix-gitlab", "irix-devin-usage"];
-export const WUKONG_BUILTIN_PLUGINS = IRIX_BUILTIN_PLUGINS;
 
 export function irixBuiltinPlugins(
   loader: BuiltinPluginLoader | undefined,
@@ -30,6 +29,3 @@ export function pluginSourcesUnavailableMessage(upstreamMessage: string): string
         "irix plugin install <folder>"
     : upstreamMessage;
 }
-
-export const wukongManagedSources = irixManagedSources;
-export const wukongBuiltinPlugins = irixBuiltinPlugins;

@@ -20,7 +20,7 @@ export function applyIrixEdition(): void {
   process.env.PASEO_DICTATION_ENABLED = "false";
   process.env.PASEO_VOICE_MODE_ENABLED = "false";
 
-  const allowedHosts = process.env.IRIX_ALLOWED_HOSTS ?? process.env.WUKONG_ALLOWED_HOSTS ?? "";
+  const allowedHosts = process.env.IRIX_ALLOWED_HOSTS ?? "";
   for (const host of allowedHosts.split(",")) {
     if (host.trim()) {
       allowEgressHost(host);
@@ -40,8 +40,6 @@ export function applyIrixEdition(): void {
     },
   });
 }
-
-export const applyWukongEdition = applyIrixEdition;
 
 // daemon-worker imports this module first so the policy is in force before upstream modules
 // (the forge registry builds itself at import time) are evaluated.

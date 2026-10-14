@@ -18,9 +18,6 @@ describe("Devin usage hosts", () => {
       "other.corp.example",
     ]);
     expect([...allowedHosts(env)].sort()).toEqual([...devinUsageHosts(env)].sort());
-
-    const fallbackEnv = { WUKONG_DEVIN_API_HOSTS: "devin.corp.example" };
-    expect(devinUsageHosts(fallbackEnv)).toEqual([...DEVIN_USAGE_HOSTS, "devin.corp.example"]);
   });
 
   it("lets the guard pass Devin's hosts and still block anything else", async () => {

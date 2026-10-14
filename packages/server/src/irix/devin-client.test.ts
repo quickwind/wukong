@@ -5,7 +5,6 @@ import type { AgentSession } from "../server/agent/agent-sdk-types.js";
 import { activateIrixPolicy } from "./policy.js";
 import {
   createIrixAcpClient,
-  createWukongAcpClient,
   DEVIN_COMMANDS_WAIT_MS,
   DevinACPAgentClient,
   hideInjectedInstructions,
@@ -91,12 +90,10 @@ describe("Devin system prompt delivery", () => {
       providerId: "devin",
     } as never;
     expect(createIrixAcpClient("devin", options)).toBeUndefined();
-    expect(createWukongAcpClient("devin", options)).toBeUndefined();
     const deactivate = activateIrixPolicy();
     try {
       const client = createIrixAcpClient("devin", options);
       expect(client).toBeInstanceOf(DevinACPAgentClient);
-      expect(createWukongAcpClient("devin", options)).toBeInstanceOf(DevinACPAgentClient);
       // Longer than upstream's 1.5 s, and a configured value would still win.
       expect(DEVIN_COMMANDS_WAIT_MS).toBeGreaterThan(1_500);
       expect(

@@ -200,7 +200,6 @@ export function main(argv) {
     const env = {
       ...process.env,
       EXPO_PUBLIC_IRIX: "1",
-      EXPO_PUBLIC_WUKONG: "1",
       ONNXRUNTIME_NODE_INSTALL: "skip",
     };
     const node = process.execPath;

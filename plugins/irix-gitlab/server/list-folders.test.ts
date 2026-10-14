@@ -17,7 +17,7 @@ function envFor(home: string, overrides: Partial<ListFoldersEnv> = {}): ListFold
 
 describe("listFolders", () => {
   it("lists only visible folders, sorted, with their full paths", async () => {
-    const root = mkdtempSync(path.join(tmpdir(), "wukong-folders-"));
+    const root = mkdtempSync(path.join(tmpdir(), "irix-folders-"));
     mkdirSync(path.join(root, "beta"));
     mkdirSync(path.join(root, "Alpha"));
     mkdirSync(path.join(root, ".hidden"));
@@ -34,7 +34,7 @@ describe("listFolders", () => {
   });
 
   it("starts in the home folder when no path is given", async () => {
-    const home = mkdtempSync(path.join(tmpdir(), "wukong-home-"));
+    const home = mkdtempSync(path.join(tmpdir(), "irix-home-"));
     expect((await listFolders(undefined, envFor(home))).path).toBe(home);
   });
 
@@ -43,7 +43,7 @@ describe("listFolders", () => {
   });
 
   it("rejects a missing path and a file", async () => {
-    const root = mkdtempSync(path.join(tmpdir(), "wukong-folders-"));
+    const root = mkdtempSync(path.join(tmpdir(), "irix-folders-"));
     writeFileSync(path.join(root, "file.txt"), "x");
     await expect(listFolders(path.join(root, "nope"), envFor(root))).rejects.toThrow();
     await expect(listFolders(path.join(root, "file.txt"), envFor(root))).rejects.toThrow(
@@ -82,14 +82,14 @@ describe("shortcutsFor", () => {
 
 describe("createFolder", () => {
   it("makes the folder and returns its path", async () => {
-    const root = mkdtempSync(path.join(tmpdir(), "wukong-new-"));
+    const root = mkdtempSync(path.join(tmpdir(), "irix-new-"));
     const made = await createFolder(root, "  fresh ");
     expect(made.path).toBe(path.join(root, "fresh"));
     expect((await listFolders(root, envFor(root))).folders.map((f) => f.name)).toEqual(["fresh"]);
   });
 
   it("refuses a name that exists, and one that is not a plain name", async () => {
-    const root = mkdtempSync(path.join(tmpdir(), "wukong-new-"));
+    const root = mkdtempSync(path.join(tmpdir(), "irix-new-"));
     await createFolder(root, "once");
     await expect(createFolder(root, "once")).rejects.toThrow(/already exists/);
     await expect(createFolder(root, "../escape")).rejects.toThrow();

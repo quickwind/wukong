@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { activateIrixPolicy } from "./policy.js";
-import { irixWindowsShell, wukongWindowsShell } from "./windows-shell.js";
+import { irixWindowsShell } from "./windows-shell.js";
 
 describe("irixWindowsShell", () => {
   let deactivate: (() => void) | undefined;
@@ -15,8 +15,6 @@ describe("irixWindowsShell", () => {
     deactivate = activateIrixPolicy();
     expect(irixWindowsShell({})).toBe("powershell");
     expect(irixWindowsShell({ IRIX_WINDOWS_SHELL: "CMD" })).toBe("cmd");
-    expect(irixWindowsShell({ WUKONG_WINDOWS_SHELL: "CMD" })).toBe("cmd");
     expect(irixWindowsShell({ IRIX_WINDOWS_SHELL: "bash" })).toBe("powershell");
-    expect(wukongWindowsShell({})).toBe("powershell");
   });
 });

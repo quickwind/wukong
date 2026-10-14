@@ -4,7 +4,7 @@ import { z } from "zod";
 import { normalizeHost, parseGitRemoteLocation } from "@getpaseo/protocol/git-remote";
 
 // Irix: the company's self-hosted GitLab is the only forge. Its location comes from
-// `irix.json` (or `wukong.json`) in the Irix/Paseo home (or IRIX_GITLAB_* / WUKONG_GITLAB_* variables),
+// `irix.json` in the Irix/Paseo home (or IRIX_GITLAB_* variables),
 // never from the checkout's remote, so a remote on any other host resolves to "no forge".
 
 const SSH_HOST_PATTERN = /^([a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)(?::(\d{1,5}))?$/iu;
@@ -75,7 +75,7 @@ export const GitLabForgeConfigSchema = z
       .array(z.string().min(1, "gitlab.command entries must not be empty"))
       .min(1, "gitlab.command must name an executable")
       .optional(),
-    // Read by the bundled GitLab plugin; accepted here so one wukong.json serves both.
+    // Read by the bundled GitLab plugin; accepted here so one irix.json serves both.
     cloneRoot: z.string().trim().min(1).optional(),
   })
   .strict();
@@ -138,20 +138,16 @@ export function parseGitLabProjectPath(
   return path.length > 0 ? path : null;
 }
 
-import { existsSync } from "node:fs";
-
 /**
- * Reads the GitLab location from `<home>/irix.json` (or `wukong.json`) (`{ "gitlab": { "url": ... } }`),
- * with IRIX_GITLAB_* / WUKONG_GITLAB_* taking precedence. Returns null
+ * Reads the GitLab location from `<home>/irix.json` (`{ "gitlab": { "url": ... } }`),
+ * with IRIX_GITLAB_* taking precedence. Returns null
  * when no GitLab is configured, which leaves the edition with no forge at all.
  */
 export function loadGitLabForgeConfig(
   paseoHome: string,
   env: NodeJS.ProcessEnv = process.env,
 ): GitLabForgeConfig | null {
-  const irixPath = join(paseoHome, "irix.json");
-  const wukongPath = join(paseoHome, "wukong.json");
-  const filePath = existsSync(irixPath) ? irixPath : wukongPath;
+  const filePath = join(paseoHome, "irix.json");
 
   let fileConfig: Record<string, unknown> = {};
   try {
@@ -167,10 +163,10 @@ export function loadGitLabForgeConfig(
       });
     }
   }
-  const command = (env.IRIX_GITLAB_COMMAND ?? env.WUKONG_GITLAB_COMMAND)?.trim();
-  const url = env.IRIX_GITLAB_URL ?? env.WUKONG_GITLAB_URL;
-  const sshHost = env.IRIX_GITLAB_SSH_HOST ?? env.WUKONG_GITLAB_SSH_HOST;
-  const configSection = env.IRIX_GITLAB_SECTION ?? env.WUKONG_GITLAB_SECTION;
+  const command = env.IRIX_GITLAB_COMMAND?.trim();
+  const url = env.IRIX_GITLAB_URL;
+  const sshHost = env.IRIX_GITLAB_SSH_HOST;
+  const configSection = env.IRIX_GITLAB_SECTION;
 
   const merged = {
     ...fileConfig,

@@ -72,8 +72,6 @@ if (-not (Has "npm")) {
 # from replacing its files, so say so rather than fail later with an obscure npm error.
 if (Has "irix") {
   Step "irix daemon stop" { irix daemon stop } -MayFail
-} elseif (Has "wukong") {
-  Step "wukong daemon stop (legacy)" { wukong daemon stop } -MayFail
 } else {
   Write-Host "==> irix is not installed; nothing to stop"
   $listener = $null
@@ -89,7 +87,6 @@ if (Has "irix") {
 }
 Step "npm uninstall -g (old packages)" {
   npm uninstall -g ($packages | ForEach-Object { "@irix/$_" })
-  npm uninstall -g ($packages | ForEach-Object { "@wukong/$_" })
 } -MayFail
 
 $env:ONNXRUNTIME_NODE_INSTALL = "skip"

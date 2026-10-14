@@ -16,7 +16,7 @@ Irix is installed from seven npm tarballs (`irix-*.tgz`). They must be installed
 Instead of receiving the files, build them from the repository:
 
 ```powershell
-git clone -b irix https://github.com/quickwind/wukong.git irix
+git clone -b irix https://github.com/quickwind/Paseo.git irix
 cd irix
 node irix/scripts/pack-local.mjs --out ..\irix-dist
 ```
@@ -97,7 +97,7 @@ api_version = 4
 Check it works before going further: `gitlab -g corp current-user get` should print your user.
 
 **2. `%USERPROFILE%\.irix\irix.json`**: tells Irix which GitLab and which section.
-Escape backslashes in JSON. (Note: legacy `wukong.json` in `~/.wukong/` is also supported as fallback).
+Escape backslashes in JSON.
 
 ```json
 {

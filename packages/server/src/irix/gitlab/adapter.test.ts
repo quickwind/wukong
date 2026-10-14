@@ -5,12 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { ForgeRegistry } from "../../services/forge-registry.js";
 import { activateIrixPolicy } from "../policy.js";
-import {
-  createIrixGitLabAdapter,
-  createWukongGitLabAdapter,
-  irixForgeEntries,
-  wukongForgeEntries,
-} from "./adapter.js";
+import { createIrixGitLabAdapter, irixForgeEntries } from "./adapter.js";
 import { loadGitLabForgeConfig, parseGitLabProjectPath } from "./config.js";
 
 const config = { url: "https://gitlab.corp.example/", sshHost: "git.corp.example:2222" };
@@ -26,7 +21,6 @@ describe("Irix GitLab forge", () => {
     deactivate = activateIrixPolicy();
     const registry = new ForgeRegistry(irixForgeEntries([...upstream], adapter));
     expect(registry.ids()).toEqual(["gitlab"]);
-    expect(wukongForgeEntries([...upstream], adapter).map(([id]) => id)).toEqual(["gitlab"]);
   });
 
   it("recognises only the configured GitLab hosts", () => {
@@ -35,7 +29,6 @@ describe("Irix GitLab forge", () => {
     expect(adapter.matchesHost?.("git.corp.example")).toBe(true);
     expect(adapter.matchesHost?.("github.com")).toBe(false);
     expect(createIrixGitLabAdapter(() => null).matchesHost?.("gitlab.corp.example")).toBe(false);
-    expect(createWukongGitLabAdapter(() => config).matchesHost?.("gitlab.corp.example")).toBe(true);
   });
 
   it("derives the project path from https, scp and ssh remotes only on the configured host", () => {
@@ -49,7 +42,7 @@ describe("Irix GitLab forge", () => {
     expect(parseGitLabProjectPath(config, "git@github.com:g/app.git")).toBeNull();
   });
 
-  it("reads irix.json (or wukong.json), with environment variables taking precedence", () => {
+  it("reads irix.json, with environment variables taking precedence", () => {
     const home = mkdtempSync(join(tmpdir(), "irix-"));
     expect(loadGitLabForgeConfig(home, {})).toBeNull();
     writeFileSync(
@@ -61,9 +54,6 @@ describe("Irix GitLab forge", () => {
       url: "https://env.example",
       configSection: "corp",
     });
-    expect(
-      loadGitLabForgeConfig(home, { WUKONG_GITLAB_URL: "https://legacy.example" }),
-    ).toMatchObject({ url: "https://legacy.example", configSection: "corp" });
     expect(() => loadGitLabForgeConfig(home, { IRIX_GITLAB_URL: "http://plain.example" })).toThrow(
       /https/,
     );

@@ -241,7 +241,7 @@ describe("fetchUsage", () => {
   });
 
   it("allows an extra host a company configures, and only exactly that host", async () => {
-    const env = { WUKONG_DEVIN_API_HOSTS: "devin.corp.example, other.corp.example" };
+    const env = { IRIX_DEVIN_API_HOSTS: "devin.corp.example, other.corp.example" };
     expect(allowedHosts(env).has("devin.corp.example")).toBe(true);
     expect(allowedHosts(env).has("corp.example")).toBe(false);
     const fetchApi = respond(realStatus);

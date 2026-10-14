@@ -1,4 +1,4 @@
-// The system folder dialog, shown on the machine the daemon runs on. Wukong's daemon listens on
+// The system folder dialog, shown on the machine the daemon runs on. Irix's daemon listens on
 // loopback only, so that is the machine the user is sitting at. Windows uses the Explorer folder
 // dialog, macOS the Finder one, Linux zenity or kdialog.
 

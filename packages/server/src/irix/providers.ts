@@ -5,7 +5,6 @@ import { isIrixActive } from "./policy.js";
 import type { ProviderOverride } from "../server/agent/provider-launch-config.js";
 
 export const IRIX_PROVIDER_IDS: readonly string[] = ["claude", "devin"];
-export const WUKONG_PROVIDER_IDS = IRIX_PROVIDER_IDS;
 
 const DEFAULT_OVERRIDES: Record<string, ProviderOverride> = {
   devin: {
@@ -44,6 +43,3 @@ export function restrictToIrixProviders<T extends Record<string, unknown>>(
     ),
   ) as T;
 }
-
-export const withWukongProviderOverrides = withIrixProviderOverrides;
-export const restrictToWukongProviders = restrictToIrixProviders;

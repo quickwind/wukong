@@ -9,7 +9,7 @@ import { loadGitLabForgeConfig, matchesGitLabForgeHost, type GitLabForgeConfig }
 import { createGlabCompatRunner } from "./glab-runner.js";
 import { createGitLabPythonClient } from "./python-client.js";
 
-// Read once: a changed irix.json / wukong.json takes effect when the daemon restarts.
+// Read once: a changed irix.json takes effect when the daemon restarts.
 let cachedConfig: GitLabForgeConfig | null | undefined;
 
 export function defaultConfig(): GitLabForgeConfig | null {
@@ -40,8 +40,6 @@ export function createIrixGitLabAdapter(
   };
 }
 
-export const createWukongGitLabAdapter = createIrixGitLabAdapter;
-
 type ForgeEntry = readonly [string, ForgeAdapterRegistration];
 
 /** Upstream's adapters unless Irix is active, in which case GitLab is the only forge. */
@@ -51,5 +49,3 @@ export function irixForgeEntries(
 ): ForgeEntry[] {
   return isIrixActive() ? [["gitlab", adapter]] : upstream;
 }
-
-export const wukongForgeEntries = irixForgeEntries;

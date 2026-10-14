@@ -1,6 +1,6 @@
-// Run from bin/wukong before the CLI starts.
+// Run from bin/irix before the CLI starts.
 //
-// On Windows a message such as `wukong send <id> "What are you doing?"` can reach the CLI cut at the
+// On Windows a message such as `irix send <id> "What are you doing?"` can reach the CLI cut at the
 // spaces with the quotes still on: `"What`, `are`, `you`, `doing?"`. This happened with commands
 // run by Devin; the CLI then took the first piece as the whole message. A correctly parsed argument
 // never starts with a quote mark that closes only in a later argument, so that shape is put back

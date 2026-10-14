@@ -44,7 +44,7 @@ function DialogShell({ title, footer, onClose, children }: DialogShellProps) {
   );
   const setScope = useWebOverlayRegistration({ active: true, layer, onKeyDown });
   return (
-    <View style={styles.overlay} testID="wukong-folder-picker">
+    <View style={styles.overlay} testID="irix-folder-picker">
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
       <View ref={setScope} style={styles.card}>
         <View style={styles.header}>

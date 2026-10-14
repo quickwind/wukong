@@ -39,7 +39,7 @@ export interface UsageDeps {
 
 /** Hosts the key may be sent to: Devin's own, plus any a company adds for its deployment. */
 export function allowedHosts(env: NodeJS.ProcessEnv = process.env): Set<string> {
-  const extra = (env["IRIX_DEVIN_API_HOSTS"] ?? env["WUKONG_DEVIN_API_HOSTS"] ?? "")
+  const extra = (env["IRIX_DEVIN_API_HOSTS"] ?? "")
     .split(",")
     .map((host) => host.trim().toLowerCase())
     .filter(Boolean);

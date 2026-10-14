@@ -198,5 +198,3 @@ export function createIrixAcpClient(
     ? new DevinACPAgentClient(options)
     : undefined;
 }
-
-export const createWukongAcpClient = createIrixAcpClient;

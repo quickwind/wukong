@@ -6,7 +6,6 @@
 import { isIrixActive } from "./policy.js";
 
 export type IrixWindowsShell = "powershell" | "cmd";
-export type WukongWindowsShell = IrixWindowsShell;
 
 /** The configured Windows shell, or undefined outside the Irix edition (upstream decides). */
 export function irixWindowsShell(
@@ -15,8 +14,6 @@ export function irixWindowsShell(
   if (!isIrixActive()) {
     return undefined;
   }
-  const configured = env.IRIX_WINDOWS_SHELL ?? env.WUKONG_WINDOWS_SHELL;
+  const configured = env.IRIX_WINDOWS_SHELL;
   return configured?.trim().toLowerCase() === "cmd" ? "cmd" : "powershell";
 }
-
-export const wukongWindowsShell = irixWindowsShell;

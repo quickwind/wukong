@@ -14,7 +14,3 @@ export function activateIrixPolicy(): () => void {
     active = false;
   };
 }
-
-// Backward-compat aliases
-export const isWukongActive = isIrixActive;
-export const activateWukongPolicy = activateIrixPolicy;

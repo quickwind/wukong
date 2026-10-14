@@ -40,7 +40,7 @@ They are a handful of one-line hooks, not rewrites.
 
 ## GitLab
 
-Put the company GitLab in `<Irix home>/irix.json` (default `~/.irix/irix.json`, with fallback to `wukong.json`):
+Put the company GitLab in `<Irix home>/irix.json` (default `~/.irix/irix.json`):
 
 ```json
 {
@@ -69,7 +69,7 @@ supported: rebase merges. The daemon's clone request clones only from this GitLa
 Needs Node.js 22+ and Git. Works the same on Windows (PowerShell or cmd), macOS and Linux:
 
 ```sh
-git clone -b irix https://github.com/quickwind/wukong.git irix
+git clone -b irix https://github.com/quickwind/Paseo.git irix
 cd irix
 node irix/scripts/pack-local.mjs --out ../irix-dist
 ```

@@ -105,7 +105,7 @@ const git = (directory: string, ...args: string[]) =>
   execFileSync("git", ["-C", directory, ...args], { encoding: "utf8" }).trim();
 
 beforeEach(() => {
-  work = mkdtempSync(join(tmpdir(), "wukong-gitlab-"));
+  work = mkdtempSync(join(tmpdir(), "irix-gitlab-"));
   remotes = join(work, "remotes");
   statePath = join(work, "gitlab-state.json");
   // Real repositories served at the projects' clone URLs through git's own URL rewriting: the
@@ -117,10 +117,10 @@ beforeEach(() => {
   mkdirSync(home, { recursive: true });
   const script = join(work, "fake-gitlab.mjs");
   writeFileSync(script, FAKE_GITLAB);
-  // The command goes in wukong.json as an array: the environment variable splits on spaces, which
+  // The command goes in irix.json as an array: the environment variable splits on spaces, which
   // breaks on a Windows path such as C:\Program Files\nodejs\node.exe.
   writeFileSync(
-    join(home, "wukong.json"),
+    join(home, "irix.json"),
     JSON.stringify({ gitlab: { command: [process.execPath, script] } }),
   );
   seed();
@@ -128,8 +128,8 @@ beforeEach(() => {
 
   process.env.PASEO_HOME = home;
   process.env.FAKE_GL_STATE = statePath;
-  process.env.WUKONG_GITLAB_URL = GITLAB;
-  process.env.WUKONG_CLONE_ROOT = join(work, "clones");
+  process.env.IRIX_GITLAB_URL = GITLAB;
+  process.env.IRIX_CLONE_ROOT = join(work, "clones");
   process.env.GIT_CONFIG_COUNT = "1";
   process.env.GIT_CONFIG_KEY_0 = `url.${pathToFileURL(remotes).href}/.insteadOf`;
   process.env.GIT_CONFIG_VALUE_0 = `${GITLAB}/`;
@@ -203,8 +203,8 @@ describe("search", () => {
   });
 
   it("explains how to configure GitLab when nothing is set", async () => {
-    delete process.env.WUKONG_GITLAB_URL;
-    writeFileSync(join(process.env.PASEO_HOME ?? "", "wukong.json"), "{}");
+    delete process.env.IRIX_GITLAB_URL;
+    writeFileSync(join(process.env.PASEO_HOME ?? "", "irix.json"), "{}");
     await expect(search({ query: "" })).rejects.toThrow(/not configured/);
   });
 });

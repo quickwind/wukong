@@ -1,10 +1,6 @@
 // Irix edition switch for the web app. Set at build time (EXPO_PUBLIC_IRIX=1) so the
 // bundle carries no dead voice or GitHub entry points. Unset in upstream builds and tests.
-export const IRIX_BUILD =
-  process.env.EXPO_PUBLIC_IRIX === "1" || process.env.EXPO_PUBLIC_WUKONG === "1";
-
-// COMPAT(wukong): alias for backward compatibility
-export const WUKONG_BUILD = IRIX_BUILD;
+export const IRIX_BUILD = process.env.EXPO_PUBLIC_IRIX === "1";
 
 /** For a row Irix removes without moving upstream's JSX: keeps the diff to one line. */
 export const HIDDEN_ROW_STYLE = { display: "none" } as const;

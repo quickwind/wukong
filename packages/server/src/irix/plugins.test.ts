@@ -7,8 +7,6 @@ import {
   irixBuiltinPlugins,
   irixManagedSources,
   pluginSourcesUnavailableMessage,
-  wukongBuiltinPlugins,
-  wukongManagedSources,
 } from "./plugins.js";
 
 describe("Irix plugins", () => {
@@ -18,8 +16,6 @@ describe("Irix plugins", () => {
   it("passes upstream wiring through until activated", () => {
     expect(irixManagedSources(sources)).toBe(sources);
     expect(irixBuiltinPlugins(loader)).toBe(loader);
-    expect(wukongManagedSources(sources)).toBe(sources);
-    expect(wukongBuiltinPlugins(loader)).toBe(loader);
   });
 
   describe("once active", () => {
@@ -31,15 +27,10 @@ describe("Irix plugins", () => {
 
     it("drops managed (npm, Git, registry) sources", () => {
       expect(irixManagedSources(sources)).toBeUndefined();
-      expect(wukongManagedSources(sources)).toBeUndefined();
     });
 
     it("starts only Irix's own bundled plugins", () => {
       expect([...(irixBuiltinPlugins(loader)?.ids ?? [])]).toEqual([
-        "irix-gitlab",
-        "irix-devin-usage",
-      ]);
-      expect([...(wukongBuiltinPlugins(loader)?.ids ?? [])]).toEqual([
         "irix-gitlab",
         "irix-devin-usage",
       ]);

@@ -6,7 +6,7 @@ export const DEVIN_USAGE_HOSTS: readonly string[] = ["server.codeium.com", "api.
 
 /** The defaults plus any hosts a company adds with IRIX_DEVIN_API_HOSTS (comma separated). */
 export function devinUsageHosts(env: NodeJS.ProcessEnv = process.env): string[] {
-  const configured = env.IRIX_DEVIN_API_HOSTS ?? env.WUKONG_DEVIN_API_HOSTS ?? "";
+  const configured = env.IRIX_DEVIN_API_HOSTS ?? "";
   const extra = configured
     .split(",")
     .map((host) => host.trim())

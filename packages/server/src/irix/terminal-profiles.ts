@@ -17,5 +17,3 @@ export function irixTerminalProfiles(
 ): TerminalProfile[] | undefined {
   return isIrixActive() ? [...IRIX_TERMINAL_PROFILES] : configured;
 }
-
-export const wukongTerminalProfiles = irixTerminalProfiles;

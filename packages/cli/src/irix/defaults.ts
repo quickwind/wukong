@@ -26,7 +26,7 @@ export function applyIrixDefaults(
   homeDirectory: string = os.homedir(),
 ): void {
   delete env.PASEO_HOST;
-  env.PASEO_HOME = env.IRIX_HOME || env.WUKONG_HOME || irixDefaultHome(homeDirectory);
+  env.PASEO_HOME = env.IRIX_HOME || irixDefaultHome(homeDirectory);
   const home = path.resolve(expandHome(env.PASEO_HOME, homeDirectory));
   const config = path.join(home, "config.json");
   if (existsSync(config)) {

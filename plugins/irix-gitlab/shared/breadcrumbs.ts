@@ -5,7 +5,7 @@ export interface Crumb {
 
 /**
  * The path as clickable steps, from the top of the disk (or the Windows drive list) down. The app
- * has its own copy (`packages/app/src/wukong/folder-picker.ts`): a plugin cannot import app code.
+ * has its own copy (`packages/app/src/irix/folder-picker.ts`): a plugin cannot import app code.
  */
 export function breadcrumbsOf(path: string): Crumb[] {
   const windows = path === "" || /^[A-Za-z]:/u.test(path);
