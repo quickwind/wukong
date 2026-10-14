@@ -163,7 +163,12 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     const session = await super.createSession(config, launchContext, options);
     injectInstructionsIntoFirstPrompt(
       session,
-      [config.systemPrompt?.trim(), paseoCommandLineGuide(launchContext?.agentId)]
+      [
+        config.systemPrompt?.trim(),
+        // The system prompt set in the app's settings; upstream's ACP client ignores it too.
+        config.daemonAppendSystemPrompt?.trim(),
+        paseoCommandLineGuide(launchContext?.agentId),
+      ]
         .filter(Boolean)
         .join("\n\n"),
       this.clientLogger,

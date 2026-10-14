@@ -11,6 +11,7 @@ import { writePrivateFileAtomicSync } from "../server/private-files.js";
 import { findExecutable } from "../executable-resolution/executable-resolution.js";
 import type { TerminalCell, TerminalState } from "@getpaseo/protocol/messages";
 import { TerminalInputModeTracker } from "@getpaseo/protocol/terminal-input-mode";
+import { wukongWindowsShell } from "../wukong/windows-shell.js"; // Wukong: configurable Windows shell
 import { TerminalActivityTracker } from "./activity/terminal-activity-tracker.js";
 import type { TerminalActivity, TerminalActivityState } from "@getpaseo/protocol/terminal-activity";
 
@@ -239,6 +240,7 @@ export function resolveDefaultTerminalShell(
   const env = options.env ?? process.env;
 
   if (platform === "win32") {
+    if (wukongWindowsShell(env) === "powershell") return "powershell.exe"; // Wukong
     return env.ComSpec || env.COMSPEC || "C:\\Windows\\System32\\cmd.exe";
   }
 

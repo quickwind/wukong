@@ -123,6 +123,7 @@ import {
   createStringCommandShellEnvOverlay,
 } from "../../../utils/string-command-shell.js";
 import { spawnProcess } from "../../../utils/spawn.js";
+import { wukongWindowsShell } from "../../../wukong/windows-shell.js"; // Wukong: configurable Windows shell
 import {
   type DiagnosticEntry,
   toDiagnosticErrorMessage,
@@ -246,7 +247,10 @@ function resolveTerminalCommand(
     return { command, args: [] };
   }
 
-  const shell = buildStringCommandShellInvocation({ command, windowsShell: "cmd" });
+  const shell = buildStringCommandShellInvocation({
+    command,
+    windowsShell: wukongWindowsShell() ?? "cmd",
+  }); // Wukong: PowerShell by default
   return { command: shell.shell, args: shell.args, shell: false };
 }
 

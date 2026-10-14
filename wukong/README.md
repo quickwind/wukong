@@ -27,6 +27,9 @@ They are a handful of one-line hooks, not rewrites.
   `python-gitlab`) are outside the daemon and unaffected.
 - **Providers:** Claude Code and Devin CLI. Devin is a configured ACP provider (`devin acp`).
   Other providers are removed from the registry, not just disabled.
+- **Windows shell:** commands agents run (Devin's `terminal/create`) and new terminals use
+  PowerShell, not `cmd.exe`. Set `WUKONG_WINDOWS_SHELL=cmd` in the daemon's environment to switch
+  back. This is the one place to configure it (`packages/server/src/wukong/windows-shell.ts`).
 - **Plugins:** local directories only, plus the bundled `wukong-gitlab`. npm, Git and registry
   installs and the other bundled plugins are off.
 - **Voice:** dictation, voice mode and speech model downloads are off.
