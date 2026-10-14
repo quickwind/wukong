@@ -60,7 +60,7 @@ interface SupervisorOptions {
   logFile?: SupervisorLogFileOptions;
 }
 
-// Wukong: `fork` passes every option to `spawn`, but @types/node does not list windowsHide for it.
+// Irix: `fork` passes every option to `spawn`, but @types/node does not list windowsHide for it.
 const HIDE_WORKER_CONSOLE = { windowsHide: true };
 
 export interface SupervisorController {
@@ -291,7 +291,7 @@ export function runSupervisor(options: SupervisorOptions): SupervisorController 
       child = spawn(spawnSpec.command, spawnSpec.args, {
         stdio: ["inherit", "pipe", "pipe", "ipc"],
         env: spawnSpec.env ?? workerEnv,
-        windowsHide: true, // Wukong: a detached supervisor has no console; without this Windows opens one
+        windowsHide: true, // Irix: a detached supervisor has no console; without this Windows opens one
       });
     } else {
       child = fork(workerEntry, workerArgs, {

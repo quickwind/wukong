@@ -1,0 +1,6 @@
+{
+  "id": "irix-gitlab",
+  "name": "GitLab projects",
+  "description": "Search the company GitLab and add a project by cloning it.",
+  "requirements": { "paseo": ">=0.11.2" }
+}

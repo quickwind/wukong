@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { upstreamOnly } from "@/wukong/build"; // Wukong
+import { upstreamOnly } from "@/irix/build"; // Irix
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -42,7 +42,7 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 
-const UpstreamPressable = upstreamOnly(Pressable); // Wukong: pairing links go through the relay
+const UpstreamPressable = upstreamOnly(Pressable); // Irix: pairing links go through the relay
 
 export interface AddHostMethodModalProps {
   visible: boolean;

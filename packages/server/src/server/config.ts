@@ -1,5 +1,5 @@
 import { configurationEnvironment } from "./config-environment.js";
-import { wukongTerminalProfiles } from "../wukong/terminal-profiles.js"; // Wukong
+import { irixTerminalProfiles } from "../irix/terminal-profiles.js"; // Irix
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -525,7 +525,7 @@ function resolveBrowserToolsEnabled(persisted: ReturnType<typeof loadPersistedCo
  */
 function resolveProfileLists(persisted: ReturnType<typeof loadPersistedConfig>) {
   return {
-    terminalProfiles: wukongTerminalProfiles(persisted.daemon?.terminalProfiles), // Wukong
+    terminalProfiles: irixTerminalProfiles(persisted.daemon?.terminalProfiles), // Irix
     agentProfiles: persisted.daemon?.agentProfiles,
   };
 }

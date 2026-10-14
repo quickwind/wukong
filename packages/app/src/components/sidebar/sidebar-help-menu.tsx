@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { upstreamOnly } from "@/wukong/build"; // Wukong
+import { upstreamOnly } from "@/irix/build"; // Irix
 import { Text, View } from "react-native";
 import { Activity, CircleHelp, Gift, Keyboard } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
@@ -30,9 +30,9 @@ import { resolveAppVersion } from "@/utils/app-version";
 import { openChangelog } from "@/changelog";
 import { openExternalUrl } from "@/utils/open-external-url";
 
-const UpstreamMenuItem = upstreamOnly(DropdownMenuItem); // Wukong
-const UpstreamMenuLabel = upstreamOnly(DropdownMenuLabel); // Wukong
-const UpstreamMenuSeparator = upstreamOnly(DropdownMenuSeparator); // Wukong
+const UpstreamMenuItem = upstreamOnly(DropdownMenuItem); // Irix
+const UpstreamMenuLabel = upstreamOnly(DropdownMenuLabel); // Irix
+const UpstreamMenuSeparator = upstreamOnly(DropdownMenuSeparator); // Irix
 
 const DISCORD_URL = "https://discord.gg/jz8T2uahpH";
 const GITHUB_ISSUE_URL = "https://github.com/getpaseo/paseo/issues/new";

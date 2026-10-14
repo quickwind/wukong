@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { HIDDEN_ROW_STYLE, WUKONG_BUILD, isHostSectionOffered } from "@/wukong/build"; // Wukong
+import { HIDDEN_ROW_STYLE, IRIX_BUILD, isHostSectionOffered } from "@/irix/build"; // Irix
 import type { ComponentType, ReactNode } from "react";
 import {
   Alert,
@@ -241,7 +241,7 @@ const HOST_SECTION_ITEMS: HostSectionItem[] = [
   { id: "plugins", labelKey: "settings.hostSections.plugins", icon: Blocks },
 ];
 
-const isOfferedHostSection = (item: HostSectionItem) => isHostSectionOffered(item.id); // Wukong
+const isOfferedHostSection = (item: HostSectionItem) => isHostSectionOffered(item.id); // Irix
 
 function renderHostSettingsContent(
   view: Extract<SettingsView, { kind: "host" }>,
@@ -424,7 +424,7 @@ function DiagnosticsSection({
             {t("settings.diagnostics.app.run")}
           </Button>
         </View>
-        <View style={WUKONG_BUILD ? HIDDEN_ROW_STYLE : settingsStyles.row}>
+        <View style={IRIX_BUILD ? HIDDEN_ROW_STYLE : settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
             <Text style={settingsStyles.rowTitle}>{t("settings.diagnostics.testAudio")}</Text>
             {playbackTestResult ? (
@@ -481,7 +481,7 @@ function AboutSection({ appVersion, appVersionText, isDesktopApp }: AboutSection
 function WhatsNewRow() {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
-  if (WUKONG_BUILD) return null; // Wukong: the changelog is upstream's
+  if (IRIX_BUILD) return null; // Irix: the changelog is upstream's
 
   return (
     <Pressable
@@ -988,7 +988,7 @@ function SettingsSidebar({
             enableBuiltInDaemonOption={enableBuiltInDaemonOption}
           />
           {HOST_SECTION_ITEMS.filter(isOfferedHostSection).map((item) => (
-            // Wukong
+            // Irix
             <SidebarHostSectionButton
               key={item.id}
               itemId={item.id}

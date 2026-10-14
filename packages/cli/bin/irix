@@ -1,0 +1,7 @@
+#!/usr/bin/env -S node --disable-warning=DEP0040
+import { mendSplitQuotedArgs } from "../dist/irix/argv.js";
+import { applyIrixDefaults } from "../dist/irix/defaults.js";
+
+process.argv = [...process.argv.slice(0, 2), ...mendSplitQuotedArgs(process.argv.slice(2))];
+applyIrixDefaults();
+await import("../dist/index.js");

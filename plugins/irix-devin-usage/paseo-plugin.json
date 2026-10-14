@@ -1,0 +1,6 @@
+{
+  "id": "irix-devin-usage",
+  "name": "Devin usage",
+  "description": "Shows the signed-in Devin account's ACU usage for the billing period.",
+  "requirements": { "paseo": ">=0.11.2" }
+}

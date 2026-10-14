@@ -1,5 +1,5 @@
 import { formatPluginInstallation } from "@getpaseo/protocol/plugin-source-reference";
-import { pluginSourceField } from "@/wukong/plugin-source-field"; // Wukong
+import { pluginSourceField } from "@/irix/plugin-source-field"; // Irix
 import { PluginSettingsMenuItems } from "@/plugins/settings";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
@@ -298,7 +298,7 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
     label: t("settings.plugins.sourceLabel"),
     placeholder: t("settings.plugins.sourcePlaceholder"),
     trailing: sourceDocsLink,
-  }); // Wukong
+  }); // Irix
   const [logsPluginId, setLogsPluginId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(
     null,

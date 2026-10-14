@@ -26,10 +26,10 @@ import { runPluginBuild } from "./preparation.js";
 import { PluginRuntime } from "./runtime.js";
 import { BuiltinPluginLoader, type BuiltinPlugin } from "./builtin/index.js";
 import {
+  irixBuiltinPlugins,
+  irixManagedSources,
   pluginSourcesUnavailableMessage,
-  wukongBuiltinPlugins,
-  wukongManagedSources,
-} from "../../wukong/plugins.js"; // Wukong
+} from "../../irix/plugins.js"; // Irix
 import type { PluginProviderMetadata } from "./plugin-process-protocol.js";
 import { readPluginProviderIcon } from "./provider-icon.js";
 import {
@@ -121,9 +121,9 @@ export class PluginService {
           for (const listener of this.settingsListeners) listener(pluginId, settingsId);
         },
       });
-    this.managedSources = wukongManagedSources(dependencies.managedSources) ?? null; // Wukong
+    this.managedSources = irixManagedSources(dependencies.managedSources) ?? null; // Irix
     this.builtinPlugins =
-      wukongBuiltinPlugins(dependencies.builtinPlugins) ?? new BuiltinPluginLoader(undefined, []); // Wukong
+      irixBuiltinPlugins(dependencies.builtinPlugins) ?? new BuiltinPluginLoader(undefined, []); // Irix
     this.builtinPluginIds = this.builtinPlugins.ids;
     this.runtime.subscribe((pluginId, error) => {
       this.removeProviderRegistrations(pluginId);
@@ -775,7 +775,7 @@ export class PluginService {
 
   private requireManagedSources(): ManagedPluginSources {
     if (!this.managedSources) {
-      throw new Error(pluginSourcesUnavailableMessage("Plugin source management is unavailable")); // Wukong
+      throw new Error(pluginSourcesUnavailableMessage("Plugin source management is unavailable")); // Irix
     }
     return this.managedSources;
   }

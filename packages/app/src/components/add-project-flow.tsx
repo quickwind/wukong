@@ -80,10 +80,10 @@ import { useFetchQuery } from "@/data/query";
 import { getOpenProjectFailureReason, registerProjectDescriptor } from "@/hooks/open-project";
 import { useIsLocalDaemon, useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
 import { useCloneGithubProject, useOpenProject } from "@/hooks/use-open-project";
-import { WUKONG_BUILD } from "@/wukong/build"; // Wukong
-import { useOpenGitLabProjects } from "@/wukong/open-gitlab-projects"; // Wukong
-import { FolderPickerHost } from "@/wukong/folder-picker-dialog"; // Wukong
-import { pickFolderInDialog } from "@/wukong/folder-picker"; // Wukong
+import { IRIX_BUILD } from "@/irix/build"; // Irix
+import { useOpenGitLabProjects } from "@/irix/open-gitlab-projects"; // Irix
+import { FolderPickerHost } from "@/irix/folder-picker-dialog"; // Irix
+import { pickFolderInDialog } from "@/irix/folder-picker"; // Irix
 import {
   OverlayLayerProvider,
   useGlobalWebOverlayLayer,
@@ -167,7 +167,7 @@ function FlowBackButton({ onPress }: { onPress: () => void }) {
 }
 
 function methodIcon(method: AddProjectMethodId): FlowRowOption["icon"] {
-  if (method === "github") return WUKONG_BUILD ? GitBranch : GitHubIcon; // Wukong
+  if (method === "github") return IRIX_BUILD ? GitBranch : GitHubIcon; // Irix
   if (method === "browse") return FolderOpen;
   if (method === "new-directory") return FolderPlus;
   return Search;
@@ -348,7 +348,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
             canAddProject,
             canBrowse:
               canAddProject &&
-              (WUKONG_BUILD || (getIsElectronRuntime() && localServerId === host.serverId)), // Wukong: the daemon opens the dialog
+              (IRIX_BUILD || (getIsElectronRuntime() && localServerId === host.serverId)), // Irix: the daemon opens the dialog
             canCloneGithubRepositories: githubCloneByHost.get(host.serverId) === true,
             canSearchGithubRepositories: githubSearchByHost.get(host.serverId) === true,
             canCreateDirectory: createDirectoryByHost.get(host.serverId) === true,
@@ -380,7 +380,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
   const recommendedPaths = useRecommendedProjectPaths(hostId);
   const openProject = useOpenProject(hostId);
   const cloneGithubProject = useCloneGithubProject(hostId);
-  const openGitLabProjects = useOpenGitLabProjects(onClose); // Wukong
+  const openGitLabProjects = useOpenGitLabProjects(onClose); // Irix
   const upsertProject = useCallback(
     (
       targetServerId: string,
@@ -513,10 +513,10 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
   );
 
   const browse = useCallback(async () => {
-    if (!hostId || (!isLocalDaemon && !WUKONG_BUILD) || browseInFlightRef.current) return; // Wukong
+    if (!hostId || (!isLocalDaemon && !IRIX_BUILD) || browseInFlightRef.current) return; // Irix
     browseInFlightRef.current = true;
     try {
-      const path = WUKONG_BUILD ? await pickFolderInDialog(client) : await pickDirectory(); // Wukong
+      const path = IRIX_BUILD ? await pickFolderInDialog(client) : await pickDirectory(); // Irix
       if (path) await openAddedProject(path, "method");
     } catch {
       setState((current) =>
@@ -534,8 +534,8 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
         setState((current) => openDirectorySearchPage(current, hostId));
       } else if (method === "browse") {
         void browse();
-      } else if (method === "github" && WUKONG_BUILD) {
-        openGitLabProjects(hostId); // Wukong
+      } else if (method === "github" && IRIX_BUILD) {
+        openGitLabProjects(hostId); // Irix
       } else if (method === "github") {
         setState((current) => openGithubSearchPage(current, hostId));
       } else {
@@ -969,7 +969,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
             <FlowHint keys={ESCAPE_HINT_KEYS} action={state.pages.length > 1 ? "Back" : "Close"} />
           </View>
         </View>
-        {WUKONG_BUILD ? <FolderPickerHost /> : null}
+        {IRIX_BUILD ? <FolderPickerHost /> : null}
       </View>
     </Modal>
   );

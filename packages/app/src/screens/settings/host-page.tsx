@@ -22,7 +22,7 @@ import {
   DEFAULT_TERMINAL_PROFILES,
 } from "@getpaseo/protocol/terminal-profiles";
 import { AgentProfilesSection } from "@/agent-profiles";
-import { HIDDEN_ROW_STYLE, upstreamOnly, WUKONG_BUILD } from "@/wukong/build"; // Wukong
+import { HIDDEN_ROW_STYLE, upstreamOnly, IRIX_BUILD } from "@/irix/build"; // Irix
 import { AgentSkillsSection } from "@/agent-skills";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { SettingsTextAreaCard } from "@/components/settings-textarea";
@@ -860,8 +860,8 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
   );
 }
 
-const OfferedUpdateDaemonCard = upstreamOnly(UpdateDaemonCard); // Wukong: no self-update
-// Wukong: the agent tools and skills are fixed by its config.
+const OfferedUpdateDaemonCard = upstreamOnly(UpdateDaemonCard); // Irix: no self-update
+// Irix: the agent tools and skills are fixed by its config.
 const OfferedInjectPaseoToolsCard = upstreamOnly(InjectPaseoToolsCard);
 const OfferedBrowserToolsOptInCard = upstreamOnly(BrowserToolsOptInCard);
 const OfferedAgentSkillsSection = upstreamOnly(AgentSkillsSection);
@@ -1248,8 +1248,8 @@ function RemoveHostSection({
     >
       <RestartDaemonCard host={host} />
 
-      <View style={WUKONG_BUILD ? HIDDEN_ROW_STYLE : settingsStyles.card}>
-        {/* Wukong: no Remove host */}
+      <View style={IRIX_BUILD ? HIDDEN_ROW_STYLE : settingsStyles.card}>
+        {/* Irix: no Remove host */}
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
             <Text style={settingsStyles.rowTitle}>
@@ -1393,7 +1393,7 @@ function TerminalProfileRow({
           {commandText}
         </Text>
       </View>
-      <View style={WUKONG_BUILD ? HIDDEN_ROW_STYLE : terminalProfileStyles.rowActions}>
+      <View style={IRIX_BUILD ? HIDDEN_ROW_STYLE : terminalProfileStyles.rowActions}>
         <Button
           variant="ghost"
           size="sm"
@@ -1614,7 +1614,7 @@ function TerminalProfilesSection({ serverId }: { serverId: string }) {
     <>
       <SettingsSection
         title={t("settings.host.terminalProfiles.sectionTitle")}
-        trailing={WUKONG_BUILD ? undefined : addButton} // Wukong: Claude Code only
+        trailing={IRIX_BUILD ? undefined : addButton} // Irix: Claude Code only
         testID="terminal-profiles-section"
       >
         <View style={settingsStyles.card} testID="terminal-profiles-card">

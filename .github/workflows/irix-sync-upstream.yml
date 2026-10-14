@@ -1,0 +1,110 @@
+name: Sync Irix with upstream
+
+# Keeps `main` an exact mirror of upstream and proposes the merge of upstream into `irix`
+# as a pull request. A merge that conflicts opens an issue that names the files instead.
+# Keeping the sync small and frequent is the point: see irix/README.md ("Staying in sync").
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: irix-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_URL: https://github.com/getpaseo/paseo.git
+  ONNXRUNTIME_NODE_INSTALL: skip
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: irix
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: |
+          git config user.name "irix-sync"
+          git config user.email "irix-sync@users.noreply.github.com"
+          git config rerere.enabled true
+          git remote add upstream "$UPSTREAM_URL"
+          git fetch upstream main
+
+      # Fast-forward only: main must stay identical to upstream, so a diverged main fails here.
+      - name: Mirror upstream main
+        run: git push origin upstream/main:refs/heads/main
+
+      - name: Merge upstream into a sync branch
+        id: merge
+        run: |
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "state=current" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          branch="sync/upstream-$(date -u +%Y%m%d)"
+          git checkout -b "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          if git merge --no-edit upstream/main; then
+            echo "state=merged" >> "$GITHUB_OUTPUT"
+          else
+            git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflicts.txt"
+            git merge --abort
+            echo "state=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report conflicts
+        if: steps.merge.outputs.state == 'conflict'
+        run: |
+          {
+            echo "Merging upstream/main into irix conflicts in these files:"
+            echo
+            sed 's/^/- `/; s/$/`/' "$RUNNER_TEMP/conflicts.txt"
+            echo
+            echo "Merge locally: \`git checkout irix && git merge upstream/main\`. With rerere on,"
+            echo "a conflict resolved once is resolved the same way next time."
+          } > "$RUNNER_TEMP/body.md"
+          gh issue create --title "Upstream sync conflicts ($(date -u +%Y-%m-%d))" --body-file "$RUNNER_TEMP/body.md"
+          exit 1
+
+      - uses: actions/setup-node@v4
+        if: steps.merge.outputs.state == 'merged'
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Brand, build and verify the merge
+        if: steps.merge.outputs.state == 'merged'
+        run: |
+          node --test "irix/scripts/*.test.mjs"
+          node scripts/npm-retry.mjs ci --ignore-scripts --no-audit --no-fund
+          npm run postinstall
+          npm run build:server
+          npm run typecheck
+          npm run lint
+          (cd packages/server && npx vitest run --bail=1 src/irix)
+          (cd plugins && npx vitest run --bail=1 irix-gitlab irix-devin-usage)
+          (cd packages/app && npx vitest run --bail=1 src/irix src/usage)
+          # Still within budget, every touched upstream file still carries its Irix marker.
+          node irix/scripts/upstream-footprint.mjs
+          # Nothing blocked (GPL, AGPL, SSPL, BUSL, unlicensed) has entered what we ship.
+          node irix/scripts/license-audit.mjs
+
+      - name: Open a pull request
+        if: steps.merge.outputs.state == 'merged'
+        run: |
+          git push origin "${{ steps.merge.outputs.branch }}"
+          gh pr create --base irix --head "${{ steps.merge.outputs.branch }}" \
+            --title "Sync upstream ($(date -u +%Y-%m-%d))" \
+            --body "Merges upstream/main into irix. The brand, Irix tests and typecheck passed in this run."

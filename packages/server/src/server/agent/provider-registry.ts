@@ -49,8 +49,8 @@ import { TraeACPAgentClient } from "./providers/trae-acp-agent.js";
 import { MockLoadTestAgentClient } from "./providers/mock-load-test-agent.js";
 import { MockSlowProviderClient } from "./providers/mock-slow-provider.js";
 import { ToolPolicyUnsupportedError, mergeProviderOptions } from "./provider-options.js";
-import { createWukongAcpClient } from "../../wukong/devin-client.js"; // Wukong
-import { restrictToWukongProviders, withWukongProviderOverrides } from "../../wukong/providers.js"; // Wukong
+import { createIrixAcpClient } from "../../irix/devin-client.js"; // Irix
+import { restrictToIrixProviders, withIrixProviderOverrides } from "../../irix/providers.js"; // Irix
 import {
   AGENT_PROVIDER_DEFINITIONS,
   BUILTIN_PROVIDER_IDS,
@@ -855,9 +855,9 @@ function addDerivedProviders(
           if (providerId === "traecli") {
             return new TraeACPAgentClient(acpOptions);
           }
-          const wukongClient = createWukongAcpClient(providerId, acpOptions); // Wukong
-          if (wukongClient) {
-            return wukongClient;
+          const irixClient = createIrixAcpClient(providerId, acpOptions); // Irix
+          if (irixClient) {
+            return irixClient;
           }
           return new GenericACPAgentClient(acpOptions);
         },
@@ -914,7 +914,7 @@ export function buildProviderRegistry(
   options?: BuildProviderRegistryOptions,
 ): Record<AgentProvider, ProviderDefinition> {
   const runtimeSettings = options?.runtimeSettings;
-  const providerOverrides = withWukongProviderOverrides(options?.providerOverrides ?? {}); // Wukong
+  const providerOverrides = withIrixProviderOverrides(options?.providerOverrides ?? {}); // Irix
   const resolvedProviders = buildResolvedBuiltinProviders(
     providerOverrides,
     runtimeSettings,
@@ -953,14 +953,14 @@ export function buildProviderRegistry(
     openCodeBridge: options?.openCodeBridge,
   });
 
-  return restrictToWukongProviders(
+  return restrictToIrixProviders(
     Object.fromEntries(
       [...resolvedProviders.entries()].map(([provider, resolved]) => [
         provider,
         createRegistryEntry(logger, provider, resolved),
       ]),
     ) as Record<AgentProvider, ProviderDefinition>,
-    { isDev: options?.isDev === true, devProviderIds: DEV_PROVIDER_IDS }, // Wukong
+    { isDev: options?.isDev === true, devProviderIds: DEV_PROVIDER_IDS }, // Irix
   );
 }
 

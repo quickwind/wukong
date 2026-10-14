@@ -4,7 +4,7 @@ import { createGitHubService, probeGitHubHost } from "./github-service.js";
 import type { ForgeService } from "./forge-service.js";
 import { createGiteaService, resolveGiteaFamilyForge } from "./gitea-service.js";
 import { createGitLabService, probeGitLabHost } from "./gitlab-service.js";
-import { wukongForgeEntries } from "../wukong/gitlab/adapter.js"; // Wukong
+import { irixForgeEntries } from "../irix/gitlab/adapter.js"; // Irix
 
 export type ForgeServiceFactory = () => ForgeService;
 
@@ -169,7 +169,7 @@ const upstreamForgeEntries: Array<readonly [string, ForgeAdapterRegistration]> =
   ],
   ["codeberg", { createService: createGiteaService, matchesHost: matchesCloudHost("codeberg") }],
 ];
-export const defaultForgeRegistry = new ForgeRegistry(wukongForgeEntries(upstreamForgeEntries)); // Wukong
+export const defaultForgeRegistry = new ForgeRegistry(irixForgeEntries(upstreamForgeEntries)); // Irix
 
 export function createForgeService(forge: string): ForgeService | null {
   return defaultForgeRegistry.create(forge);

@@ -4,7 +4,7 @@ import {
   parseGitRemoteLocation,
 } from "@getpaseo/protocol/git-remote";
 import { shortenPath } from "@/utils/shorten-path";
-import { WUKONG_BUILD } from "@/wukong/build"; // Wukong
+import { IRIX_BUILD } from "@/irix/build"; // Irix
 import type { AddProjectHost, GithubRepositoryChoice } from "./model";
 
 export type AddProjectMethodId = "directory-search" | "browse" | "github" | "new-directory";
@@ -45,19 +45,19 @@ export function buildAddProjectMethods(host: AddProjectHost): AddProjectMethodOp
   if (host.canBrowse) {
     options.push({
       id: "browse",
-      label: WUKONG_BUILD ? "Open folder" : "Browse", // Wukong
-      description: WUKONG_BUILD
+      label: IRIX_BUILD ? "Open folder" : "Browse", // Irix
+      description: IRIX_BUILD
         ? "Browse and choose a folder"
         : "Choose or create a directory in Finder",
     });
   }
   options.push({
     id: "github",
-    label: WUKONG_BUILD ? "Clone from GitLab" : "Clone from GitHub", // Wukong
-    description: WUKONG_BUILD
+    label: IRIX_BUILD ? "Clone from GitLab" : "Clone from GitHub", // Irix
+    description: IRIX_BUILD
       ? "Search projects in your company GitLab"
       : githubMethodDescription(host),
-    disabled: WUKONG_BUILD ? false : !host.canCloneGithubRepositories,
+    disabled: IRIX_BUILD ? false : !host.canCloneGithubRepositories,
   });
   options.push({
     id: "new-directory",

@@ -1,5 +1,5 @@
 // oxlint-disable-next-line import/no-unassigned-import
-import "../wukong/edition.js"; // Wukong: policy must be active before upstream modules load
+import "../irix/edition.js"; // Irix: policy must be active before upstream modules load
 import { appendFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { createPaseoDaemon, formatListenTarget } from "./bootstrap.js";

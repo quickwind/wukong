@@ -7,7 +7,7 @@
  * Callers pick a mode and nothing else. What a mode implies lives here, so the
  * two presentations cannot drift apart one prop at a time.
  */
-import { WUKONG_BUILD } from "@/wukong/build"; // Wukong
+import { IRIX_BUILD } from "@/irix/build"; // Irix
 
 export type ComposerInputMode = "chat" | "terminal";
 
@@ -27,7 +27,7 @@ export interface ComposerInputModePresentation {
 const PRESENTATION_BY_MODE: Record<ComposerInputMode, ComposerInputModePresentation> = {
   chat: {
     showAttachments: true,
-    showVoice: !WUKONG_BUILD, // Wukong: no dictation or voice mode
+    showVoice: !IRIX_BUILD, // Irix: no dictation or voice mode
     showAutocomplete: true,
     showAgentControls: true,
     isMonospace: false,

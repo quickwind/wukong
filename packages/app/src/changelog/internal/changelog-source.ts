@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { WUKONG_BUILD } from "@/wukong/build"; // Wukong
+import { IRIX_BUILD } from "@/irix/build"; // Irix
 import { parseChangelog, type ChangelogRelease } from "./parse-changelog";
 
 const CHANGELOG_URL = "https://raw.githubusercontent.com/getpaseo/paseo/main/CHANGELOG.md";
@@ -35,7 +35,7 @@ export function useChangelog(enabled: boolean): Changelog {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!enabled || WUKONG_BUILD) return; // Wukong: no request to the upstream repository
+    if (!enabled || IRIX_BUILD) return; // Irix: no request to the upstream repository
 
     const controller = new AbortController();
     setState(readCache());

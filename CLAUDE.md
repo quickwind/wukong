@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Wukong fork: read [WUKONG.md](WUKONG.md) first.** Its rules come before the ones below.
+> **Irix fork: read [IRIX.md](IRIX.md) first.** Its rules come before the ones below.
 
 Paseo is a mobile app for monitoring and controlling your local AI coding agents from anywhere. Your dev environment, in your pocket. Connects directly to your actual development environment — your code stays on your machine.
 

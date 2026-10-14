@@ -6,7 +6,7 @@ import {
   type DaemonInstallOriginRuntime,
 } from "./install-origin.js";
 import { npmGlobalPaseoCli, type NpmGlobalPaseoCli } from "./npm-global-cli.js";
-import { selfUpdateRefusal } from "../../../wukong/update-policy.js"; // Wukong
+import { selfUpdateRefusal } from "../../../irix/update-policy.js"; // Irix
 
 export type DaemonSelfUpdatePhase = "starting" | "downloading" | "installing" | "complete";
 
@@ -58,8 +58,8 @@ export class DaemonSelfUpdater {
       return { success: false, error: DESKTOP_MANAGED_UPDATE_ERROR, newVersion: null };
     }
 
-    const refusal = selfUpdateRefusal(); // Wukong
-    if (refusal) return { success: false, error: refusal, newVersion: null }; // Wukong
+    const refusal = selfUpdateRefusal(); // Irix
+    if (refusal) return { success: false, error: refusal, newVersion: null }; // Irix
 
     if (this.inProgress) {
       throw new DaemonSelfUpdateInProgressError();
