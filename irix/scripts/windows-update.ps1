@@ -76,13 +76,13 @@ if (Has "irix") {
   Write-Host "==> irix is not installed; nothing to stop"
   $listener = $null
   try {
-    $listener = Get-NetTCPConnection -LocalPort 6899 -State Listen -ErrorAction Stop |
+    $listener = Get-NetTCPConnection -LocalPort 6890 -State Listen -ErrorAction Stop |
       Select-Object -First 1
   } catch {
     # Nothing listens there, or the check is unavailable: either way there is nothing to warn about.
   }
   if ($listener) {
-    Write-Warning "Something is listening on port 6899 (process id $($listener.OwningProcess)), probably an old daemon whose command is gone. If the install below fails with EBUSY or EPERM, stop it: Stop-Process -Id $($listener.OwningProcess)"
+    Write-Warning "Something is listening on port 6890 (process id $($listener.OwningProcess)), probably an old daemon whose command is gone. If the install below fails with EBUSY or EPERM, stop it: Stop-Process -Id $($listener.OwningProcess)"
   }
 }
 Step "npm uninstall -g (old packages)" {

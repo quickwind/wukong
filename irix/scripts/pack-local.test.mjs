@@ -50,6 +50,7 @@ test("strips the prerelease and stamps the build in UTC", () => {
 test("only tarballs of the same scope count as leftovers from an earlier build", () => {
   assert.equal(staleTarball("irix-cli-0.11.2-irix.1.tgz", "irix"), true);
   assert.equal(staleTarball("acme-cli-1.0.0.tgz", "irix"), false);
+  assert.equal(staleTarball("irix-ui-render-0.1.0-offline.tgz", "irix"), false);
   assert.equal(staleTarball("INSTALL-WINDOWS.md", "irix"), false);
 });
 
@@ -57,6 +58,8 @@ test("only bundles of the same scope count as leftovers", () => {
   assert.equal(staleBundle("irix-0.11.2-irix.1.zip", "irix"), true);
   assert.equal(staleBundle("acme-1.0.0.zip", "irix"), false);
   assert.equal(staleBundle("paseo-bots-0.2.0-offline.2.zip", "irix"), false);
+  assert.equal(staleBundle("irix-ui-render-0.1.0-offline.zip", "irix"), false);
+  assert.equal(staleBundle("irix-export-session-0.1.0-offline.zip", "irix"), false);
   assert.equal(staleBundle("irix-cli-0.11.2-irix.1.tgz", "irix"), false);
 });
 

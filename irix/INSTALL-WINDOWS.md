@@ -57,13 +57,13 @@ tarballs, and starts the daemon again. See [Update or remove](#update-or-remove)
 irix daemon start
 ```
 
-Open **http://127.0.0.1:6899** in a browser.
+Open **http://127.0.0.1:6890** in a browser.
 
 Irix keeps to itself, so it can sit next to a Paseo you already run:
 
 - the command is `irix` (it does not install a `paseo` command);
 - its data lives in `%USERPROFILE%\.irix` (Paseo uses `%USERPROFILE%\.paseo`);
-- it listens on port 6899 (Paseo uses 6767).
+- it listens on port 6890 (Paseo uses 6767).
 - it ignores the `PASEO_HOME` and `PASEO_HOST` variables that a terminal opened inside Paseo
   carries, so it never talks to Paseo's daemon by accident. To use another folder, set
   `IRIX_HOME` (or pass `--home`).

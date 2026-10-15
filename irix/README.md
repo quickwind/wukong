@@ -104,7 +104,7 @@ registry:
 ```sh
 npm install -g @<scope>/cli @<scope>/server @<scope>/client @<scope>/protocol @<scope>/relay \
   @<scope>/plugin @<scope>/highlight
-irix daemon start        # http://127.0.0.1:6899, data in ~/.irix
+irix daemon start        # http://127.0.0.1:6890, data in ~/.irix
 ```
 
 Tag releases with a prefix other than `v` (for example `irix-20261010`): upstream's release

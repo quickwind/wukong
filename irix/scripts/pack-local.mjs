@@ -61,12 +61,12 @@ export function buildStamp(date = new Date()) {
 
 /** A tarball of this scope from an earlier build, such as `irix-cli-0.11.2-irix.1.tgz`. */
 export function staleTarball(file, scope) {
-  return file.startsWith(`${scope}-`) && file.endsWith(".tgz");
+  return PACKAGES.some((pkg) => file.startsWith(`${scope}-${pkg}-`)) && file.endsWith(".tgz");
 }
 
 /** An earlier bundle of this scope, such as `irix-0.11.2-irix.1.zip`. */
 export function staleBundle(file, scope) {
-  return file.startsWith(`${scope}-`) && file.endsWith(".zip");
+  return new RegExp(`^${scope}-\\d`).test(file) && file.endsWith(".zip");
 }
 
 const isWindows = process.platform === "win32";

@@ -15,14 +15,14 @@ const readText = (home: string) => readFileSync(configPath(home), "utf8");
 const readConfig = (home: string) => JSON.parse(readText(home));
 
 describe("applyIrixDefaults", () => {
-  it("uses ~/.irix and writes a config that listens on 6899 and hands agents Paseo's tools", () => {
+  it("uses ~/.irix and writes a config that listens on 6890 and hands agents Paseo's tools", () => {
     const home = freshHome();
     const env: NodeJS.ProcessEnv = {};
     applyIrixDefaults(env, home);
     expect(env.PASEO_HOME).toBe(irixDefaultHome(home));
     expect(readConfig(env.PASEO_HOME ?? "")).toEqual({
       version: 1,
-      daemon: { listen: "127.0.0.1:6899", mcp: { injectIntoAgents: true } },
+      daemon: { listen: "127.0.0.1:6890", mcp: { injectIntoAgents: true } },
     });
   });
 

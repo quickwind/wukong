@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-export const IRIX_DEFAULT_PORT = 6899;
+export const IRIX_DEFAULT_PORT = 6890;
 
 export function irixDefaultHome(homeDirectory: string = os.homedir()): string {
   return path.join(homeDirectory, ".irix");
@@ -20,7 +20,7 @@ function expandHome(input: string, homeDirectory: string): string {
   return /^~[\\/]/u.test(input) ? path.join(homeDirectory, input.slice(2)) : input;
 }
 
-/** Points the CLI at ~/.irix (or IRIX_HOME) and gives a fresh home a config on port 6899. */
+/** Points the CLI at ~/.irix (or IRIX_HOME) and gives a fresh home a config on port 6890. */
 export function applyIrixDefaults(
   env: NodeJS.ProcessEnv = process.env,
   homeDirectory: string = os.homedir(),

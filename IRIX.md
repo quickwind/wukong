@@ -15,7 +15,7 @@ Paseo on company Windows machines, where nothing may be sent to cloud services:
 - **No traffic from the daemon to the internet.** Loopback only, plus an explicit allowlist.
 - Delivered as **seven npm tarballs** (`@irix/*`), installed with `npm install -g`. No desktop or
   mobile app. The team uses Windows and has no administrator rights.
-- Runs next to a normal Paseo install: own command (`irix`), home (`~/.irix`), port (6899).
+- Runs next to a normal Paseo install: own command (`irix`), home (`~/.irix`), port (6890).
 
 ## The prime rule: the smallest possible footprint on upstream
 
@@ -176,7 +176,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   upstream's version because Expo rejects other forms. All seven must be installed together or npm
   fetches upstream packages and the guard's promise is gone.
 - **Isolation from Paseo:** only an `irix` binary (no `paseo`), home `~/.irix` or
-  `IRIX_HOME`, port 6899, and the CLI ignores `PASEO_HOME`/`PASEO_HOST` inherited from a
+  `IRIX_HOME`, port 6890, and the CLI ignores `PASEO_HOME`/`PASEO_HOST` inherited from a
   terminal opened inside Paseo.
 - **Web UI:** served by the daemon, on by default. English only: Irix's added strings are not in
   the translation tables, to keep i18n files untouched.
@@ -284,7 +284,7 @@ to an unofficial Devin endpoint is acceptable under the company's agreement with
   Windows runner runs steps in Git Bash, whose GNU tar reads `C:\...` as host:file: give `tar` bare
   names and a `cwd`. **Look at CI after every push**; the Windows job once failed for days unseen.
 - **Never kill processes by name** (`pkill`, `pgrep | kill`): the user's main Paseo daemon on 6767 is
-  titled "Paseo Daemon" too, and so was the Irix trial instance on 6899. Stop what you started with
+  titled "Paseo Daemon" too, and so was the Irix trial instance on 6890. Stop what you started with
   `irix daemon stop` on your own `IRIX_HOME`, or by the PID the start printed. When testing against
   the real Devin, give the test daemon its own `IRIX_HOME` (the real `HOME` stays so Devin finds its
   login), and read only: Devin's `credentials.toml` is not yours to open.
@@ -301,7 +301,7 @@ files you changed**, never the whole suite, use the npm scripts for lint and for
    `plugins`; `node --test "irix/scripts/*.test.mjs"`.
 3. `node irix/scripts/upstream-footprint.mjs` if you touched an upstream file.
 4. For anything user-visible, run it for real: temp home, own port, never `6767` (the main Paseo
-   daemon; do not restart it) and not `6899` if someone is using it.
+   daemon; do not restart it) and not `6890` if someone is using it.
 5. Packaging: `node irix/scripts/pack-local.mjs --out ~/irix-dist` (one batch only; it clears
    earlier tarballs there), then install them into a temp `--prefix` and run `irix --version`.
 6. If you added a dependency, a copied snippet, a file from elsewhere or an asset: apply "Rules for
