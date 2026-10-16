@@ -35,7 +35,7 @@ function option(name: string, value: string | number | boolean): string {
   return `--${name}=${cliValue(String(value))}`;
 }
 
-function run(file: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string> {
+export function run(file: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       file,
