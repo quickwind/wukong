@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { needsGitLabSetup } from "../shared/setup-hint.js";
 import { FolderDialog } from "./folder-dialog.js";
 import {
   pollCloneRpc,
@@ -318,7 +319,11 @@ function describe(state: Extract<CloneState, { status: "done" }>): string {
   return `${result.alreadyCloned ? "Opened existing clone " : "Cloned and opened "}${result.directory}`;
 }
 
-export function AddFromGitLabScreen({ theme, layout }: PluginScreenProps) {
+export function AddFromGitLabScreen({
+  theme,
+  layout,
+  openGitLabSettings,
+}: PluginScreenProps & { openGitLabSettings?: () => void }) {
   const search = useRpc(searchProjectsRpc);
   const [query, setQuery] = useState("");
   const [folder, setFolder] = useState("");
@@ -418,6 +423,16 @@ export function AddFromGitLabScreen({ theme, layout }: PluginScreenProps) {
 
       <ProgressDialog state={cloneState} styles={styles} theme={theme} onClose={dismiss} />
       {results.error ? <Text style={styles.error}>{messageOf(results.error)}</Text> : null}
+      {results.error && openGitLabSettings && needsGitLabSetup(messageOf(results.error)) ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open GitLab settings"
+          style={styles.secondaryButton}
+          onPress={openGitLabSettings}
+        >
+          <Text style={styles.secondaryButtonText}>Open GitLab settings</Text>
+        </Pressable>
+      ) : null}
 
       <ScrollView>
         {results.isFetching && !results.data ? (
