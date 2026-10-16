@@ -17,6 +17,7 @@ import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
+import { hideWhenSchedulesDisabled } from "@/irix/schedules-disabled";
 import {
   buildNewWorkspaceRoute,
   buildSchedulesRoute,
@@ -177,5 +178,5 @@ const BUILTIN_ROWS: Record<BuiltinSidebarNavId, ComponentType<SidebarNavRowProps
   "new-workspace": SidebarNewWorkspaceRow,
   history: SidebarHistoryRow,
   search: SidebarSearchRow,
-  schedules: SidebarSchedulesRow,
+  schedules: hideWhenSchedulesDisabled(SidebarSchedulesRow), // Irix
 };

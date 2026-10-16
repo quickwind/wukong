@@ -960,7 +960,11 @@ export function buildProviderRegistry(
         createRegistryEntry(logger, provider, resolved),
       ]),
     ) as Record<AgentProvider, ProviderDefinition>,
-    { isDev: options?.isDev === true, devProviderIds: DEV_PROVIDER_IDS }, // Irix
+    {
+      isDev: options?.isDev === true,
+      devProviderIds: DEV_PROVIDER_IDS,
+      registryOptions: options,
+    }, // Irix
   );
 }
 

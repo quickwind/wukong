@@ -36,6 +36,7 @@ import { getShortcutOs } from "@/utils/shortcut-platform";
 import type { CommandCenterContribution, CommandCenterIconProps } from "./contributions";
 import { useCommandCenterActions } from "./provider";
 import { buildGroupingContribution } from "./root-contributions";
+import { useSchedulesDisabled } from "@/irix/schedules-disabled";
 
 const ThemedPlus = withUnistyles(Plus, (theme) => ({ color: theme.colors.foregroundMuted }));
 const ThemedFolderPlus = withUnistyles(FolderPlus, (theme) => ({
@@ -118,6 +119,7 @@ export function CommandCenterRootActions() {
   const homeRoute = useMemo<Href>(() => buildOpenProjectRoute(), []);
   const sessionsRoute = useMemo<Href>(() => buildSessionsRoute(), []);
   const schedulesRoute = useMemo<Href>(() => buildSchedulesRoute(), []);
+  const schedulesDisabled = useSchedulesDisabled(); // Irix
   const setShortcutsDialogOpen = useKeyboardShortcutsStore((state) => state.setShortcutsDialogOpen);
   // Narrow selector on purpose: a whole-store subscription would re-register every root action
   // each time host filters are reconciled.
@@ -329,8 +331,12 @@ export function CommandCenterRootActions() {
       }),
     );
 
-    return availableActions;
+    // Irix: no Schedules entry when the daemon has schedules off
+    return schedulesDisabled
+      ? availableActions.filter((a) => a.id !== "schedules")
+      : availableActions;
   }, [
+    schedulesDisabled,
     groupMode,
     homeRoute,
     keyboardActionDispatcher,

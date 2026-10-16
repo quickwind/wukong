@@ -30,6 +30,7 @@ import type {
 } from "../server/agent/agent-sdk-types.js";
 import { GenericACPAgentClient } from "../server/agent/providers/generic-acp-agent.js";
 import { isIrixActive } from "./policy.js";
+import { isIrixRestricted } from "./restrictions.js";
 
 const DEVIN_PROVIDER_ID = "devin";
 
@@ -50,6 +51,7 @@ interface PromptingConnection {
 
 /** What Devin is told about driving Paseo from its shell, for the tools it cannot get over MCP. */
 export function paseoCommandLineGuide(agentId?: string): string {
+  const mayMessage = !isIrixRestricted("agentMessaging");
   return [
     "Working with other agents in this app: you have no MCP tools for it. Use the `irix` command in " +
       "your shell (it talks to the app running on this machine).",
@@ -57,14 +59,22 @@ export function paseoCommandLineGuide(agentId?: string): string {
       ? [`Your own agent ID is ${agentId} (also in the environment as PASEO_AGENT_ID).`]
       : []),
     "- `irix agent ls`: list the agents, with their IDs, titles and status",
-    '- `irix send <id> "<message>" --no-wait`: send a message to the agent with that ID (an ID ' +
-      "prefix is enough); it knows the message is from you. Leave out --no-wait to wait for its reply",
+    ...(mayMessage
+      ? [
+          '- `irix send <id> "<message>" --no-wait`: send a message to the agent with that ID (an ID ' +
+            "prefix is enough); it knows the message is from you. Leave out --no-wait to wait for its reply",
+        ]
+      : []),
     "- `irix logs <id> --tail 20`: read what an agent has done and said lately",
     "- `irix wait <id>`: wait until an agent is idle",
     '- `irix run --provider <provider> --title <title> "<task>"`: start a new agent on a task',
-    "You are not told when an agent you started or messaged finishes. To get its answer, leave out " +
-      "--no-wait (the command returns when the agent is done), or for long work ask it in the message " +
-      "to report back with `irix send <your ID> ...` when it is finished.",
+    ...(mayMessage
+      ? [
+          "You are not told when an agent you started or messaged finishes. To get its answer, leave out " +
+            "--no-wait (the command returns when the agent is done), or for long work ask it in the message " +
+            "to report back with `irix send <your ID> ...` when it is finished.",
+        ]
+      : []),
     "A skill or instruction that names Paseo tools (list_agents, create_agent, send_agent_prompt, " +
       "get_agent_activity, wait_for_agent, list_profiles, ...) means these commands: use `irix --help` " +
       "and `irix <command> --help` to find the matching one. Write `irix`, never `paseo`.",

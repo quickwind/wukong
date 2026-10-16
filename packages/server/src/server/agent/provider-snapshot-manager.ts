@@ -1,4 +1,5 @@
 import { normalizeAgentModelCatalog } from "@getpaseo/protocol/agent-types";
+import { withoutIrixBypassModes } from "../../irix/restrictions.js";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { homedir } from "node:os";
@@ -1048,7 +1049,7 @@ export class ProviderSnapshotManager {
         status: "ready",
         enabled: true,
         models,
-        modes: catalog.modes,
+        modes: withoutIrixBypassModes(catalog.modes), // Irix: no bypass modes
         fetchedAt: new Date().toISOString(),
       });
     } catch (error) {

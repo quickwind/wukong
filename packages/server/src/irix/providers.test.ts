@@ -1,7 +1,11 @@
 import pino from "pino";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { buildProviderRegistry } from "../server/agent/provider-registry.js";
+import {
+  buildProviderRegistry,
+  type RegisteredProviderDefinition,
+} from "../server/agent/provider-registry.js";
+import type { AgentClient } from "../server/agent/agent-sdk-types.js";
 import { activateIrixPolicy } from "./policy.js";
 
 const logger = pino({ level: "silent" });
@@ -48,5 +52,43 @@ describe("Irix providers", () => {
       expect.arrayContaining(["claude", "devin"]),
     );
     expect(Object.keys(buildProviderRegistry(logger, { isDev: false }))).not.toContain("mock");
+  });
+
+  describe("plugin providers", () => {
+    function pluginProvider(id: string): RegisteredProviderDefinition {
+      return {
+        id,
+        label: id,
+        description: id,
+        defaultModeId: null,
+        modes: [],
+        supportsExactMcpPreapproval: false,
+        createClient: () => ({}) as unknown as AgentClient,
+      } as unknown as RegisteredProviderDefinition;
+    }
+
+    it("shows the scripted provider only while its plugin has registered it", () => {
+      expect(Object.keys(buildProviderRegistry(logger)).sort()).toEqual(["claude", "devin"]);
+      const registry = buildProviderRegistry(logger, {
+        pluginProviders: { scripted: pluginProvider("scripted") },
+      });
+      expect(Object.keys(registry).sort()).toEqual(["claude", "devin", "scripted"]);
+    });
+
+    it("drops plugin providers that are not on the list", () => {
+      const registry = buildProviderRegistry(logger, {
+        pluginProviders: { rogue: pluginProvider("rogue") },
+      });
+      expect(Object.keys(registry).sort()).toEqual(["claude", "devin"]);
+    });
+
+    it("does not let a configured provider stand in for the plugin", () => {
+      const registry = buildProviderRegistry(logger, {
+        providerOverrides: {
+          scripted: { extends: "acp", label: "Scripted", command: ["x", "acp"] },
+        },
+      });
+      expect(Object.keys(registry).sort()).toEqual(["claude", "devin"]);
+    });
   });
 });

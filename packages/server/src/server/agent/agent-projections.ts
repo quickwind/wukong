@@ -3,6 +3,7 @@ import type {
   AgentSnapshotPayload,
   RecentProviderSessionDescriptorPayload,
 } from "../messages.js";
+import { withoutIrixBypassModes } from "../../irix/restrictions.js";
 import type { SerializableAgentConfig, StoredAgentRecord } from "./agent-storage.js";
 import type {
   AgentCapabilityFlags,
@@ -133,7 +134,7 @@ export function toAgentPayload(
       : null,
     capabilities: cloneCapabilities(agent.capabilities),
     currentModeId: agent.currentModeId,
-    availableModes: cloneAvailableModes(agent.availableModes),
+    availableModes: cloneAvailableModes(withoutIrixBypassModes(agent.availableModes) ?? []), // Irix: no bypass modes
     features: normalizeFeatures(agent.features),
     pendingPermissions: sanitizePendingPermissions(agent.pendingPermissions),
     persistence: projectPersistenceHandleForWire(agent.persistence),

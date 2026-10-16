@@ -92,6 +92,7 @@ import {
 } from "./provider-subagents/store.js";
 import { withTimeout } from "../../utils/promise-timeout.js";
 import { extractAttention } from "../persistence-hooks.js";
+import { assertIrixModeAllowed } from "../../irix/restrictions.js";
 
 const RELOAD_SESSION_CLOSE_TIMEOUT_MS = 3_000;
 const INTERRUPT_SESSION_TIMEOUT_MS = 2_000;
@@ -2020,6 +2021,7 @@ export class AgentManager {
   }
 
   async setAgentMode(agentId: string, modeId: string): Promise<AgentProviderNotice | null> {
+    assertIrixModeAllowed({ modeId }); // Irix: no bypass modes
     const agent = this.requireSessionAgent(agentId);
     const notice = (await agent.session.setMode(modeId)) ?? null;
     await this.drainSessionEvents(agentId);
@@ -2089,6 +2091,7 @@ export class AgentManager {
   }
 
   async setAgentFeature(agentId: string, featureId: string, value: unknown): Promise<void> {
+    assertIrixModeAllowed({ featureValues: { [featureId]: value } }); // Irix: no auto-accept
     const agent = this.requireAgent(agentId);
 
     if (!agent.session.setFeature) {
@@ -5296,6 +5299,7 @@ export class AgentManager {
       env: options.env,
       purpose: options.purpose,
     });
+    assertIrixModeAllowed(storedConfig); // Irix: no bypass modes
     const paseoToolPolicy = this.paseoToolsEnabled
       ? this.resolvePaseoToolPolicy(storedConfig.provider)
       : { enabled: false };

@@ -25,6 +25,7 @@ import type {
   UpdateScheduleNewAgentConfig,
 } from "@getpaseo/protocol/schedule/types";
 import type { FirstAgentContext } from "@getpaseo/protocol/messages";
+import { assertIrixSchedulesAllowed, isIrixRestricted } from "../../irix/restrictions.js";
 
 const SCHEDULE_TICK_INTERVAL_MS = 1000;
 
@@ -296,6 +297,7 @@ export class ScheduleService {
   }
 
   async create(input: CreateScheduleInput): Promise<StoredSchedule> {
+    assertIrixSchedulesAllowed(); // Irix
     const prompt = normalizePrompt(input.prompt);
     validateScheduleCadence(input.cadence);
     return this.createScheduleRecord(input, {
@@ -340,6 +342,7 @@ export class ScheduleService {
   // name and target (e.g. babysit-pr re-registering its heartbeat) refreshes the
   // existing non-completed schedule in place instead of minting a duplicate.
   async createOrReplace(input: CreateScheduleInput): Promise<StoredSchedule> {
+    assertIrixSchedulesAllowed(); // Irix
     const name = trimOptionalName(input.name);
     const prompt = normalizePrompt(input.prompt);
     validateScheduleCadence(input.cadence);
@@ -412,6 +415,7 @@ export class ScheduleService {
   }
 
   async resume(id: string): Promise<StoredSchedule> {
+    assertIrixSchedulesAllowed(); // Irix
     const resumed = await this.store.update(id, (schedule) => {
       if (schedule.status === "completed") {
         throw new Error(`Schedule ${id} is already completed`);
@@ -432,6 +436,7 @@ export class ScheduleService {
   }
 
   async update(input: UpdateScheduleInput): Promise<StoredSchedule> {
+    assertIrixSchedulesAllowed(); // Irix
     const next = await this.store.update(input.id, async (schedule) => {
       const now = this.now();
       let updated: StoredSchedule = schedule;
@@ -532,6 +537,7 @@ export class ScheduleService {
   }
 
   async runOnce(id: string): Promise<StoredSchedule> {
+    assertIrixSchedulesAllowed(); // Irix
     const schedule = await this.inspect(id);
     if (schedule.status === "completed") {
       throw new Error(`Schedule ${id} is already completed`);
@@ -544,6 +550,7 @@ export class ScheduleService {
   }
 
   async tick(): Promise<void> {
+    if (isIrixRestricted("schedules")) return; // Irix
     const now = this.now();
     const schedules = await this.store.list();
     for (const schedule of schedules) {

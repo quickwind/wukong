@@ -1,4 +1,5 @@
 import { ACPProviderOptionsSchema } from "./acp-options.js";
+import { irixFeatures } from "../../../irix/restrictions.js";
 import { type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
@@ -1186,7 +1187,7 @@ export class ACPAgentClient implements AgentClient {
   async listFeatures(config: AgentSessionConfig): Promise<AgentFeature[]> {
     const autoAcceptFeature = buildACPAutoAcceptFeature(config);
     if (this.configFeatureOptions.length === 0) {
-      return [autoAcceptFeature];
+      return irixFeatures(autoAcceptFeature); // Irix: no auto accept
     }
 
     this.assertProvider(config);
@@ -1202,7 +1203,7 @@ export class ACPAgentClient implements AgentClient {
       probeSessionId = response.sessionId;
       const transformed = this.transformSessionResponse(response);
       return [
-        autoAcceptFeature,
+        ...irixFeatures(autoAcceptFeature), // Irix
         ...deriveFeaturesFromACP(transformed.configOptions, this.configFeatureOptions),
       ];
     } finally {
@@ -1994,7 +1995,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
 
   get features(): AgentFeature[] {
     return [
-      buildACPAutoAcceptFeature(this.config),
+      ...irixFeatures(buildACPAutoAcceptFeature(this.config)), // Irix
       ...deriveFeaturesFromACP(this.configOptions, this.configFeatureOptions),
     ];
   }

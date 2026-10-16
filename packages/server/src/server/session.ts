@@ -278,6 +278,7 @@ import {
 import { runGitCommand } from "../utils/run-git-command.js";
 import { CreateAgentLifecycleDispatch } from "./agent/create-agent-lifecycle-dispatch.js";
 import { resolveWorktreeSourceCwd } from "./workspace-source.js";
+import { assertIrixAgentMessagingAllowed } from "../irix/restrictions.js";
 
 type ProviderSubagentManagerEvent = Extract<
   AgentManagerEvent,
@@ -8189,6 +8190,7 @@ export class Session {
     try {
       const agentId = resolved.agentId;
 
+      assertIrixAgentMessagingAllowed(msg.sourceAgentId); // Irix: no agent-to-agent send
       const prompt = buildAgentPrompt(msg.text, msg.images, msg.attachments);
       this.sessionLogger.trace(
         {

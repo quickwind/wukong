@@ -100,6 +100,7 @@ import type {
 } from "./types.js";
 import type { ProviderPaseoToolsPolicy } from "@getpaseo/protocol/provider-config";
 import { isPaseoToolEnabled } from "../paseo-tool-policy.js";
+import { isIrixToolBlocked } from "../../../irix/restrictions.js";
 
 export interface PaseoToolHostDependencies {
   agentManager: AgentManager;
@@ -603,7 +604,8 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Tool handlers are schema-validated at registration boundaries.
     handler: (input: any, context: PaseoToolExecutionContext) => Promise<PaseoToolResult>,
   ) => {
-    if (!isPaseoToolEnabled(options.paseoToolPolicy, name)) {
+    if (!isPaseoToolEnabled(options.paseoToolPolicy, name) || isIrixToolBlocked(name)) {
+      // Irix: no schedule tools, no agent-to-agent send
       return;
     }
     tools.set(name, {
