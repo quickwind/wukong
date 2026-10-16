@@ -7,6 +7,7 @@ import {
 } from "../server/agent/provider-registry.js";
 import type { AgentClient } from "../server/agent/agent-sdk-types.js";
 import { activateIrixPolicy } from "./policy.js";
+import { detectIrixProviders, resetIrixProviderDetection } from "./providers.js";
 
 const logger = pino({ level: "silent" });
 
@@ -15,7 +16,10 @@ describe("Irix providers", () => {
   beforeEach(() => {
     deactivate = activateIrixPolicy();
   });
-  afterEach(() => deactivate());
+  afterEach(() => {
+    resetIrixProviderDetection();
+    deactivate();
+  });
 
   it("leaves the upstream registry alone until activated", () => {
     deactivate();
@@ -89,6 +93,55 @@ describe("Irix providers", () => {
         },
       });
       expect(Object.keys(registry).sort()).toEqual(["claude", "devin"]);
+    });
+  });
+
+  describe("Claude detection", () => {
+    const missing = async () => ({ available: false, resolvedPath: null });
+    const present = async () => ({ available: true, resolvedPath: "/usr/bin/claude" });
+
+    it("is enabled until detection has run", () => {
+      expect(buildProviderRegistry(logger).claude.enabled).toBe(true);
+    });
+
+    it("turns Claude off when the command is not installed, and leaves Devin alone", async () => {
+      await detectIrixProviders(undefined, missing);
+      const registry = buildProviderRegistry(logger);
+      expect(registry.claude.enabled).toBe(false);
+      expect(registry.devin.enabled).toBe(true);
+    });
+
+    it("leaves Claude on when the command is found", async () => {
+      await detectIrixProviders(undefined, present);
+      expect(buildProviderRegistry(logger).claude.enabled).toBe(true);
+    });
+
+    it("lets the user's own setting win over detection", async () => {
+      await detectIrixProviders(undefined, missing);
+      const registry = buildProviderRegistry(logger, {
+        providerOverrides: { claude: { enabled: true } },
+      });
+      expect(registry.claude.enabled).toBe(true);
+    });
+
+    it("checks the command the user configured, not just claude on PATH", async () => {
+      const seen: string[] = [];
+      const record = async (launch: { command: string }) => {
+        seen.push(launch.command);
+        return { available: true, resolvedPath: launch.command };
+      };
+      await detectIrixProviders(
+        { claude: { command: { mode: "replace", argv: ["/opt/claude/bin/claude"] } } },
+        record,
+      );
+      expect(seen).toEqual(["/opt/claude/bin/claude"]);
+    });
+
+    it("does nothing outside the Irix edition", async () => {
+      deactivate();
+      await detectIrixProviders(undefined, missing);
+      deactivate = activateIrixPolicy();
+      expect(buildProviderRegistry(logger).claude.enabled).toBe(true);
     });
   });
 });

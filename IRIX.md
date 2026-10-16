@@ -141,7 +141,9 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   `brand.mjs` rewrites `paseo <command>` to `irix <command>` in those skills at pack time, since
   Irix ships no `paseo` command. Paseo's `browser_*` tools have no CLI, so Devin has none.
 - **Providers:** removed from the registry, not merely disabled. Terminal profiles are fixed to
-  Claude Code. The Providers page and Add provider catalog are hidden.
+  Claude Code. The Providers page and Add provider catalog are hidden. Claude starts disabled when
+  its command is not found at daemon start (`detectIrixProviders` in `irix/providers.ts`); an
+  explicit enabled setting wins, and installing Claude later takes effect at the next start.
 - **Plugins:** local folders only. npm, Git and registry sources are switched off because they run
   child processes the guard cannot see. A friendly error says so. Plugins written for Paseo still
   work: `irix/plugin-sdk-alias.ts` maps `@getpaseo/plugin` to the local SDK name. The upstream
