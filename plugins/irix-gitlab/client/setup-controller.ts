@@ -102,9 +102,13 @@ export function createSetupController(api: SetupApi) {
     if (!section) return;
     set({ test: { running: true, outcome: null, error: null } });
     try {
-      set({ test: { running: false, outcome: await api.testSection(section), error: null } });
+      const outcome = await api.testSection(section);
+      // The user may have chosen another section while GitLab answered.
+      if (state.section === section) set({ test: { running: false, outcome, error: null } });
     } catch (error) {
-      set({ test: { running: false, outcome: null, error: messageOf(error) } });
+      if (state.section === section) {
+        set({ test: { running: false, outcome: null, error: messageOf(error) } });
+      }
     }
   }
 
@@ -193,7 +197,7 @@ export function createSetupController(api: SetupApi) {
     setCloneRoot: (cloneRoot: string) => set({ cloneRoot, savedResult: null }),
     /** The new-section form shows on request, or when there is nothing to choose from. */
     showNewSectionForm: () =>
-      state.adding || (state.status !== null && state.status.sections.length === 0),
+      state.adding || (state.status !== null && !state.status.sections.some((entry) => entry.usable)),
     /** A rejected token, or one about to expire, calls for a new one. */
     needsNewToken: () =>
       state.test.outcome?.result === "token-rejected" || state.test.outcome?.expiresSoon === true,

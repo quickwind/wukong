@@ -56,6 +56,21 @@ describe("setupStatus", () => {
     expect(status.overrides).toEqual([]);
   });
 
+  it("marks sections the daemon would reject as unusable", async () => {
+    writeFileSync(
+      cfg,
+      "[my work]\nurl = https://a.example.com\n\n[creds]\nurl = https://u:p@b.example.com\n\n[query]\nurl = https://c.example.com/?x=1\n\n[none]\nprivate_token = x\n\n[fine]\nurl = https://d.example.com\n",
+    );
+    const usable = (await setupStatus(env)).sections.map((s) => [s.name, s.usable]);
+    expect(usable).toEqual([
+      ["my work", false],
+      ["creds", false],
+      ["query", false],
+      ["none", false],
+      ["fine", true],
+    ]);
+  });
+
   it("names the environment variables that override the saved values", async () => {
     const status = await setupStatus({ ...env, IRIX_GITLAB_SECTION: "x", IRIX_CLONE_ROOT: "/p" });
     expect(status.overrides).toEqual(["IRIX_GITLAB_SECTION", "IRIX_CLONE_ROOT"]);

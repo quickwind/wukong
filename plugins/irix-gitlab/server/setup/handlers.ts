@@ -18,12 +18,28 @@ import {
 import { readGitLabSaved, writeGitLabSaved } from "./irix-json.js";
 import { checkTools, expiresSoon, testSection, testToken } from "./probe.js";
 
-function isHttps(url: string | null): url is string {
+// The daemon's forge config (packages/server/src/irix/gitlab/config.ts) rejects other urls and
+// section names at startup, which would switch off every merge-request feature.
+const SECTION_NAME = /^[^\s-]\S*$/u;
+
+/** Why `value` cannot be the GitLab url, or null when it can. */
+function urlProblem(value: string | null): string | null {
+  if (!value) return "has no url";
+  let parsed: URL;
   try {
-    return url !== null && new URL(url).protocol === "https:";
+    parsed = new URL(value);
   } catch {
-    return false;
+    return "has an url that is not valid";
   }
+  if (parsed.protocol !== "https:") return "needs an https url";
+  if (parsed.username || parsed.password) return "must not have credentials in its url";
+  if (parsed.search || parsed.hash) return "must not have a query string or fragment in its url";
+  return null;
+}
+
+function sectionProblem(name: string, url: string | null): string | null {
+  if (!SECTION_NAME.test(name)) return "has a name with spaces or a leading dash";
+  return urlProblem(url);
 }
 
 function resolveCommand(env: NodeJS.ProcessEnv): string[] {
@@ -35,27 +51,15 @@ function resolveCommand(env: NodeJS.ProcessEnv): string[] {
 function usableSection(env: NodeJS.ProcessEnv, name: string): string {
   const section = readCfgSections(cfgPath(env)).find((entry) => entry.name === name);
   if (!section) throw new Error(`There is no section "${name}" in ${cfgPath(env)}`);
-  if (!isHttps(section.url)) {
-    throw new Error(`Section "${name}" needs an https url in ${cfgPath(env)}`);
-  }
-  return section.url.replace(/\/+$/u, "");
+  const problem = sectionProblem(name, section.url);
+  if (problem) throw new Error(`Section "${name}" ${problem} in ${cfgPath(env)}`);
+  return (section.url ?? "").replace(/\/+$/u, "");
 }
 
 function validateUrl(value: string): string {
   assertCfgValue("GitLab URL", value);
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    throw new Error(`The GitLab URL must look like https://gitlab.example.com (got "${value}")`);
-  }
-  if (parsed.protocol !== "https:") throw new Error("The GitLab URL must use https");
-  if (parsed.username || parsed.password) {
-    throw new Error("The GitLab URL must not contain credentials");
-  }
-  if (parsed.search || parsed.hash) {
-    throw new Error("The GitLab URL must not contain a query string or fragment");
-  }
+  const problem = urlProblem(value);
+  if (problem) throw new Error(`The GitLab URL ${problem.replace(/^has no url$/u, "is empty")}`);
   return value.replace(/\/+$/u, "");
 }
 
@@ -66,7 +70,7 @@ export async function setupStatus(
   return {
     tools: await checkTools(resolveCommand(env)),
     cfgPath: path,
-    sections: readCfgSections(path).map(({ name, url }) => ({ name, url, usable: isHttps(url) })),
+    sections: readCfgSections(path).map(({ name, url }) => ({ name, url, usable: sectionProblem(name, url) === null })),
     saved: (({ url, configSection, cloneRoot }) => ({ url, configSection, cloneRoot }))(
       readGitLabSaved(env),
     ),

@@ -122,6 +122,7 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
   }
 
   const showForm = controller.showNewSectionForm();
+  const unusable = status.sections.filter((entry) => !entry.usable);
   const needsToken = controller.needsNewToken();
   const outcome = state.test.outcome;
 
@@ -202,6 +203,20 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
               />
             </SettingsCard>
           ) : null}
+        </SettingsSection>
+      ) : null}
+
+      {unusable.length > 0 ? (
+        <SettingsSection title="Sections that cannot be used">
+          <SettingsCard>
+            {unusable.map((entry) => (
+              <SettingsRow
+                key={entry.name}
+                label={entry.name}
+                hint={`${entry.url ?? "no url"}. Needs an https url without credentials or a query string, and a name without spaces. Fix it in ${status.cfgPath}.`}
+              />
+            ))}
+          </SettingsCard>
         </SettingsSection>
       ) : null}
 
