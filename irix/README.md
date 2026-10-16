@@ -56,7 +56,7 @@ Put the company GitLab in `<Irix home>/irix.json` (default `~/.irix/irix.json`):
 `IRIX_GITLAB_URL`, `IRIX_GITLAB_SECTION`, `IRIX_GITLAB_SSH_HOST`, `IRIX_GITLAB_COMMAND`
 and `IRIX_CLONE_ROOT` take precedence. The URL must be https.
 
-You normally do not edit these by hand. Open **Settings → Plugins → GitLab**: it checks that
+You normally do not edit these by hand. Open the Command Center and run **GitLab settings**, or press **GitLab settings** on the Add project from GitLab page (a built-in plugin has no row under Settings → Plugins). It checks that
 [python-gitlab](https://python-gitlab.readthedocs.io/) is installed (if not, it shows
 `uv tool install python-gitlab` and where to get uv; Irix never runs the installer), lists the
 sections of `~/.python-gitlab.cfg` and tests one when you press **Test**, or, with no config, takes

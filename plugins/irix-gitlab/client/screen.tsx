@@ -11,7 +11,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { needsGitLabSetup } from "../shared/setup-hint.js";
 import { FolderDialog } from "./folder-dialog.js";
 import {
   pollCloneRpc,
@@ -373,6 +372,16 @@ export function AddFromGitLabScreen({
         autoCorrect={false}
         accessibilityLabel="Search GitLab projects"
       />
+      {openGitLabSettings ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open GitLab settings"
+          style={styles.secondaryButton}
+          onPress={openGitLabSettings}
+        >
+          <Text style={styles.secondaryButtonText}>GitLab settings</Text>
+        </Pressable>
+      ) : null}
       <Text style={styles.label}>Clone into</Text>
       <TextInput
         style={styles.input}
@@ -423,16 +432,6 @@ export function AddFromGitLabScreen({
 
       <ProgressDialog state={cloneState} styles={styles} theme={theme} onClose={dismiss} />
       {results.error ? <Text style={styles.error}>{messageOf(results.error)}</Text> : null}
-      {results.error && openGitLabSettings && needsGitLabSetup(messageOf(results.error)) ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open GitLab settings"
-          style={styles.secondaryButton}
-          onPress={openGitLabSettings}
-        >
-          <Text style={styles.secondaryButtonText}>Open GitLab settings</Text>
-        </Pressable>
-      ) : null}
 
       <ScrollView>
         {results.isFetching && !results.data ? (

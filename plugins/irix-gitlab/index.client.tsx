@@ -4,6 +4,7 @@ import type { PluginScreenProps } from "@getpaseo/plugin/client";
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { contributeDevinDesktopButton } from "./client/devin-desktop-button.js";
 import { AddFromGitLabScreen } from "./client/screen.js";
+import { contributeSettingsEntry, GITLAB_SETTINGS_ID } from "./client/settings-entry.js";
 import { GitLabSetupScreen } from "./client/setup-screen.js";
 
 const SCREEN_ID = "add-from-gitlab";
@@ -23,16 +24,21 @@ function AddFromGitLabItem({ currentScreen, openScreen }: PluginSidebarItemProps
 
 export default function contribute(client: PluginClientContext) {
   client.addSettingsScreen({
-    id: "gitlab",
+    id: GITLAB_SETTINGS_ID,
     title: "GitLab",
     icon: "GitBranch",
     Component: GitLabSetupScreen,
   });
-  const openGitLabSettings = () => client.openSettings("gitlab");
+  const openGitLabSettings = () => client.openSettings(GITLAB_SETTINGS_ID);
   const Screen = (props: PluginScreenProps) => (
     <AddFromGitLabScreen {...props} openGitLabSettings={openGitLabSettings} />
   );
   client.addScreen({ id: SCREEN_ID, title: TITLE, Component: Screen });
   client.addSidebarHeaderItem({ id: SCREEN_ID, title: TITLE, Component: AddFromGitLabItem });
-  return contributeDevinDesktopButton(client);
+  const removeSettingsEntry = contributeSettingsEntry(client);
+  const removeDevinButton = contributeDevinDesktopButton(client);
+  return () => {
+    removeSettingsEntry();
+    removeDevinButton();
+  };
 }
