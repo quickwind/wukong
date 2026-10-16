@@ -11,7 +11,7 @@ export type IrixWindowsShell = "powershell" | "cmd";
 export function irixWindowsShell(
   env: NodeJS.ProcessEnv = process.env,
 ): IrixWindowsShell | undefined {
-  if (!isIrixActive()) {
+  if (!isIrixActive() && process.env.IRIX_EDITION_ACTIVE !== "1") {
     return undefined;
   }
   const configured = env.IRIX_WINDOWS_SHELL;

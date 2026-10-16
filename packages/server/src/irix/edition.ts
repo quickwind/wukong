@@ -32,6 +32,10 @@ export function applyIrixEdition(): void {
     allowEgressHost(host);
   }
 
+  // The terminal worker is a forked process with its own copy of the policy flag; it inherits
+  // this marker instead (see windows-shell.ts).
+  process.env.IRIX_EDITION_ACTIVE = "1";
+
   activateIrixPolicy();
 
   installEgressGuard({
