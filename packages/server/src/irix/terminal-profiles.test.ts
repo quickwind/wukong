@@ -14,10 +14,13 @@ describe("irixTerminalProfiles", () => {
     expect(irixTerminalProfiles(undefined)).toBeUndefined();
   });
 
-  it("is Claude Code alone once active, ignoring configured profiles", () => {
+  it("is Claude Code and Devin CLI once active, ignoring configured profiles", () => {
     deactivate = activateIrixPolicy();
     for (const configured of [undefined, custom]) {
-      expect(irixTerminalProfiles(configured)?.map((profile) => profile.id)).toEqual(["claude"]);
+      expect(irixTerminalProfiles(configured)?.map((profile) => profile.id)).toEqual([
+        "claude",
+        "devin",
+      ]);
     }
   });
 });
