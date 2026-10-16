@@ -7,14 +7,14 @@ fork. Everything Irix adds lives in a few directories so that syncing with upstr
 Maintainers and AI agents: read [IRIX.md](../IRIX.md) first. It holds the rules (keep upstream edits
 minimal), the design decisions, the checks to run, and the known gaps. This file covers set-up.
 
-| Where                          | What                                                                          |
-| ------------------------------ | ----------------------------------------------------------------------------- |
-| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy |
-| `plugins/irix-gitlab/`         | Bundled plugin: "Add project from GitLab" and "Open a local folder"           |
-| `plugins/irix-devin-usage/`    | Bundled plugin: Devin usage queries and status                                |
-| `packages/app/src/irix/`       | Web UI switches and the Add Project redirect                                  |
-| `irix/`                        | Brand assets, brand/publish scripts (this directory)                          |
-| `.github/workflows/irix-*.yml` | Publish to npm, sync with upstream                                            |
+| Where                          | What                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy         |
+| `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, "Add project from GitLab", "Open a local folder" |
+| `plugins/irix-devin-usage/`    | Bundled plugin: Devin usage queries and status                                        |
+| `packages/app/src/irix/`       | Web UI switches and the Add Project redirect                                          |
+| `irix/`                        | Brand assets, brand/publish scripts (this directory)                                  |
+| `.github/workflows/irix-*.yml` | Publish to npm, sync with upstream                                                    |
 
 Upstream files Irix touches are marked `// Irix:`: `rg "// Irix"` lists every one of them.
 They are a handful of one-line hooks, not rewrites.
@@ -54,10 +54,21 @@ Put the company GitLab in `<Irix home>/irix.json` (default `~/.irix/irix.json`):
 ```
 
 `IRIX_GITLAB_URL`, `IRIX_GITLAB_SECTION`, `IRIX_GITLAB_SSH_HOST`, `IRIX_GITLAB_COMMAND`
-and `IRIX_CLONE_ROOT` take precedence. The URL must be https. Install
-[python-gitlab](https://python-gitlab.readthedocs.io/) (`uv tool install python-gitlab`) and
-configure it as usual (`~/.python-gitlab.cfg`, including credential helpers). Paseo never sees the
-token.
+and `IRIX_CLONE_ROOT` take precedence. The URL must be https.
+
+You normally do not edit these by hand. Open **Settings → Plugins → GitLab**: it checks that
+[python-gitlab](https://python-gitlab.readthedocs.io/) is installed (if not, it shows
+`uv tool install python-gitlab` and where to get uv; Irix never runs the installer), lists the
+sections of `~/.python-gitlab.cfg` and tests one when you press **Test**, or, with no config, takes
+your GitLab URL, opens GitLab's new-token page with the name and permissions (`api`,
+`read_repository`, `write_repository`) filled in, and writes the pasted token to
+`~/.python-gitlab.cfg` (mode 0600, only after the token works). **Save** then writes `url`,
+`configSection` and `cloneRoot` to `irix.json`. The URL always comes from the chosen section.
+Paseo does not keep the token: it passes through one request and ends up only in python-gitlab's
+config, or in its credential helper if you configure one yourself.
+
+The daemon's merge-request features read `irix.json` once at startup, so a changed section or URL
+reaches them after the daemon restarts. Project search and clone read it on every call.
 
 Merge request status, checks, merge, auto-merge and issues run through upstream's GitLab service.
 A glab-compatible runner (`packages/server/src/irix/gitlab/glab-runner.ts`) answers the `glab`

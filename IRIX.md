@@ -56,18 +56,18 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
 ## Where Irix lives
 
-| Path                           | What                                                                                   |
-| ------------------------------ | -------------------------------------------------------------------------------------- |
-| `IRIX.md`                      | This guide                                                                             |
-| `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide      |
-| `irix/README.md`               | Configuration, GitLab setup, building, publishing                                      |
-| `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins              |
-| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy          |
-| `packages/cli/src/irix/`       | `irix` command defaults (home, port, ignore Paseo's environment)                       |
-| `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                         |
-| `plugins/irix-gitlab/`         | Bundled plugin: Add project from GitLab, Fork clone, Open folder dialog, Open in Devin |
-| `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                              |
-| `.github/workflows/irix-*.yml` | Publish to npm; weekly sync with upstream                                              |
+| Path                           | What                                                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `IRIX.md`                      | This guide                                                                                                  |
+| `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide                           |
+| `irix/README.md`               | Configuration, GitLab setup, building, publishing                                                           |
+| `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins                                   |
+| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                               |
+| `packages/cli/src/irix/`       | `irix` command defaults (home, port, ignore Paseo's environment)                                            |
+| `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                                              |
+| `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin |
+| `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                   |
+| `.github/workflows/irix-*.yml` | Publish to npm; weekly sync with upstream                                                                   |
 
 ## Upstream files we touch (the whole list)
 
@@ -152,7 +152,9 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   of GitLab logic run unchanged and no `glab` executable exists to clash with a user's own.
   Contract tests drive upstream's service through it, so an upstream change to a command line fails
   a test instead of failing silently. Rebase merge is not supported. Configuration is
-  `<home>/irix.json` or `IRIX_GITLAB_*`; the URL must be https.
+  `<home>/irix.json` or `IRIX_GITLAB_*`; the URL must be https. Settings → Plugins → GitLab
+  (`plugins/irix-gitlab/server/setup/`, `client/setup-controller.ts`) writes both the python-gitlab
+  config and `irix.json`; the adapter reads `irix.json` once, so a changed section needs a restart.
 - **Add project:** upstream's dialog is kept (search a directory, New directory). Its GitHub entry
   becomes Clone from GitLab, which opens the plugin screen with search, Clone and Fork clone
   (fork, wait, clone your fork, add `upstream`; shown for any project outside your namespace) and
