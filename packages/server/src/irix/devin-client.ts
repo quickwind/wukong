@@ -52,6 +52,7 @@ interface PromptingConnection {
 /** What Devin is told about driving Paseo from its shell, for the tools it cannot get over MCP. */
 export function paseoCommandLineGuide(agentId?: string): string {
   const mayMessage = !isIrixRestricted("agentMessaging");
+  const maySchedule = !isIrixRestricted("schedules");
   return [
     "Working with other agents in this app: you have no MCP tools for it. Use the `irix` command in " +
       "your shell (it talks to the app running on this machine).",
@@ -73,6 +74,23 @@ export function paseoCommandLineGuide(agentId?: string): string {
       "`typecheck` or a dev server. It runs under the app's supervision, so the user sees it in the Scripts menu",
     "The script commands act on the workspace of your current directory; add `--workspace <id>` if that is ambiguous. " +
       "To see a script's output, read its terminal in the app; `start` only starts it.",
+    ...(maySchedule
+      ? [
+          '- `irix schedule create "<prompt>" --every <duration>` (for example 30m or 1h) or `--cron "<expr>"`: ' +
+            "run a prompt on a recurring schedule; each run starts a new agent. Add `--timezone <iana>` for cron, " +
+            "`--name`, `--provider`, `--cwd`, `--max-runs <n>` and `--expires-in <duration>` as needed",
+          "- `irix schedule ls`: list the schedules with their IDs, cadence and status",
+          "- `irix schedule inspect <id>`: show one schedule's details; `irix schedule logs <id>`: show its recent runs",
+          "- `irix schedule pause <id>` / `irix schedule resume <id>`: stop or restart its runs without deleting it",
+          "- `irix schedule run-once <id>`: trigger one extra run now, without changing the cadence",
+          "- `irix schedule update <id>`: change a schedule in place instead of creating a duplicate " +
+            "(cadence, prompt, name, working directory, model, mode, run limit, expiry)",
+          "- `irix schedule delete <id>`: remove a schedule for good",
+          "Use `irix schedule <command> --help` for each command's options.",
+          "- `irix heartbeat --help`: heartbeats are different from schedules: they send a prompt back to you " +
+            "(this agent) on a cron cadence, instead of starting a new agent",
+        ]
+      : []),
     ...(mayMessage
       ? [
           "You are not told when an agent you started or messaged finishes. To get its answer, leave out " +

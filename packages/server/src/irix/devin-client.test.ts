@@ -185,6 +185,25 @@ describe("Devin system prompt delivery", () => {
       expect(guide).toContain("report back");
     });
 
+    it("mentions schedules only once the edition allows them", () => {
+      const deactivate = activateIrixPolicy();
+      const saved = process.env.IRIX_ALLOW_SCHEDULES;
+      try {
+        delete process.env.IRIX_ALLOW_SCHEDULES;
+        expect(paseoCommandLineGuide("abc")).not.toContain("irix schedule");
+
+        process.env.IRIX_ALLOW_SCHEDULES = "1";
+        const guide = paseoCommandLineGuide("abc");
+        expect(guide).toContain("irix schedule create");
+        expect(guide).toContain("--cron");
+        expect(guide).toContain("irix schedule ls");
+      } finally {
+        if (saved === undefined) delete process.env.IRIX_ALLOW_SCHEDULES;
+        else process.env.IRIX_ALLOW_SCHEDULES = saved;
+        deactivate();
+      }
+    });
+
     it("still reads well when the agent's ID is not known yet", () => {
       const guide = paseoCommandLineGuide();
       expect(guide).toContain("irix send");
