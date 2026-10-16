@@ -9,6 +9,7 @@ export interface GitLabSaved {
   url: string | null;
   configSection: string | null;
   cloneRoot: string | null;
+  command: string[] | null;
 }
 
 export function irixJsonPath(env: NodeJS.ProcessEnv = process.env): string {
@@ -38,6 +39,12 @@ function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function commandOf(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const parts = value.filter((part): part is string => typeof part === "string" && part.length > 0);
+  return parts.length > 0 ? parts : null;
+}
+
 export function readGitLabSaved(env: NodeJS.ProcessEnv = process.env): GitLabSaved {
   const gitlab = readDocument(irixJsonPath(env)).gitlab;
   const fields = gitlab && typeof gitlab === "object" ? (gitlab as Record<string, unknown>) : {};
@@ -45,6 +52,7 @@ export function readGitLabSaved(env: NodeJS.ProcessEnv = process.env): GitLabSav
     url: text(fields.url),
     configSection: text(fields.configSection),
     cloneRoot: text(fields.cloneRoot),
+    command: commandOf(fields.command),
   };
 }
 

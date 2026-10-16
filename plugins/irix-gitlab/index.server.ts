@@ -7,6 +7,10 @@ import {
   listFoldersRpc,
   openInDevinDesktopRpc,
   searchProjectsRpc,
+  setupCreateSectionRpc,
+  setupSaveRpc,
+  setupStatusRpc,
+  setupTestSectionRpc,
   startCloneRpc,
   startPickFolderRpc,
   type CloneResult,
@@ -17,6 +21,12 @@ import { createFolderPickerSessions } from "./server/pick-folder-sessions.js";
 import { createFolder, listFolders } from "./server/list-folders.js";
 import { createJobs } from "./server/jobs.js";
 import { runClone, search } from "./server/projects.js";
+import {
+  setupCreateSection,
+  setupSave,
+  setupStatus,
+  setupTestSection,
+} from "./server/setup/handlers.js";
 
 // These lines land in the daemon log, so a dialog that never appears can be traced.
 const folderPicker = createFolderPickerSessions(async (title) => {
@@ -35,6 +45,10 @@ const cloneJobs = createJobs<CloneResult>();
 
 export default function contribute(server: PluginServerContext) {
   server.handle(searchProjectsRpc, search);
+  server.handle(setupStatusRpc, () => setupStatus());
+  server.handle(setupTestSectionRpc, (input) => setupTestSection(input));
+  server.handle(setupCreateSectionRpc, (input) => setupCreateSection(input));
+  server.handle(setupSaveRpc, (input) => setupSave(input));
   server.handle(listFoldersRpc, ({ path }) => listFolders(path));
   server.handle(createFolderRpc, ({ parent, name }) => createFolder(parent, name));
   server.handle(devinDesktopStatusRpc, () => getDevinDesktopStatus());

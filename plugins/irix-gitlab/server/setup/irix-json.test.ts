@@ -19,7 +19,12 @@ describe("irix.json", () => {
   });
 
   it("reads nothing when the file is absent", () => {
-    expect(readGitLabSaved(env)).toEqual({ url: null, configSection: null, cloneRoot: null });
+    expect(readGitLabSaved(env)).toEqual({
+      url: null,
+      configSection: null,
+      cloneRoot: null,
+      command: null,
+    });
   });
 
   it("creates the file and the home folder on first write", () => {
@@ -39,6 +44,12 @@ describe("irix.json", () => {
       gitlab: { sshHost: "h:22", cloneRoot: "~/projects", configSection: "corp" },
       other: 1,
     });
+  });
+
+  it("reads a command array", () => {
+    mkdirSync(home, { recursive: true });
+    writeFileSync(irixJsonPath(env), '{"gitlab":{"command":["uv","run","gitlab"]}}');
+    expect(readGitLabSaved(env).command).toEqual(["uv", "run", "gitlab"]);
   });
 
   it("does not expand ~ in cloneRoot", () => {

@@ -136,3 +136,71 @@ export const openInDevinDesktopRpc = defineRpc({
     ok: z.literal(true),
   }),
 });
+
+// GitLab setup screen (Settings > Plugins > GitLab). The token in `setupCreateSectionRpc` is the
+// only secret that crosses an RPC: it is tested, written to the python-gitlab config and dropped.
+export const SETUP_OVERRIDE_VARIABLES = [
+  "IRIX_GITLAB_URL",
+  "IRIX_GITLAB_SECTION",
+  "IRIX_GITLAB_COMMAND",
+  "IRIX_CLONE_ROOT",
+] as const;
+
+export const setupStatusRpc = defineRpc({
+  name: "irix.gitlab.setup.status",
+  input: z.object({}),
+  output: z.object({
+    tools: z.object({
+      gitlab: z.object({ found: z.boolean(), version: z.string().nullable() }),
+      uv: z.object({ found: z.boolean() }),
+    }),
+    cfgPath: z.string(),
+    /** Sections of the python-gitlab config; `usable` is false unless the url is https. */
+    sections: z.array(
+      z.object({ name: z.string(), url: z.string().nullable(), usable: z.boolean() }),
+    ),
+    saved: z.object({
+      url: z.string().nullable(),
+      configSection: z.string().nullable(),
+      cloneRoot: z.string().nullable(),
+    }),
+    /** Environment variables that are set and so win over the saved values. */
+    overrides: z.array(z.enum(SETUP_OVERRIDE_VARIABLES)),
+  }),
+});
+
+export const setupTestSectionRpc = defineRpc({
+  name: "irix.gitlab.setup.test-section",
+  input: z.object({ section: z.string().min(1).max(200) }),
+  output: z.object({
+    result: z.enum(["ok", "unreachable", "token-rejected"]),
+    /** Why the test failed; null when it passed. */
+    detail: z.string().nullable(),
+    /** The token's expiry date (`YYYY-MM-DD`) when GitLab reports one. */
+    expiresAt: z.string().nullable(),
+    expiresSoon: z.boolean(),
+    /** Scopes among api, read_repository and write_repository that the token lacks. */
+    missingScopes: z.array(z.string()),
+  }),
+});
+
+export const setupCreateSectionRpc = defineRpc({
+  name: "irix.gitlab.setup.create-section",
+  input: z.object({
+    url: z.string().max(2048),
+    token: z.string().max(512),
+    /** Replace the token of this existing section instead of adding one; its url is kept. */
+    replaceSection: z.string().max(200).optional(),
+  }),
+  output: z.object({ section: z.string() }),
+});
+
+export const setupSaveRpc = defineRpc({
+  name: "irix.gitlab.setup.save",
+  input: z.object({ section: z.string().min(1).max(200), cloneRoot: z.string().max(4096) }),
+  output: z.object({
+    url: z.string(),
+    /** The merge-request features read irix.json once, so they need a daemon restart. */
+    restartNeeded: z.boolean(),
+  }),
+});
