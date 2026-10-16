@@ -166,6 +166,8 @@ export const setupStatusRpc = defineRpc({
     }),
     /** Environment variables that are set and so win over the saved values. */
     overrides: z.array(z.enum(SETUP_OVERRIDE_VARIABLES)),
+    /** Where clones go until the user picks a folder. */
+    defaultCloneRoot: z.string(),
   }),
 });
 

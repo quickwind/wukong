@@ -9,13 +9,14 @@ import {
   type SettingsInputHandle,
 } from "@getpaseo/plugin/client/ui";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Text } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import {
   setupCreateSectionRpc,
   setupSaveRpc,
   setupStatusRpc,
   setupTestSectionRpc,
 } from "../shared/rpc.js";
+import { FolderDialog } from "./folder-dialog.js";
 import { createSetupController, type SetupController, type TestOutcome } from "./setup-controller.js";
 
 const INSTALL_UV = "https://docs.astral.sh/uv/getting-started/installation/";
@@ -58,6 +59,22 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
   const state = useSyncExternalStore(controller.subscribe, controller.getState);
   const style = useMemo(() => ({ color: theme.colors.foreground }), [theme]);
   const errorStyle = useMemo(() => ({ color: theme.colors.statusDanger }), [theme]);
+  const saveStyles = useMemo(
+    () => ({
+      row: { paddingHorizontal: 4, paddingTop: 12, gap: 8, alignItems: "flex-start" as const },
+      button: {
+        paddingVertical: 10,
+        paddingHorizontal: 28,
+        borderRadius: 8,
+        backgroundColor: theme.colors.accent,
+      },
+      disabled: { opacity: 0.5 },
+      text: { color: theme.colors.accentForeground, fontWeight: "600" as const },
+    }),
+    [theme],
+  );
+  const [browsing, setBrowsing] = useState(false);
+  const cloneRootRef = useRef<SettingsInputHandle>(null);
   const newTokenRef = useRef<SettingsInputHandle>(null);
   const renewTokenRef = useRef<SettingsInputHandle>(null);
 
@@ -80,6 +97,16 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
   }, [controller]);
   const runTest = useCallback(() => void controller.runTest(), [controller]);
   const save = useCallback(() => void controller.save(), [controller]);
+  const startBrowsing = useCallback(() => setBrowsing(true), []);
+  const stopBrowsing = useCallback(() => setBrowsing(false), []);
+  const chooseCloneRoot = useCallback(
+    (path: string) => {
+      setBrowsing(false);
+      controller.setCloneRoot(path);
+      cloneRootRef.current?.replaceText(path);
+    },
+    [controller],
+  );
   const reload = useCallback(() => void controller.load(), [controller]);
   const sectionOptions = useMemo(
     () =>
@@ -265,6 +292,7 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
         <SettingsSection title="Projects">
           <SettingsCard>
             <SettingsInput
+              ref={cloneRootRef}
               label="Clone folder"
               hint="Where new clones go. An absolute path, or one starting with ~/"
               initialValue={state.cloneRoot}
@@ -273,22 +301,33 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
               error={state.saveError}
             />
             <SettingsAction
-              label="Irix settings"
-              actionLabel={state.saving ? "Saving…" : "Save"}
+              label="Pick it from the disk"
+              actionLabel="Browse…"
+              disabled={state.saving}
+              onPress={startBrowsing}
+            />
+          </SettingsCard>
+          <View style={saveStyles.row}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Save"
+              style={state.saving ? [saveStyles.button, saveStyles.disabled] : saveStyles.button}
               disabled={state.saving}
               onPress={save}
-            />
+            >
+              <Text style={saveStyles.text}>{state.saving ? "Saving…" : "Save"}</Text>
+            </Pressable>
             {state.savedResult ? (
-              <SettingsRow
-                label="Saved"
-                hint={
-                  state.savedResult.restartNeeded
-                    ? `Using ${state.savedResult.url}. Project search and clone use it now; merge-request features use it after the daemon restarts.`
-                    : `Using ${state.savedResult.url}.`
-                }
-              />
+              <Text style={style}>
+                {state.savedResult.restartNeeded
+                  ? `Using ${state.savedResult.url}. Project search and clone use it now; merge-request features use it after the daemon restarts.`
+                  : `Using ${state.savedResult.url}.`}
+              </Text>
             ) : null}
-          </SettingsCard>
+          </View>
+          {browsing ? (
+            <FolderDialog theme={theme} onSelect={chooseCloneRoot} onClose={stopBrowsing} />
+          ) : null}
         </SettingsSection>
       ) : null}
     </>

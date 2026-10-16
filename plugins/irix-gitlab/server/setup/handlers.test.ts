@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -54,6 +54,11 @@ describe("setupStatus", () => {
     ]);
     expect(status.saved.configSection).toBeNull();
     expect(status.overrides).toEqual([]);
+    expect(status.defaultCloneRoot).toBe(
+      process.platform === "win32"
+        ? join(homedir(), "workspace", "gitlab")
+        : "~/workspace/gitlab",
+    );
   });
 
   it("marks sections the daemon would reject as unusable", async () => {

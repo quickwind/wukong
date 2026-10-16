@@ -7,7 +7,7 @@ import {
   type setupStatusRpc,
   type setupTestSectionRpc,
 } from "../../shared/rpc.js";
-import { expandHome } from "../config.js";
+import { defaultCloneRoot, expandHome } from "../config.js";
 import {
   assertCfgValue,
   cfgPath,
@@ -75,6 +75,7 @@ export async function setupStatus(
       readGitLabSaved(env),
     ),
     overrides: SETUP_OVERRIDE_VARIABLES.filter((name) => Boolean(env[name]?.trim())),
+    defaultCloneRoot: defaultCloneRoot(),
   };
 }
 

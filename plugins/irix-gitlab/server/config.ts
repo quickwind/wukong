@@ -4,7 +4,7 @@
 
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, win32 } from "node:path";
 
 export interface GitLabSettings {
   url: string;
@@ -12,6 +12,17 @@ export interface GitLabSettings {
   configSection: string | null;
   command: string[];
   cloneRoot: string;
+}
+
+/**
+ * Where clones go when nothing says otherwise: `<home>\workspace\gitlab` on Windows (written out,
+ * since `~` is not a Windows idiom), `~/workspace/gitlab` elsewhere.
+ */
+export function defaultCloneRoot(
+  platform: NodeJS.Platform = process.platform,
+  home: string = homedir(),
+): string {
+  return platform === "win32" ? win32.join(home, "workspace", "gitlab") : "~/workspace/gitlab";
 }
 
 export function expandHome(input: string): string {
@@ -57,7 +68,7 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): GitLabSettin
     configSection: text(env.IRIX_GITLAB_SECTION) ?? text(file.configSection),
     command: command ?? (fileCommand.length > 0 ? fileCommand : ["gitlab"]),
     cloneRoot: resolve(
-      expandHome(text(env.IRIX_CLONE_ROOT) ?? text(file.cloneRoot) ?? "~/projects"),
+      expandHome(text(env.IRIX_CLONE_ROOT) ?? text(file.cloneRoot) ?? defaultCloneRoot()),
     ),
   };
 }

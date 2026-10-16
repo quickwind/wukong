@@ -41,7 +41,6 @@ export interface SetupState {
   saveError: string | null;
 }
 
-const DEFAULT_CLONE_ROOT = "~/projects";
 const NO_TEST = { running: false, outcome: null, error: null } as const;
 
 const messageOf = (error: unknown): string =>
@@ -59,7 +58,7 @@ export function createSetupController(api: SetupApi) {
     token: "",
     busy: false,
     formError: null,
-    cloneRoot: DEFAULT_CLONE_ROOT,
+    cloneRoot: "",
     saving: false,
     savedResult: null,
     saveError: null,
@@ -90,7 +89,7 @@ export function createSetupController(api: SetupApi) {
         loading: false,
         status,
         section,
-        cloneRoot: state.status ? state.cloneRoot : (status.saved.cloneRoot ?? DEFAULT_CLONE_ROOT),
+        cloneRoot: state.status ? state.cloneRoot : (status.saved.cloneRoot ?? status.defaultCloneRoot),
       });
     } catch (error) {
       set({ loading: false, loadError: messageOf(error) });

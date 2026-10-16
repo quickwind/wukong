@@ -10,6 +10,7 @@ function status(partial: Partial<SetupStatus> = {}): SetupStatus {
     sections: [CORP],
     saved: { url: null, configSection: null, cloneRoot: null },
     overrides: [],
+    defaultCloneRoot: "~/workspace/gitlab",
     ...partial,
   };
 }
@@ -55,7 +56,7 @@ describe("setup controller", () => {
     expect(calls.map((c) => c.method)).not.toContain("testSection");
   });
 
-  it("defaults the clone root to ~/projects and shows the new-section form when there are no sections", async () => {
+  it("defaults the clone root to the one the daemon suggests and shows the new-section form when there are no sections", async () => {
     const { api } = fakeApi({
       async status() {
         return status({ sections: [] });
@@ -63,7 +64,7 @@ describe("setup controller", () => {
     });
     const controller = createSetupController(api);
     await controller.load();
-    expect(controller.getState().cloneRoot).toBe("~/projects");
+    expect(controller.getState().cloneRoot).toBe("~/workspace/gitlab");
     expect(controller.showNewSectionForm()).toBe(true);
   });
 
