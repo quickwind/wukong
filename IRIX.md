@@ -152,9 +152,9 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   of GitLab logic run unchanged and no `glab` executable exists to clash with a user's own.
   Contract tests drive upstream's service through it, so an upstream change to a command line fails
   a test instead of failing silently. Rebase merge is not supported. Configuration is
-  `<home>/irix.json` or `IRIX_GITLAB_*`; the URL must be https. the GitLab settings screen (Command Center item, or the button on the GitLab page; built-in plugins have no Settings → Plugins row)
-  (`plugins/irix-gitlab/server/setup/`, `client/setup-controller.ts`) writes both the python-gitlab
-  config and `irix.json`; the adapter reads `irix.json` once, so a changed section needs a restart.
+  `<home>/irix.json` or `IRIX_GITLAB_*`; the URL must be https. The GitLab settings screen (Command Center item, or the button on the GitLab
+  page; built-in plugins have no Settings → Plugins row) writes both the python-gitlab
+  config and `irix.json` (`plugins/irix-gitlab/server/setup/`, `client/setup-controller.ts`); the adapter reads `irix.json` once, so a changed section needs a restart.
 - **Add project:** upstream's dialog is kept (search a directory, New directory). Its GitHub entry
   becomes Clone from GitLab, which opens the plugin screen with search, Clone and Fork clone
   (fork, wait, clone your fork, add `upstream`; shown for any project outside your namespace) and
