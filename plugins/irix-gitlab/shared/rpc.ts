@@ -117,3 +117,22 @@ export const createFolderRpc = defineRpc({
   input: z.object({ parent: z.string().min(1).max(4096), name: z.string().min(1).max(255) }),
   output: z.object({ path: z.string() }),
 });
+
+export const devinDesktopStatusRpc = defineRpc({
+  name: "irix.devin-desktop.status",
+  input: z.object({}),
+  output: z.object({
+    installed: z.boolean(),
+    iconDataUrl: z.string().nullable(),
+  }),
+});
+
+export const openInDevinDesktopRpc = defineRpc({
+  name: "irix.devin-desktop.open",
+  input: z.object({
+    workspacePath: z.string().min(1).max(4096),
+  }),
+  output: z.object({
+    ok: z.literal(true),
+  }),
+});

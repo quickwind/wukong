@@ -1,6 +1,7 @@
 import type { PluginClientContext, PluginSidebarItemProps } from "@getpaseo/plugin/client";
 import { useCallback } from "react";
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
+import { contributeDevinDesktopButton } from "./client/devin-desktop-button.js";
 import { AddFromGitLabScreen } from "./client/screen.js";
 
 const SCREEN_ID = "add-from-gitlab";
@@ -21,5 +22,5 @@ function AddFromGitLabItem({ currentScreen, openScreen }: PluginSidebarItemProps
 export default function contribute(client: PluginClientContext) {
   client.addScreen({ id: SCREEN_ID, title: TITLE, Component: AddFromGitLabScreen });
   client.addSidebarHeaderItem({ id: SCREEN_ID, title: TITLE, Component: AddFromGitLabItem });
-  return () => {};
+  return contributeDevinDesktopButton(client);
 }

@@ -3,12 +3,15 @@ import {
   pollCloneRpc,
   pollPickFolderRpc,
   createFolderRpc,
+  devinDesktopStatusRpc,
   listFoldersRpc,
+  openInDevinDesktopRpc,
   searchProjectsRpc,
   startCloneRpc,
   startPickFolderRpc,
   type CloneResult,
 } from "./shared/rpc.js";
+import { getDevinDesktopStatus, openInDevinDesktop } from "./server/devin-desktop.js";
 import { pickFolder } from "./server/pick-folder.js";
 import { createFolderPickerSessions } from "./server/pick-folder-sessions.js";
 import { createFolder, listFolders } from "./server/list-folders.js";
@@ -34,6 +37,8 @@ export default function contribute(server: PluginServerContext) {
   server.handle(searchProjectsRpc, search);
   server.handle(listFoldersRpc, ({ path }) => listFolders(path));
   server.handle(createFolderRpc, ({ parent, name }) => createFolder(parent, name));
+  server.handle(devinDesktopStatusRpc, () => getDevinDesktopStatus());
+  server.handle(openInDevinDesktopRpc, ({ workspacePath }) => openInDevinDesktop(workspacePath));
   server.handle(startCloneRpc, (input) => ({
     id: cloneJobs.start((report) => runClone(input, report), "Starting…"),
   }));
