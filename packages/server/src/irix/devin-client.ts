@@ -68,6 +68,11 @@ export function paseoCommandLineGuide(agentId?: string): string {
     "- `irix logs <id> --tail 20`: read what an agent has done and said lately",
     "- `irix wait <id>`: wait until an agent is idle",
     '- `irix run --provider <provider> --title <title> "<task>"`: start a new agent on a task',
+    "- `irix script ls`: list this workspace's configured scripts (from paseo.json) with their status, port and URL",
+    "- `irix script start <name>` / `irix script stop <name>`: start or stop one of those scripts, e.g. " +
+      "`typecheck` or a dev server. It runs under the app's supervision, so the user sees it in the Scripts menu",
+    "The script commands act on the workspace of your current directory; add `--workspace <id>` if that is ambiguous. " +
+      "To see a script's output, read its terminal in the app; `start` only starts it.",
     ...(mayMessage
       ? [
           "You are not told when an agent you started or messaged finishes. To get its answer, leave out " +

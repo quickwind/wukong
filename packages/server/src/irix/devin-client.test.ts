@@ -163,7 +163,16 @@ describe("Devin system prompt delivery", () => {
   describe("Paseo's tools from the shell", () => {
     it("names the irix commands and the agent's own ID", () => {
       const guide = paseoCommandLineGuide("a1b2c3d4-0000");
-      for (const command of ["irix agent ls", "irix send", "irix logs", "irix wait", "irix run"]) {
+      for (const command of [
+        "irix agent ls",
+        "irix send",
+        "irix logs",
+        "irix wait",
+        "irix run",
+        "irix script ls",
+        "irix script start",
+        "irix script stop",
+      ]) {
         expect(guide).toContain(command);
       }
       expect(guide).toContain("--prompt-file");
