@@ -157,30 +157,9 @@ irix plugin install D:\plugins\<plugin>
 - Only Claude Code and Devin CLI exist as providers, so a plugin that adds a provider has no effect.
 - Plugins that bundle upstream's own extras (usage readers, other providers) are not included.
 
-### Bots, offline
+### Paseo's tools in Devin
 
-`paseo-bots-<version>.zip` is the Bots plugin with everything that connects to the internet removed
-(connected apps, OpenAI avatars, GitHub imports, testing of remote MCP servers). It installs without git, npm or
-internet. Use the file name of the zip you were given in place of `<version>` below:
-
-```powershell
-Expand-Archive .\paseo-bots-<version>.zip -DestinationPath D:\plugins
-irix plugin install D:\plugins\paseo-bots-<version>
-```
-
-Check the download first if you like: `(Get-FileHash .\paseo-bots-<version>.zip).Hash` should equal the
-hash in the `.sha256` file. Skills import from a folder on the machine, not from GitHub.
-
-**Bots on Devin.** Devin has no system prompt, so a bot's identity and soul reach it as an always-on
-Devin rule: the plugin keeps `.devin/rules/bot-identity.md` in each bot's own folder, for every bot, and
-refreshes it before a chat starts. Chats started from the Bots page and ordinary new chats in the bot's
-workspace both pick it up. A bot with a custom working folder gets its instructions through Irix's
-first-message block instead, and nothing is written into that folder. Devin truncates an always-on rule
-file at 32 KiB; the plugin splits a longer identity into several files and says so on the bot's
-Overview page. A chat keeps the rules it had when it was created.
-
-**Paseo's tools in Devin (message another agent by ID, list agents, ...).** A company MCP policy makes
-Devin ignore the MCP server Paseo offers, so Irix tells every new Devin chat to use the `irix`
+A company MCP policy makes Devin ignore the MCP server Paseo offers, so Irix tells every new Devin chat to use the `irix`
 command in its shell instead (`irix agent ls`, `irix send <id> ...`, `irix logs`, `irix run`).
 Devin asks before running a command, as it does for any shell command. A Devin chat created before this
 update does not know about it; start a new one. To see what your Devin does with MCP servers, run
