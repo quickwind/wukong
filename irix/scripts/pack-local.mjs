@@ -223,6 +223,8 @@ export function main(argv) {
       ),
     );
     const version = `${core}-irix.${stamp}`;
+    // The web UI is built later, while packing the server; its About page shows this version.
+    env.EXPO_PUBLIC_IRIX_VERSION = version;
     run("npm", ["pkg", "set", `version=${version}`], inWork);
     run(node, ["scripts/sync-workspace-versions.mjs"], inWork);
     // The app is not published, and its Expo config only accepts x.y.z or x.y.z-beta.N.

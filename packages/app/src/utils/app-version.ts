@@ -15,6 +15,13 @@ function toVersionOrNull(value: unknown): string | null {
 }
 
 export function resolveAppVersion(): string | null {
+  // Irix: the app's package.json keeps x.y.z (Expo rejects a longer version), so the packaging
+  // script passes the full version of the build, which is also the daemon's.
+  const irixVersion = toVersionOrNull(process.env.EXPO_PUBLIC_IRIX_VERSION); // Irix
+  if (irixVersion) {
+    return irixVersion;
+  }
+
   const packageVersion = toVersionOrNull(appPackage?.version);
   if (packageVersion) {
     return packageVersion;
