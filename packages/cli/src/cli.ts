@@ -50,8 +50,10 @@ export function createCli(): Command {
   const irix = isIrixCli();
 
   program
-    .name("paseo")
-    .description("Paseo CLI - control your AI coding agents from the command line")
+    .name(irix ? "irix" : "paseo") // Irix
+    .description(
+      `${irix ? "Irix" : "Paseo"} CLI - control your AI coding agents from the command line`,
+    )
     .version(VERSION, "-v, --version", "output the version number")
     // Global output options
     .option("-o, --format <format>", "output format: table, json, yaml", "table")

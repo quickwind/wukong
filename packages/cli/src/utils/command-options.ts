@@ -1,15 +1,23 @@
 import type { Command } from "commander";
+import { isIrixCli } from "../irix/defaults.js"; // Irix
 import { selectDaemonTarget } from "./daemon-target.js";
 
 const JSON_OPTION_DESCRIPTION = "Output in JSON format";
 const DAEMON_HOST_OPTION_DESCRIPTION =
   "Explicit daemon endpoint: host:port, TCP, socket, SSH, or pairing URL (default: local home)";
 
+// Irix: its home is ~/.irix and it has no pairing.
+const defaultHomeLabel = () => (isIrixCli() ? "~/.irix" : "~/.paseo");
+const daemonHostDescription = () =>
+  isIrixCli()
+    ? "Explicit daemon endpoint: host:port, TCP, socket, or SSH (default: local home)"
+    : DAEMON_HOST_OPTION_DESCRIPTION;
+
 const localCommands = new WeakSet<Command>();
 
 export function addLocalDaemonOptions<T extends Command>(command: T): T {
   localCommands.add(command);
-  command.option("--home <path>", "Local daemon home (default: ~/.paseo)");
+  command.option("--home <path>", `Local daemon home (default: ${defaultHomeLabel()})`);
   return command;
 }
 
@@ -23,9 +31,9 @@ export function addJsonOption<T extends Command>(command: T): T {
 }
 
 export function addDaemonHostOption<T extends Command>(command: T): T {
-  command.option("--host <host>", DAEMON_HOST_OPTION_DESCRIPTION);
+  command.option("--host <host>", daemonHostDescription());
   if (!command.options.some((option) => option.long === "--home"))
-    command.option("--home <path>", "Select a local daemon home (default: ~/.paseo)");
+    command.option("--home <path>", `Select a local daemon home (default: ${defaultHomeLabel()})`);
   return command;
 }
 

@@ -2,6 +2,7 @@ import { renderError, toCommandError, defaultOutputOptions } from "./output/rend
 import { createCli } from "./cli.js";
 import { classifyInvocation } from "./classify.js";
 import { openDesktopWithProject } from "./commands/open.js";
+import { isIrixCli } from "./irix/defaults.js"; // Irix
 
 export interface RunCliOptions {
   cwd?: string;
@@ -28,7 +29,10 @@ export function createCliParseArgv(input: {
   const nodeArgv = input.nodeArgv ?? ["paseo", "paseo"];
   const isOnboardRootFlag = invocation.argv[0] === "--relay" || invocation.argv[0] === "--no-relay";
   let cliArgv = invocation.argv;
-  if (invocation.argv.length === 0) {
+  if (isIrixCli()) {
+    // Irix has no onboard command: no arguments shows the help.
+    if (invocation.argv.length === 0) cliArgv = ["--help"];
+  } else if (invocation.argv.length === 0) {
     cliArgv = ["onboard"];
   } else if (isOnboardRootFlag) {
     cliArgv = ["onboard", ...invocation.argv];

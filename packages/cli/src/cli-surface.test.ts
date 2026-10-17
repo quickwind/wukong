@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createCli } from "./cli.js";
+import { createCliParseArgv } from "./run.js";
 import { markIrixCli } from "./irix/defaults.js";
 
 describe("canonical CLI surface", () => {
@@ -152,5 +153,41 @@ describe("Irix CLI surface", () => {
     expect(names(createCli())).toEqual(
       expect.arrayContaining(["run", "ls", "send", "daemon", "plugin", "provider", "schedule"]),
     );
+  });
+
+  it("names itself irix and points at the Irix home", () => {
+    markIrixCli(true);
+    const help = createCli().helpInformation().replace(/\s+/gu, " ");
+    expect(help).toContain("Usage: irix");
+    expect(help).toContain("Irix CLI");
+    expect(help).toContain("(default: ~/.irix)");
+    expect(help).not.toContain("~/.paseo");
+    const ls = createCli().commands.find((command) => command.name() === "ls");
+    expect(ls?.helpInformation()).not.toContain("~/.paseo");
+  });
+
+  it("shows help when run with no arguments, instead of onboarding", () => {
+    markIrixCli(true);
+    const nodeArgv: [string, string] = ["node", "irix"];
+    expect(createCliParseArgv({ argv: [], cwd: "/tmp", nodeArgv })).toEqual([
+      "node",
+      "irix",
+      "--help",
+    ]);
+    expect(createCliParseArgv({ argv: ["--relay"], cwd: "/tmp", nodeArgv })).toEqual([
+      "node",
+      "irix",
+      "--relay",
+    ]);
+  });
+
+  it("still onboards with no arguments outside the Irix edition", () => {
+    markIrixCli(false);
+    const nodeArgv: [string, string] = ["node", "paseo"];
+    expect(createCliParseArgv({ argv: [], cwd: "/tmp", nodeArgv })).toEqual([
+      "node",
+      "paseo",
+      "onboard",
+    ]);
   });
 });
