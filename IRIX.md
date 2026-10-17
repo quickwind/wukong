@@ -56,18 +56,18 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
 ## Where Irix lives
 
-| Path                           | What                                                                                                        |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `IRIX.md`                      | This guide                                                                                                  |
-| `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide                           |
-| `irix/README.md`               | Configuration, GitLab setup, building, publishing                                                           |
-| `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins                                   |
-| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                               |
-| `packages/cli/src/irix/`       | `irix` command defaults (home, port, ignore Paseo's environment)                                            |
-| `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                                              |
-| `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin |
-| `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                   |
-| `.github/workflows/irix-*.yml` | Publish to npm; weekly sync with upstream                                                                   |
+| Path                           | What                                                                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `IRIX.md`                      | This guide                                                                                                                  |
+| `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide                                           |
+| `irix/README.md`               | Configuration, GitLab setup, building, publishing                                                                           |
+| `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins                                                   |
+| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                                               |
+| `packages/cli/src/irix/`       | `irix` command defaults (home, port, ignore Paseo's environment); `irix` has no clone, onboard, pair, hub or speech command |
+| `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                                                              |
+| `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin                 |
+| `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                                   |
+| `.github/workflows/irix-*.yml` | Publish to npm; weekly sync with upstream                                                                                   |
 
 ## Upstream files we touch (the whole list)
 

@@ -34,6 +34,7 @@ import { addImportOptions, runImportCommand } from "./commands/agent/import.js";
 import { withOutput } from "./output/index.js";
 import { runCloneCommand } from "./commands/clone.js";
 import { onboardCommand } from "./commands/onboard.js";
+import { isIrixCli } from "./irix/defaults.js"; // Irix
 import {
   addDaemonHostOption,
   addJsonAndDaemonHostOptions,
@@ -45,6 +46,8 @@ const VERSION = resolveCliVersion();
 
 export function createCli(): Command {
   const program = new Command();
+  // Irix: clone, onboard, pair, hub and speech are not used, so they are not registered.
+  const irix = isIrixCli();
 
   program
     .name("paseo")
@@ -69,19 +72,25 @@ export function createCli(): Command {
     withOutput(runImportCommand),
   );
 
-  addJsonAndDaemonHostOptions(
-    program
-      .command("clone")
-      .description("Clone a GitHub repo and register it as a Paseo workspace")
-      .argument("<repo>", "GitHub repo in owner/repo format or a full git remote URL")
-      .requiredOption("--dir <path>", "Parent directory to clone into (for example: ~/workspace)"),
-  )
-    .addOption(
-      new Option("--protocol <protocol>", "Protocol for owner/repo shorthand repositories").choices(
-        ["https", "ssh"],
-      ),
+  if (!irix) {
+    addJsonAndDaemonHostOptions(
+      program
+        .command("clone")
+        .description("Clone a GitHub repo and register it as a Paseo workspace")
+        .argument("<repo>", "GitHub repo in owner/repo format or a full git remote URL")
+        .requiredOption(
+          "--dir <path>",
+          "Parent directory to clone into (for example: ~/workspace)",
+        ),
     )
-    .action(withOutput(runCloneCommand));
+      .addOption(
+        new Option(
+          "--protocol <protocol>",
+          "Protocol for owner/repo shorthand repositories",
+        ).choices(["https", "ssh"]),
+      )
+      .action(withOutput(runCloneCommand));
+  }
 
   addDaemonHostOption(addAttachOptions(program.command("attach"))).action(
     withGlobalOptions(runAttachCommand),
@@ -116,21 +125,21 @@ export function createCli(): Command {
   );
 
   // Top-level local daemon shortcuts
-  program.addCommand(onboardCommand());
+  if (!irix) program.addCommand(onboardCommand());
   program.addCommand(daemonStartCommand());
   program.addCommand(createHooksCommand());
 
   program.addCommand(daemonStatusCommand());
   program.addCommand(daemonRestartCommand());
   program.addCommand(daemonReloadCommand());
-  program.addCommand(pairCommand());
+  if (!irix) program.addCommand(pairCommand());
 
   // Advanced agent commands (less common operations)
   program.addCommand(createAgentCommand());
 
   // Daemon commands
   program.addCommand(createDaemonCommand());
-  program.addCommand(createHubCommand());
+  if (!irix) program.addCommand(createHubCommand());
 
   // Chat commands
 
@@ -153,7 +162,7 @@ export function createCli(): Command {
   program.addCommand(createPluginCommand());
 
   // Speech model commands
-  program.addCommand(createSpeechCommand());
+  if (!irix) program.addCommand(createSpeechCommand());
 
   // Workspace commands
   program.addCommand(createProjectCommand());

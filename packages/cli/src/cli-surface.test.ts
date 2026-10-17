@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createCli } from "./cli.js";
+import { markIrixCli } from "./irix/defaults.js";
 
 describe("canonical CLI surface", () => {
   it("offers daemon host selection as a global option", () => {
@@ -122,4 +123,34 @@ it("preserves omitted and explicit false workspace background intent", () => {
   expect(readOptions([]).background).toBeUndefined();
   expect(readOptions(["--background"]).background).toBe(true);
   expect(readOptions(["--no-background"]).background).toBe(false);
+});
+
+describe("Irix CLI surface", () => {
+  const unused = ["clone", "onboard", "pair", "hub", "speech"];
+  const names = (command: ReturnType<typeof createCli>) => command.commands.map((c) => c.name());
+
+  afterEach(() => markIrixCli(false));
+
+  it("keeps the upstream commands outside the Irix edition", () => {
+    markIrixCli(false);
+    const cli = createCli();
+    expect(names(cli)).toEqual(expect.arrayContaining(unused));
+    const daemon = cli.commands.find((command) => command.name() === "daemon");
+    expect(daemon && names(daemon)).toContain("pair");
+  });
+
+  it("leaves out clone, onboard, pair, hub and speech in the Irix edition", () => {
+    markIrixCli(true);
+    const cli = createCli();
+    for (const name of unused) expect(names(cli)).not.toContain(name);
+    const daemon = cli.commands.find((command) => command.name() === "daemon");
+    expect(daemon && names(daemon)).not.toContain("pair");
+  });
+
+  it("keeps the commands Irix does use", () => {
+    markIrixCli(true);
+    expect(names(createCli())).toEqual(
+      expect.arrayContaining(["run", "ls", "send", "daemon", "plugin", "provider", "schedule"]),
+    );
+  });
 });

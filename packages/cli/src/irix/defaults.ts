@@ -11,6 +11,18 @@ import path from "node:path";
 
 export const IRIX_DEFAULT_PORT = 6890;
 
+// Set by bin/irix (through applyIrixDefaults) so the command tree can leave out what Irix does
+// not use. The `paseo` binary never sets it.
+let irixCli = false;
+
+export function markIrixCli(on = true): void {
+  irixCli = on;
+}
+
+export function isIrixCli(): boolean {
+  return irixCli;
+}
+
 export function irixDefaultHome(homeDirectory: string = os.homedir()): string {
   return path.join(homeDirectory, ".irix");
 }
@@ -25,6 +37,7 @@ export function applyIrixDefaults(
   env: NodeJS.ProcessEnv = process.env,
   homeDirectory: string = os.homedir(),
 ): void {
+  markIrixCli();
   delete env.PASEO_HOST;
   env.PASEO_HOME = env.IRIX_HOME || irixDefaultHome(homeDirectory);
   const home = path.resolve(expandHome(env.PASEO_HOME, homeDirectory));
