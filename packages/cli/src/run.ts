@@ -16,11 +16,14 @@ export function createCliParseArgv(input: {
 }): string[] | { kind: "open-project"; resolvedPath: string } {
   const program = createCli();
   const knownCommands = new Set(program.commands.map((command) => command.name()));
-  const invocation = classifyInvocation({
-    argv: input.argv,
-    knownCommands,
-    cwd: input.cwd,
-  });
+  // Irix has no desktop app, so a directory argument is not an open request.
+  const invocation = isIrixCli()
+    ? ({ kind: "cli", argv: input.argv } as const)
+    : classifyInvocation({
+        argv: input.argv,
+        knownCommands,
+        cwd: input.cwd,
+      });
 
   if (invocation.kind === "open-project") {
     return invocation;

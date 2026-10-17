@@ -190,4 +190,18 @@ describe("Irix CLI surface", () => {
       "onboard",
     ]);
   });
+
+  it("does not turn a directory argument into an open-in-desktop request", () => {
+    const nodeArgv: [string, string] = ["node", "irix"];
+    markIrixCli(false);
+    expect(createCliParseArgv({ argv: ["."], cwd: "/tmp", nodeArgv })).toMatchObject({
+      kind: "open-project",
+    });
+    markIrixCli(true);
+    expect(createCliParseArgv({ argv: ["."], cwd: "/tmp", nodeArgv })).toEqual([
+      "node",
+      "irix",
+      ".",
+    ]);
+  });
 });
