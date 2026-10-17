@@ -84,7 +84,9 @@ describe("setup controller", () => {
     let release: (outcome: Awaited<ReturnType<SetupApi["testSection"]>>) => void = () => {};
     const { api } = fakeApi({
       async status() {
-        return status({ sections: [CORP, { name: "other", url: "https://o.example.com", usable: true }] });
+        return status({
+          sections: [CORP, { name: "other", url: "https://o.example.com", usable: true }],
+        });
       },
       testSection: () => new Promise((resolve) => (release = resolve)),
     });
@@ -92,7 +94,13 @@ describe("setup controller", () => {
     await controller.load();
     const pending = controller.runTest();
     controller.selectSection("other");
-    release({ result: "token-rejected", detail: "401", expiresAt: null, expiresSoon: false, missingScopes: [] });
+    release({
+      result: "token-rejected",
+      detail: "401",
+      expiresAt: null,
+      expiresSoon: false,
+      missingScopes: [],
+    });
     await pending;
     expect(controller.getState().test).toEqual({ running: false, outcome: null, error: null });
     expect(controller.needsNewToken()).toBe(false);
@@ -113,7 +121,13 @@ describe("setup controller", () => {
     const rejected = createSetupController(
       fakeApi({
         async testSection() {
-          return { result: "token-rejected", detail: "401", expiresAt: null, expiresSoon: false, missingScopes: [] };
+          return {
+            result: "token-rejected",
+            detail: "401",
+            expiresAt: null,
+            expiresSoon: false,
+            missingScopes: [],
+          };
         },
       }).api,
     );
@@ -124,7 +138,13 @@ describe("setup controller", () => {
     const soon = createSetupController(
       fakeApi({
         async testSection() {
-          return { result: "ok", detail: null, expiresAt: "2026-10-20", expiresSoon: true, missingScopes: [] };
+          return {
+            result: "ok",
+            detail: null,
+            expiresAt: "2026-10-20",
+            expiresSoon: true,
+            missingScopes: [],
+          };
         },
       }).api,
     );
@@ -141,7 +161,9 @@ describe("setup controller", () => {
     await controller.openTokenPage("new");
     await controller.openTokenPage("section");
     const urls = calls.filter((c) => c.method === "openUrl").map((c) => String(c.input));
-    expect(urls[0]).toMatch(/^https:\/\/typed\.example\.com\/-\/user_settings\/personal_access_tokens\?name=Irix/);
+    expect(urls[0]).toMatch(
+      /^https:\/\/typed\.example\.com\/-\/user_settings\/personal_access_tokens\?name=Irix/,
+    );
     expect(urls[1]).toMatch(/^https:\/\/gitlab\.corp\.example\.com\/-\/user_settings/);
   });
 
@@ -150,7 +172,9 @@ describe("setup controller", () => {
     const { api, calls } = fakeApi({
       async status() {
         return status({
-          sections: created ? [CORP, { name: "irix", url: "https://new.example.com", usable: true }] : [],
+          sections: created
+            ? [CORP, { name: "irix", url: "https://new.example.com", usable: true }]
+            : [],
         });
       },
       async createSection(input) {

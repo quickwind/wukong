@@ -51,10 +51,12 @@
 ### Task 1: python-gitlab cfg file reader/writer
 
 **Files:**
+
 - Create: `plugins/irix-gitlab/server/setup/cfg-file.ts`
 - Test: `plugins/irix-gitlab/server/setup/cfg-file.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `cfgPath(env?: NodeJS.ProcessEnv): string` — `PYTHON_GITLAB_CFG` if set, else `~/.python-gitlab.cfg`.
   - `interface CfgSection { name: string; url: string | null }`
@@ -72,10 +74,12 @@
 ### Task 2: irix.json read/write
 
 **Files:**
+
 - Create: `plugins/irix-gitlab/server/setup/irix-json.ts`
 - Test: `plugins/irix-gitlab/server/setup/irix-json.test.ts`
 
 **Interfaces:**
+
 - Consumes: `expandHome`, `resolve` logic from `server/config.ts` (paseo home = `PASEO_HOME` or `~/.paseo`).
 - Produces:
   - `irixJsonPath(env?: NodeJS.ProcessEnv): string`
@@ -91,10 +95,12 @@
 ### Task 3: Tool check and section test
 
 **Files:**
+
 - Create: `plugins/irix-gitlab/server/setup/probe.ts`
 - Test: `plugins/irix-gitlab/server/setup/probe.test.ts`
 
 **Interfaces:**
+
 - Consumes: `GitLabSettings.command` shape (`string[]`) from `server/config.ts`; `cliValue` is not needed because no user text reaches argv except the section name, which `cfg-file` already restricted to `^[^\s-]\S*$`.
 - Produces:
   - `type ToolStatus = { gitlab: { found: boolean; version: string | null }; uv: { found: boolean } }`
@@ -114,11 +120,13 @@
 ### Task 4: Setup RPCs and handlers
 
 **Files:**
+
 - Modify: `plugins/irix-gitlab/shared/rpc.ts` (append), `plugins/irix-gitlab/index.server.ts`
 - Create: `plugins/irix-gitlab/server/setup/handlers.ts`
 - Test: `plugins/irix-gitlab/server/setup/handlers.test.ts`
 
 **Interfaces:**
+
 - Consumes: Tasks 1–3 exports.
 - Produces, in `shared/rpc.ts`:
   - `setupStatusRpc` (`irix.gitlab.setup.status`): input `{}`; output `{ tools: ToolStatus; cfgPath: string; sections: { name: string; url: string | null; usable: boolean }[]; saved: { url: string | null; configSection: string | null; cloneRoot: string | null }; overrides: ("IRIX_GITLAB_URL" | "IRIX_GITLAB_SECTION" | "IRIX_GITLAB_COMMAND" | "IRIX_CLONE_ROOT")[] }`. `usable` is true only for https urls.
@@ -136,17 +144,20 @@
 ### Task 5: Settings screen
 
 **Files:**
+
 - Create: `plugins/irix-gitlab/shared/token-url.ts`, `plugins/irix-gitlab/client/setup-screen.tsx`
 - Modify: `plugins/irix-gitlab/index.client.tsx`
 - Test: `plugins/irix-gitlab/shared/token-url.test.ts`, `plugins/irix-gitlab/client/setup-screen.test.tsx`
 
 **Interfaces:**
+
 - Consumes: the four RPCs from Task 4; `openExternalUrl` from `@getpaseo/plugin/client`; `SettingsSection`, `SettingsCard`, `SettingsRow`, `SettingsSelect`, `SettingsInput`, `SettingsAction` from `@getpaseo/plugin/client/ui`.
 - Produces:
   - `tokenPageUrl(baseUrl: string): string` — `<baseUrl without trailing slash>/-/user_settings/personal_access_tokens?name=Irix&description=Irix+GitLab+access&scopes=api,read_repository,write_repository`.
   - `GitLabSetupScreen` component, registered as `client.addSettingsScreen({ id: "gitlab", title: "GitLab", icon: "GitBranch", Component: GitLabSetupScreen })`.
 
 Screen behaviour (one block each, top to bottom):
+
 1. Tools: if `tools.gitlab.found` is false, show the install commands and disable every later block.
 2. Section: `SettingsSelect` of usable sections, a read-only row with the section's url, a **Test** action that calls `setupTestSectionRpc` and shows `ok`, with a warning listing `missingScopes`, `unreachable: <detail>` or `token rejected`, plus an expiry warning when `expiresSoon`.
 3. Token banner (after a test shows `token-rejected` or `expiresSoon`): **Generate a new token** opens `tokenPageUrl(section url)`, then a token field and **Save token** calling `setupCreateSectionRpc` with `replaceSection`.
@@ -163,10 +174,12 @@ Screen behaviour (one block each, top to bottom):
 ### Task 6: Point search errors at the settings screen
 
 **Files:**
+
 - Modify: `plugins/irix-gitlab/client/screen.tsx` (error rendering around the search failure state)
 - Test: add a case to `plugins/irix-gitlab/client/setup-screen.test.tsx` or a new `client/screen-error.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `client.openSettings("gitlab")` (the screen reaches it through the surface props or `usePaseo`; check `PluginSurfaceProps` in `packages/plugin/src/client` for the available handle).
 - Produces: when search fails with text matching `/not configured|401|unauthorized|not found; install/i`, the error area adds an **Open GitLab settings** button that opens the Task 5 screen.
 
@@ -179,6 +192,7 @@ Screen behaviour (one block each, top to bottom):
 ### Task 7: Docs
 
 **Files:**
+
 - Modify: `irix/README.md` (GitLab section), `IRIX.md` (the `plugins/irix-gitlab/` row and the Add project bullet)
 
 - [ ] **Step 1: Rewrite** the README GitLab section: setup now happens in Settings → Plugins → GitLab; `irix.json` and `IRIX_*` stay documented as the underlying mechanism; one paragraph on the restart note for merge-request features. Update the IRIX.md row to list the setup screen. Integrate into existing text, do not append.

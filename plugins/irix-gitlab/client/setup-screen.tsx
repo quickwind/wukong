@@ -17,7 +17,13 @@ import {
   setupTestSectionRpc,
 } from "../shared/rpc.js";
 import { FolderDialog } from "./folder-dialog.js";
-import { createSetupController, type SetupController, type TestOutcome } from "./setup-controller.js";
+import {
+  createSetupController,
+  type SetupController,
+  type SetupState,
+  type SetupStatus,
+  type TestOutcome,
+} from "./setup-controller.js";
 
 const INSTALL_UV = "https://docs.astral.sh/uv/getting-started/installation/";
 const INSTALL_GITLAB = "uv tool install python-gitlab";
@@ -42,60 +48,194 @@ function useController(): SetupController {
   const testSection = useRpc(setupTestSectionRpc);
   const createSection = useRpc(setupCreateSectionRpc);
   const save = useRpc(setupSaveRpc);
+  // The controller outlives renders, so it calls the latest RPC functions through a ref
+  // (a host switch or reconnect can hand `useRpc` new ones).
+  const rpc = useRef({ status, testSection, createSection, save });
+  rpc.current = { status, testSection, createSection, save };
   const [controller] = useState(() =>
     createSetupController({
-      status: () => status({}),
-      testSection: (section) => testSection({ section }),
-      createSection,
-      save,
+      status: () => rpc.current.status({}),
+      testSection: (section) => rpc.current.testSection({ section }),
+      createSection: (input) => rpc.current.createSection(input),
+      save: (input) => rpc.current.save(input),
       openUrl: openExternalUrl,
     }),
   );
   return controller;
 }
 
-export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
-  const controller = useController();
-  const state = useSyncExternalStore(controller.subscribe, controller.getState);
-  const style = useMemo(() => ({ color: theme.colors.foreground }), [theme]);
-  const errorStyle = useMemo(() => ({ color: theme.colors.statusDanger }), [theme]);
-  const saveStyles = useMemo(
-    () => ({
-      row: { paddingHorizontal: 4, paddingTop: 12, gap: 8, alignItems: "flex-start" as const },
-      button: {
-        paddingVertical: 10,
-        paddingHorizontal: 28,
-        borderRadius: 8,
-        backgroundColor: theme.colors.accent,
-      },
-      disabled: { opacity: 0.5 },
-      text: { color: theme.colors.accentForeground, fontWeight: "600" as const },
-    }),
-    [theme],
+interface ScreenStyles {
+  text: { color: string };
+  error: { color: string };
+}
+
+function ToolsMissing({ tools, onReload }: { tools: SetupStatus["tools"]; onReload: () => void }) {
+  return (
+    <SettingsSection title="GitLab">
+      <SettingsCard>
+        <SettingsRow
+          label="python-gitlab is not installed"
+          hint={`Irix reaches GitLab through python-gitlab. Install it, then reload this page: ${INSTALL_GITLAB}`}
+        />
+        {tools.uv.found ? null : (
+          <SettingsRow
+            label="uv is not installed either"
+            hint={`Install uv first, then run the command above: ${INSTALL_UV}`}
+          />
+        )}
+        <SettingsAction label="After installing" actionLabel="Check again" onPress={onReload} />
+      </SettingsCard>
+    </SettingsSection>
   );
-  const [browsing, setBrowsing] = useState(false);
-  const cloneRootRef = useRef<SettingsInputHandle>(null);
+}
+
+function EnvironmentOverrides({ overrides }: { overrides: string[] }) {
+  if (overrides.length === 0) return null;
+  return (
+    <SettingsSection title="Environment overrides">
+      <SettingsCard>
+        {overrides.map((name) => (
+          <SettingsRow
+            key={name}
+            label={name}
+            hint="This variable is set and wins over the value saved here."
+          />
+        ))}
+      </SettingsCard>
+    </SettingsSection>
+  );
+}
+
+function UnusableSections({
+  sections,
+  cfgPath,
+}: {
+  sections: SetupStatus["sections"];
+  cfgPath: string;
+}) {
+  const unusable = sections.filter((entry) => !entry.usable);
+  if (unusable.length === 0) return null;
+  return (
+    <SettingsSection title="Sections that cannot be used">
+      <SettingsCard>
+        {unusable.map((entry) => (
+          <SettingsRow
+            key={entry.name}
+            label={entry.name}
+            hint={`${entry.url ?? "no url"}. Needs an https url without credentials or a query string, and a name without spaces. Fix it in ${cfgPath}.`}
+          />
+        ))}
+      </SettingsCard>
+    </SettingsSection>
+  );
+}
+
+function TestResultRows({
+  outcome,
+  error,
+  needsToken,
+  styles,
+}: {
+  outcome: TestOutcome | null;
+  error: string | null;
+  needsToken: boolean;
+  styles: ScreenStyles;
+}) {
+  return (
+    <>
+      {outcome ? (
+        <SettingsRow label="Result">
+          <Text style={outcome.result === "ok" && !needsToken ? styles.text : styles.error}>
+            {describeOutcome(outcome)}
+          </Text>
+        </SettingsRow>
+      ) : null}
+      {error ? (
+        <SettingsRow label="Test failed">
+          <Text style={styles.error}>{error}</Text>
+        </SettingsRow>
+      ) : null}
+    </>
+  );
+}
+
+interface SectionProps {
+  controller: SetupController;
+  state: SetupState;
+}
+
+function NewAccountForm({ controller, state }: SectionProps) {
   const newTokenRef = useRef<SettingsInputHandle>(null);
-  const renewTokenRef = useRef<SettingsInputHandle>(null);
-
-  useEffect(() => {
-    void controller.load();
-  }, [controller]);
-
   const openNewTokenPage = useCallback(() => void controller.openTokenPage("new"), [controller]);
-  const openSectionTokenPage = useCallback(
-    () => void controller.openTokenPage("section"),
-    [controller],
-  );
   const createNew = useCallback(() => {
     void controller.submitNewSection();
     newTokenRef.current?.replaceText("");
   }, [controller]);
-  const renew = useCallback(() => {
-    void controller.submitRenewedToken();
-    renewTokenRef.current?.replaceText("");
-  }, [controller]);
-  const runTest = useCallback(() => void controller.runTest(), [controller]);
+  return (
+    <SettingsSection title="Add a GitLab account">
+      <SettingsCard>
+        <SettingsInput
+          label="GitLab URL"
+          placeholder="https://gitlab.example.com"
+          initialValue={state.url}
+          onChangeText={controller.setUrl}
+          disabled={state.busy}
+        />
+        <SettingsAction
+          label="Personal access token"
+          actionLabel="Get token"
+          onPress={openNewTokenPage}
+          disabled={!state.url.trim()}
+        />
+        <SettingsRow
+          label="In GitLab"
+          hint={`The page opens with the name and permissions (api, read_repository, write_repository) filled in. ${TOKEN_STEPS}`}
+        />
+        <SettingsInput
+          ref={newTokenRef}
+          label="Token"
+          secureTextEntry
+          onChangeText={controller.setToken}
+          disabled={state.busy}
+          error={state.formError}
+        />
+        <SettingsAction
+          label="Store it in the python-gitlab config"
+          actionLabel={state.busy ? "Checking…" : "Create"}
+          disabled={state.busy || !state.url.trim() || !state.token}
+          onPress={createNew}
+        />
+        {state.adding ? (
+          <SettingsAction label="Not now" actionLabel="Cancel" onPress={controller.cancelAdding} />
+        ) : null}
+      </SettingsCard>
+    </SettingsSection>
+  );
+}
+
+function ProjectsSection({
+  controller,
+  state,
+  theme,
+}: SectionProps & { theme: PluginSurfaceProps["theme"] }) {
+  const [browsing, setBrowsing] = useState(false);
+  const cloneRootRef = useRef<SettingsInputHandle>(null);
+  const style = useMemo(() => ({ color: theme.colors.foreground }), [theme]);
+  const saveStyles = useMemo(() => {
+    const button = {
+      paddingVertical: 10,
+      paddingHorizontal: 28,
+      borderRadius: 8,
+      backgroundColor: theme.colors.accent,
+    };
+    const disabled = { opacity: 0.5 };
+    return {
+      row: { paddingHorizontal: 4, paddingTop: 12, gap: 8, alignItems: "flex-start" as const },
+      button,
+      buttonDisabled: [button, disabled],
+      text: { color: theme.colors.accentForeground, fontWeight: "600" as const },
+    };
+  }, [theme]);
   const save = useCallback(() => void controller.save(), [controller]);
   const startBrowsing = useCallback(() => setBrowsing(true), []);
   const stopBrowsing = useCallback(() => setBrowsing(false), []);
@@ -107,6 +247,71 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
     },
     [controller],
   );
+  return (
+    <SettingsSection title="Projects">
+      <SettingsCard>
+        <SettingsInput
+          ref={cloneRootRef}
+          label="Clone folder"
+          hint="Where new clones go. An absolute path, or one starting with ~/"
+          initialValue={state.cloneRoot}
+          onChangeText={controller.setCloneRoot}
+          disabled={state.saving}
+          error={state.saveError}
+        />
+        <SettingsAction
+          label="Pick it from the disk"
+          actionLabel="Browse…"
+          disabled={state.saving}
+          onPress={startBrowsing}
+        />
+      </SettingsCard>
+      <View style={saveStyles.row}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Save"
+          style={state.saving ? saveStyles.buttonDisabled : saveStyles.button}
+          disabled={state.saving}
+          onPress={save}
+        >
+          <Text style={saveStyles.text}>{state.saving ? "Saving…" : "Save"}</Text>
+        </Pressable>
+        {state.savedResult ? (
+          <Text style={style}>
+            {state.savedResult.restartNeeded
+              ? `Using ${state.savedResult.url}. Project search and clone use it now; merge-request features use it after the daemon restarts.`
+              : `Using ${state.savedResult.url}.`}
+          </Text>
+        ) : null}
+      </View>
+      {browsing ? (
+        <FolderDialog theme={theme} onSelect={chooseCloneRoot} onClose={stopBrowsing} />
+      ) : null}
+    </SettingsSection>
+  );
+}
+
+export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
+  const controller = useController();
+  const state = useSyncExternalStore(controller.subscribe, controller.getState);
+  const style = useMemo(() => ({ color: theme.colors.foreground }), [theme]);
+  const errorStyle = useMemo(() => ({ color: theme.colors.statusDanger }), [theme]);
+  const screenStyles = useMemo(() => ({ text: style, error: errorStyle }), [style, errorStyle]);
+  const renewTokenRef = useRef<SettingsInputHandle>(null);
+
+  useEffect(() => {
+    void controller.load();
+  }, [controller]);
+
+  const openSectionTokenPage = useCallback(
+    () => void controller.openTokenPage("section"),
+    [controller],
+  );
+  const renew = useCallback(() => {
+    void controller.submitRenewedToken();
+    renewTokenRef.current?.replaceText("");
+  }, [controller]);
+  const runTest = useCallback(() => void controller.runTest(), [controller]);
   const reload = useCallback(() => void controller.load(), [controller]);
   const sectionOptions = useMemo(
     () =>
@@ -129,45 +334,16 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
   const { status } = state;
 
   if (!status.tools.gitlab.found) {
-    return (
-      <SettingsSection title="GitLab">
-        <SettingsCard>
-          <SettingsRow
-            label="python-gitlab is not installed"
-            hint={`Irix reaches GitLab through python-gitlab. Install it, then reload this page: ${INSTALL_GITLAB}`}
-          />
-          {status.tools.uv.found ? null : (
-            <SettingsRow
-              label="uv is not installed either"
-              hint={`Install uv first, then run the command above: ${INSTALL_UV}`}
-            />
-          )}
-          <SettingsAction label="After installing" actionLabel="Check again" onPress={reload} />
-        </SettingsCard>
-      </SettingsSection>
-    );
+    return <ToolsMissing tools={status.tools} onReload={reload} />;
   }
 
   const showForm = controller.showNewSectionForm();
-  const unusable = status.sections.filter((entry) => !entry.usable);
   const needsToken = controller.needsNewToken();
   const outcome = state.test.outcome;
 
   return (
     <>
-      {status.overrides.length > 0 ? (
-        <SettingsSection title="Environment overrides">
-          <SettingsCard>
-            {status.overrides.map((name) => (
-              <SettingsRow
-                key={name}
-                label={name}
-                hint="This variable is set and wins over the value saved here."
-              />
-            ))}
-          </SettingsCard>
-        </SettingsSection>
-      ) : null}
+      <EnvironmentOverrides overrides={status.overrides} />
 
       {sectionOptions.length > 0 && !state.adding ? (
         <SettingsSection title="GitLab account">
@@ -179,7 +355,10 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
               options={sectionOptions}
               onValueChange={controller.selectSection}
             />
-            <SettingsRow label="GitLab URL" hint="Set by the section. Choose another section to change it.">
+            <SettingsRow
+              label="GitLab URL"
+              hint="Set by the section. Choose another section to change it."
+            >
               <Text style={style}>{sectionUrl ?? ""}</Text>
             </SettingsRow>
             <SettingsAction
@@ -188,18 +367,12 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
               disabled={state.test.running || !state.section}
               onPress={runTest}
             />
-            {outcome ? (
-              <SettingsRow label="Result">
-                <Text style={outcome.result === "ok" && !needsToken ? style : errorStyle}>
-                  {describeOutcome(outcome)}
-                </Text>
-              </SettingsRow>
-            ) : null}
-            {state.test.error ? (
-              <SettingsRow label="Test failed">
-                <Text style={errorStyle}>{state.test.error}</Text>
-              </SettingsRow>
-            ) : null}
+            <TestResultRows
+              outcome={outcome}
+              error={state.test.error}
+              needsToken={needsToken}
+              styles={screenStyles}
+            />
             <SettingsAction
               label="Another GitLab"
               actionLabel="Add a section"
@@ -233,102 +406,12 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
         </SettingsSection>
       ) : null}
 
-      {unusable.length > 0 ? (
-        <SettingsSection title="Sections that cannot be used">
-          <SettingsCard>
-            {unusable.map((entry) => (
-              <SettingsRow
-                key={entry.name}
-                label={entry.name}
-                hint={`${entry.url ?? "no url"}. Needs an https url without credentials or a query string, and a name without spaces. Fix it in ${status.cfgPath}.`}
-              />
-            ))}
-          </SettingsCard>
-        </SettingsSection>
-      ) : null}
+      <UnusableSections sections={status.sections} cfgPath={status.cfgPath} />
 
-      {showForm ? (
-        <SettingsSection title="Add a GitLab account">
-          <SettingsCard>
-            <SettingsInput
-              label="GitLab URL"
-              placeholder="https://gitlab.example.com"
-              initialValue={state.url}
-              onChangeText={controller.setUrl}
-              disabled={state.busy}
-            />
-            <SettingsAction
-              label="Personal access token"
-              actionLabel="Get token"
-              onPress={openNewTokenPage}
-              disabled={!state.url.trim()}
-            />
-            <SettingsRow
-              label="In GitLab"
-              hint={`The page opens with the name and permissions (api, read_repository, write_repository) filled in. ${TOKEN_STEPS}`}
-            />
-            <SettingsInput
-              ref={newTokenRef}
-              label="Token"
-              secureTextEntry
-              onChangeText={controller.setToken}
-              disabled={state.busy}
-              error={state.formError}
-            />
-            <SettingsAction
-              label="Store it in the python-gitlab config"
-              actionLabel={state.busy ? "Checking…" : "Create"}
-              disabled={state.busy || !state.url.trim() || !state.token}
-              onPress={createNew}
-            />
-            {state.adding ? (
-              <SettingsAction label="Not now" actionLabel="Cancel" onPress={controller.cancelAdding} />
-            ) : null}
-          </SettingsCard>
-        </SettingsSection>
-      ) : null}
+      {showForm ? <NewAccountForm controller={controller} state={state} /> : null}
 
       {state.section && !showForm ? (
-        <SettingsSection title="Projects">
-          <SettingsCard>
-            <SettingsInput
-              ref={cloneRootRef}
-              label="Clone folder"
-              hint="Where new clones go. An absolute path, or one starting with ~/"
-              initialValue={state.cloneRoot}
-              onChangeText={controller.setCloneRoot}
-              disabled={state.saving}
-              error={state.saveError}
-            />
-            <SettingsAction
-              label="Pick it from the disk"
-              actionLabel="Browse…"
-              disabled={state.saving}
-              onPress={startBrowsing}
-            />
-          </SettingsCard>
-          <View style={saveStyles.row}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Save"
-              style={state.saving ? [saveStyles.button, saveStyles.disabled] : saveStyles.button}
-              disabled={state.saving}
-              onPress={save}
-            >
-              <Text style={saveStyles.text}>{state.saving ? "Saving…" : "Save"}</Text>
-            </Pressable>
-            {state.savedResult ? (
-              <Text style={style}>
-                {state.savedResult.restartNeeded
-                  ? `Using ${state.savedResult.url}. Project search and clone use it now; merge-request features use it after the daemon restarts.`
-                  : `Using ${state.savedResult.url}.`}
-              </Text>
-            ) : null}
-          </View>
-          {browsing ? (
-            <FolderDialog theme={theme} onSelect={chooseCloneRoot} onClose={stopBrowsing} />
-          ) : null}
-        </SettingsSection>
+        <ProjectsSection controller={controller} state={state} theme={theme} />
       ) : null}
     </>
   );

@@ -5,7 +5,6 @@ import { daemonStopCommand } from "./stop.js";
 import { daemonRestartCommand } from "./restart.js";
 import { runSetPasswordCommand } from "./set-password.js";
 import { pairCommand } from "./pair.js";
-import { isIrixCli } from "../../irix/defaults.js"; // Irix
 import { daemonReloadCommand } from "./reload.js";
 import { daemonConfigCommand } from "./config.js";
 import { withOutput } from "../../output/index.js";
@@ -20,7 +19,7 @@ export function createDaemonCommand(): Command {
     daemonStopCommand(),
     daemonRestartCommand(),
     daemonReloadCommand(),
-    ...(isIrixCli() ? [] : [pairCommand()]), // Irix
+    pairCommand(),
     daemonConfigCommand(),
   ])
     daemon.addCommand(command);

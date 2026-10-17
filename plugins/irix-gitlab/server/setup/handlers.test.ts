@@ -55,9 +55,7 @@ describe("setupStatus", () => {
     expect(status.saved.configSection).toBeNull();
     expect(status.overrides).toEqual([]);
     expect(status.defaultCloneRoot).toBe(
-      process.platform === "win32"
-        ? join(homedir(), "workspace", "gitlab")
-        : "~/workspace/gitlab",
+      process.platform === "win32" ? join(homedir(), "workspace", "gitlab") : "~/workspace/gitlab",
     );
   });
 
@@ -92,10 +90,20 @@ describe("setupTestSection", () => {
     const soon = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
     seedFake(process.env.FAKE_GL_STATE ?? "", {
       requireToken: "good",
-      self: { active: true, revoked: false, expires_at: soon, scopes: ["api", "read_repository", "write_repository"] },
+      self: {
+        active: true,
+        revoked: false,
+        expires_at: soon,
+        scopes: ["api", "read_repository", "write_repository"],
+      },
     });
     const result = await setupTestSection({ section: "corp" }, env);
-    expect(result).toMatchObject({ result: "ok", expiresAt: soon, expiresSoon: true, missingScopes: [] });
+    expect(result).toMatchObject({
+      result: "ok",
+      expiresAt: soon,
+      expiresSoon: true,
+      missingScopes: [],
+    });
   });
 
   it("rejects a section that is not in the cfg", async () => {
@@ -120,6 +128,11 @@ describe("setupCreateSection", () => {
     expect(out).toEqual({ section: "irix" });
     expect(readFileSync(cfg, "utf8")).toContain("url = https://gitlab.corp.example.com\n");
     if (process.platform !== "win32") expect(statSync(cfg).mode & 0o777).toBe(0o600);
+  });
+
+  it("accepts a pasted token with a trailing space or newline", async () => {
+    await setupCreateSection({ url: "https://gitlab.corp.example.com", token: " good\n" }, env);
+    expect(readFileSync(cfg, "utf8")).toContain("private_token = good\n");
   });
 
   it("picks a free name when irix exists", async () => {

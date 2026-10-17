@@ -70,7 +70,11 @@ export async function setupStatus(
   return {
     tools: await checkTools(resolveCommand(env)),
     cfgPath: path,
-    sections: readCfgSections(path).map(({ name, url }) => ({ name, url, usable: sectionProblem(name, url) === null })),
+    sections: readCfgSections(path).map(({ name, url }) => ({
+      name,
+      url,
+      usable: sectionProblem(name, url) === null,
+    })),
     saved: (({ url, configSection, cloneRoot }) => ({ url, configSection, cloneRoot }))(
       readGitLabSaved(env),
     ),
@@ -107,7 +111,8 @@ export async function setupCreateSection(
   input: RpcInput<typeof setupCreateSectionRpc>,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<RpcOutput<typeof setupCreateSectionRpc>> {
-  assertCfgValue("token", input.token);
+  const token = input.token.trim(); // a pasted token often carries a trailing space or newline
+  assertCfgValue("token", token);
   const path = cfgPath(env);
   const existing = readCfgSections(path).map((section) => section.name);
   const url = input.replaceSection
@@ -115,9 +120,11 @@ export async function setupCreateSection(
     : validateUrl(input.url);
   const name = input.replaceSection ?? freeSectionName(existing);
 
-  const outcome = await testToken(resolveCommand(env), url, input.token);
+  const outcome = await testToken(resolveCommand(env), url, token);
   if (outcome.result === "token-rejected") {
-    throw new Error("GitLab rejected the token. Check that it was copied whole and has not expired.");
+    throw new Error(
+      "GitLab rejected the token. Check that it was copied whole and has not expired.",
+    );
   }
   if (outcome.result === "unreachable") {
     throw new Error(`Could not reach ${url}: ${outcome.detail}`);
@@ -125,7 +132,7 @@ export async function setupCreateSection(
   if (outcome.missingScopes.length > 0) {
     throw new Error(`The token lacks the scopes: ${outcome.missingScopes.join(", ")}`);
   }
-  upsertSection(path, { name, url, token: input.token });
+  upsertSection(path, { name, url, token });
   return { section: name };
 }
 

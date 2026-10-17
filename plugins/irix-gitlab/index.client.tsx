@@ -22,6 +22,10 @@ function AddFromGitLabItem({ currentScreen, openScreen }: PluginSidebarItemProps
   );
 }
 
+function settingsOpener(client: PluginClientContext): () => void {
+  return () => client.openSettings(GITLAB_SETTINGS_ID);
+}
+
 export default function contribute(client: PluginClientContext) {
   client.addSettingsScreen({
     id: GITLAB_SETTINGS_ID,
@@ -29,7 +33,7 @@ export default function contribute(client: PluginClientContext) {
     icon: "GitBranch",
     Component: GitLabSetupScreen,
   });
-  const openGitLabSettings = () => client.openSettings(GITLAB_SETTINGS_ID);
+  const openGitLabSettings = settingsOpener(client);
   const Screen = (props: PluginScreenProps) => (
     <AddFromGitLabScreen {...props} openGitLabSettings={openGitLabSettings} />
   );

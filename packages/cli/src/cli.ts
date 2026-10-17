@@ -32,9 +32,10 @@ import { addArchiveOptions, runArchiveCommand } from "./commands/agent/archive.j
 import { addAttachOptions, runAttachCommand } from "./commands/agent/attach.js";
 import { addImportOptions, runImportCommand } from "./commands/agent/import.js";
 import { withOutput } from "./output/index.js";
+import { isIrixCli } from "./irix/defaults.js"; // Irix
+import { applyIrixSurface } from "./irix/surface.js"; // Irix
 import { runCloneCommand } from "./commands/clone.js";
 import { onboardCommand } from "./commands/onboard.js";
-import { isIrixCli } from "./irix/defaults.js"; // Irix
 import {
   addDaemonHostOption,
   addJsonAndDaemonHostOptions,
@@ -46,14 +47,10 @@ const VERSION = resolveCliVersion();
 
 export function createCli(): Command {
   const program = new Command();
-  // Irix: clone, onboard, pair, hub and speech are not used, so they are not registered.
-  const irix = isIrixCli();
 
   program
-    .name(irix ? "irix" : "paseo") // Irix
-    .description(
-      `${irix ? "Irix" : "Paseo"} CLI - control your AI coding agents from the command line`,
-    )
+    .name("paseo")
+    .description("Paseo CLI - control your AI coding agents from the command line")
     .version(VERSION, "-v, --version", "output the version number")
     // Global output options
     .option("-o, --format <format>", "output format: table, json, yaml", "table")
@@ -74,25 +71,19 @@ export function createCli(): Command {
     withOutput(runImportCommand),
   );
 
-  if (!irix) {
-    addJsonAndDaemonHostOptions(
-      program
-        .command("clone")
-        .description("Clone a GitHub repo and register it as a Paseo workspace")
-        .argument("<repo>", "GitHub repo in owner/repo format or a full git remote URL")
-        .requiredOption(
-          "--dir <path>",
-          "Parent directory to clone into (for example: ~/workspace)",
-        ),
+  addJsonAndDaemonHostOptions(
+    program
+      .command("clone")
+      .description("Clone a GitHub repo and register it as a Paseo workspace")
+      .argument("<repo>", "GitHub repo in owner/repo format or a full git remote URL")
+      .requiredOption("--dir <path>", "Parent directory to clone into (for example: ~/workspace)"),
+  )
+    .addOption(
+      new Option("--protocol <protocol>", "Protocol for owner/repo shorthand repositories").choices(
+        ["https", "ssh"],
+      ),
     )
-      .addOption(
-        new Option(
-          "--protocol <protocol>",
-          "Protocol for owner/repo shorthand repositories",
-        ).choices(["https", "ssh"]),
-      )
-      .action(withOutput(runCloneCommand));
-  }
+    .action(withOutput(runCloneCommand));
 
   addDaemonHostOption(addAttachOptions(program.command("attach"))).action(
     withGlobalOptions(runAttachCommand),
@@ -127,21 +118,21 @@ export function createCli(): Command {
   );
 
   // Top-level local daemon shortcuts
-  if (!irix) program.addCommand(onboardCommand());
+  program.addCommand(onboardCommand());
   program.addCommand(daemonStartCommand());
   program.addCommand(createHooksCommand());
 
   program.addCommand(daemonStatusCommand());
   program.addCommand(daemonRestartCommand());
   program.addCommand(daemonReloadCommand());
-  if (!irix) program.addCommand(pairCommand());
+  program.addCommand(pairCommand());
 
   // Advanced agent commands (less common operations)
   program.addCommand(createAgentCommand());
 
   // Daemon commands
   program.addCommand(createDaemonCommand());
-  if (!irix) program.addCommand(createHubCommand());
+  program.addCommand(createHubCommand());
 
   // Chat commands
 
@@ -164,7 +155,7 @@ export function createCli(): Command {
   program.addCommand(createPluginCommand());
 
   // Speech model commands
-  if (!irix) program.addCommand(createSpeechCommand());
+  program.addCommand(createSpeechCommand());
 
   // Workspace commands
   program.addCommand(createProjectCommand());
@@ -205,5 +196,5 @@ export function createCli(): Command {
     command.commands.forEach(enforceSelectorDuplicates);
   };
   enforceSelectorDuplicates(program);
-  return program;
+  return isIrixCli() ? applyIrixSurface(program) : program; // Irix
 }

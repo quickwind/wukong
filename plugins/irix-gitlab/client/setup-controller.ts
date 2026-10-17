@@ -43,6 +43,14 @@ export interface SetupState {
 
 const NO_TEST = { running: false, outcome: null, error: null } as const;
 
+function isUrl(value: string): boolean {
+  try {
+    return Boolean(new URL(value));
+  } catch {
+    return false;
+  }
+}
+
 const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
@@ -80,16 +88,16 @@ export function createSetupController(api: SetupApi) {
       const usable = status.sections.filter((entry) => entry.usable);
       const keep = state.section && usable.some((entry) => entry.name === state.section);
       const saved = status.saved.configSection;
-      const section = keep
-        ? state.section
-        : saved && usable.some((entry) => entry.name === saved)
-          ? saved
-          : (usable[0]?.name ?? null);
+      let section: string | null = usable[0]?.name ?? null;
+      if (keep) section = state.section;
+      else if (saved && usable.some((entry) => entry.name === saved)) section = saved;
       set({
         loading: false,
         status,
         section,
-        cloneRoot: state.status ? state.cloneRoot : (status.saved.cloneRoot ?? status.defaultCloneRoot),
+        cloneRoot: state.status
+          ? state.cloneRoot
+          : (status.saved.cloneRoot ?? status.defaultCloneRoot),
       });
     } catch (error) {
       set({ loading: false, loadError: messageOf(error) });
@@ -114,9 +122,7 @@ export function createSetupController(api: SetupApi) {
   async function openTokenPage(target: "new" | "section") {
     const base = target === "new" ? state.url.trim() : sectionUrl();
     if (!base) return;
-    try {
-      new URL(base);
-    } catch {
+    if (!isUrl(base)) {
       set({ formError: "Enter the GitLab URL first, such as https://gitlab.example.com" });
       return;
     }
@@ -130,7 +136,7 @@ export function createSetupController(api: SetupApi) {
 
   /** The token leaves the state before the request starts, so no failure path can keep it. */
   function takeToken(): string {
-    const token = state.token;
+    const token = state.token.trim();
     set({ token: "" });
     return token;
   }
@@ -196,7 +202,8 @@ export function createSetupController(api: SetupApi) {
     setCloneRoot: (cloneRoot: string) => set({ cloneRoot, savedResult: null }),
     /** The new-section form shows on request, or when there is nothing to choose from. */
     showNewSectionForm: () =>
-      state.adding || (state.status !== null && !state.status.sections.some((entry) => entry.usable)),
+      state.adding ||
+      (state.status !== null && !state.status.sections.some((entry) => entry.usable)),
     /** A rejected token, or one about to expire, calls for a new one. */
     needsNewToken: () =>
       state.test.outcome?.result === "token-rejected" || state.test.outcome?.expiresSoon === true,

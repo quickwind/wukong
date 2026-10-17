@@ -64,9 +64,17 @@ export function freeSectionName(existing: string[], base = "irix"): string {
   }
 }
 
+function hasControlCharacter(value: string): boolean {
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
 export function assertCfgValue(label: string, value: string): void {
   if (!value) throw new Error(`The ${label} must not be empty`);
-  if (/[\u0000-\u001f\u007f]/u.test(value)) {
+  if (hasControlCharacter(value)) {
     throw new Error(`The ${label} must not contain control characters or line breaks`);
   }
   if (value !== value.trim()) {
@@ -75,7 +83,7 @@ export function assertCfgValue(label: string, value: string): void {
 }
 
 function withTerminator(line: string, eol: string): string {
-  return /\n$/u.test(line) ? line : `${line}${eol}`;
+  return line.endsWith("\n") ? line : `${line}${eol}`;
 }
 
 function replaceInSection(

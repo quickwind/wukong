@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -43,7 +43,14 @@ describe("checkTools", () => {
 
 describe("testSection", () => {
   it("is ok with the expiry and no missing scopes", async () => {
-    seed({ self: { active: true, revoked: false, expires_at: "2026-12-01", scopes: ["api", "read_repository", "write_repository"] } });
+    seed({
+      self: {
+        active: true,
+        revoked: false,
+        expires_at: "2026-12-01",
+        scopes: ["api", "read_repository", "write_repository"],
+      },
+    });
     expect(await testSection(command, "corp")).toEqual({
       result: "ok",
       expiresAt: "2026-12-01",
@@ -53,7 +60,9 @@ describe("testSection", () => {
   });
 
   it("lists the scopes the token lacks", async () => {
-    seed({ self: { active: true, revoked: false, expires_at: null, scopes: ["api", "read_repository"] } });
+    seed({
+      self: { active: true, revoked: false, expires_at: null, scopes: ["api", "read_repository"] },
+    });
     expect(await testSection(command, "corp")).toMatchObject({
       result: "ok",
       missingScopes: ["write_repository"],

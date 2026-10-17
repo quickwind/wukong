@@ -53,7 +53,9 @@ describe("upsertSection", () => {
     upsertSection(file, { name: "irix", url: "https://gl.example.com", token: "tok" });
     const text = readFileSync(file, "utf8");
     expect(text).toContain("[global]\ndefault = irix");
-    expect(text).toContain("[irix]\nurl = https://gl.example.com\nprivate_token = tok\napi_version = 4");
+    expect(text).toContain(
+      "[irix]\nurl = https://gl.example.com\nprivate_token = tok\napi_version = 4",
+    );
     if (process.platform !== "win32") {
       expect(statSync(file).mode & 0o777).toBe(0o600);
     }

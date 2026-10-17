@@ -24,7 +24,9 @@ describe("contributeSettingsEntry", () => {
     expect(item?.title).toBe("GitLab settings");
     const opened: string[] = [];
     if (item?.context === "global") {
-      await item.onSelect({ openSettings: (id: string) => opened.push(id) } as unknown as PluginGlobalCommandContext);
+      await item.onSelect({
+        openSettings: (id: string) => opened.push(id),
+      } as unknown as PluginGlobalCommandContext);
     }
     expect(opened).toEqual([GITLAB_SETTINGS_ID]);
     remove();

@@ -92,7 +92,7 @@ import {
 } from "./provider-subagents/store.js";
 import { withTimeout } from "../../utils/promise-timeout.js";
 import { extractAttention } from "../persistence-hooks.js";
-import { assertIrixModeAllowed } from "../../irix/restrictions.js";
+import { assertIrixModeAllowed, withoutIrixBypassConfig } from "../../irix/restrictions.js";
 
 const RELOAD_SESSION_CLOSE_TIMEOUT_MS = 3_000;
 const INTERRUPT_SESSION_TIMEOUT_MS = 2_000;
@@ -1407,7 +1407,7 @@ export class AgentManager {
     const purpose = currentResumeOptions?.purpose ?? "interactive";
 
     const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
-      mergedConfig,
+      withoutIrixBypassConfig(mergedConfig), // Irix: a stored bypass mode falls back to the default
       resolvedAgentId,
       { purpose },
     );
@@ -1570,7 +1570,7 @@ export class AgentManager {
       provider,
     } as AgentSessionConfig;
     const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
-      refreshConfig,
+      withoutIrixBypassConfig(refreshConfig), // Irix
       agentId,
     );
     const hadPreviousPaseoToolPolicy = this.paseoToolPolicies.has(agentId);

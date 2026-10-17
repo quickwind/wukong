@@ -1,5 +1,5 @@
 import { normalizeAgentModelCatalog } from "@getpaseo/protocol/agent-types";
-import { withoutIrixBypassModes } from "../../irix/restrictions.js";
+import { irixSafeDefaultModeId, withoutIrixBypassModes } from "../../irix/restrictions.js";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { homedir } from "node:os";
@@ -1044,8 +1044,10 @@ export class ProviderSnapshotManager {
       }
       setEntry({
         ...base,
-        defaultModeId:
+        defaultModeId: irixSafeDefaultModeId(
+          // Irix: a bypass default is not offered
           catalog.defaultModeId === undefined ? base.defaultModeId : catalog.defaultModeId,
+        ),
         status: "ready",
         enabled: true,
         models,

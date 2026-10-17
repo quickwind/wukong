@@ -6,6 +6,8 @@ import {
   assertIrixAgentMessagingAllowed,
   assertIrixModeAllowed,
   assertIrixSchedulesAllowed,
+  irixSafeDefaultModeId,
+  withoutIrixBypassConfig,
   isIrixToolBlocked,
   withoutIrixBypassModes,
 } from "./restrictions.js";
@@ -49,6 +51,23 @@ describe("Irix restrictions", () => {
       ]),
     ).toEqual([{ id: "default" }]);
     expect(paseoCommandLineGuide("a1")).not.toContain("irix send");
+  });
+
+  it("learns a provider's own unattended modes, whatever they are named", () => {
+    withoutIrixBypassModes([{ id: "default" }, { id: "accept-all-edits", isUnattended: true }]);
+    expect(() => assertIrixModeAllowed({ modeId: "accept-all-edits" })).toThrow();
+  });
+
+  it("does not offer a bypass default, and lets a stored agent fall back to the default mode", () => {
+    expect(irixSafeDefaultModeId("bypassPermissions")).toBeUndefined();
+    expect(irixSafeDefaultModeId("default")).toBe("default");
+    expect(
+      withoutIrixBypassConfig({
+        modeId: "bypassPermissions",
+        featureValues: { auto_accept: true, other: 1 },
+      }),
+    ).toEqual({ featureValues: { auto_accept: false, other: 1 } });
+    expect(withoutIrixBypassConfig({ modeId: "default" })).toEqual({ modeId: "default" });
   });
 
   it("IRIX_UNRESTRICTED lifts everything", () => {

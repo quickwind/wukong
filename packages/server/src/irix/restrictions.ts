@@ -51,14 +51,39 @@ export function isIrixToolBlocked(toolName: string): boolean {
 const BYPASS_MODE_PATTERN = /bypass|yolo|dangerous|skip.?perm|auto.?approve|full.?access/i;
 const AUTO_ACCEPT_FEATURE_ID = "auto_accept";
 
+// Mode ids a provider itself flagged `isUnattended`, learned from its catalog. The name pattern
+// below is only a fallback for providers that do not flag their modes.
+const unattendedModeIds = new Set<string>();
+
+export function rememberIrixUnattendedModes(
+  modes: ReadonlyArray<{ id: string; isUnattended?: boolean }> | undefined,
+): void {
+  for (const mode of modes ?? []) {
+    if (mode.isUnattended === true) {
+      unattendedModeIds.add(mode.id);
+    }
+  }
+}
+
 export function isBypassModeId(modeId: string | null | undefined): boolean {
-  return typeof modeId === "string" && BYPASS_MODE_PATTERN.test(modeId);
+  return (
+    typeof modeId === "string" &&
+    (unattendedModeIds.has(modeId) || BYPASS_MODE_PATTERN.test(modeId))
+  );
+}
+
+/** A default mode id that is not a bypass mode, or undefined when the default is one. */
+export function irixSafeDefaultModeId<T extends string | null | undefined>(
+  modeId: T,
+): T | undefined {
+  return isIrixRestricted("bypassModes") && isBypassModeId(modeId) ? undefined : modeId;
 }
 
 /** For mode lists shown to the user: drops modes that skip permission prompts. */
 export function withoutIrixBypassModes<T extends { id: string; isUnattended?: boolean }>(
   modes: T[] | undefined,
 ): T[] | undefined {
+  rememberIrixUnattendedModes(modes);
   if (!modes || !isIrixRestricted("bypassModes")) {
     return modes;
   }
@@ -68,6 +93,26 @@ export function withoutIrixBypassModes<T extends { id: string; isUnattended?: bo
 /** Wraps the ACP "Auto accept" toggle so it is only offered when bypass modes are allowed. */
 export function irixFeatures<T>(autoAccept: T): T[] {
   return isIrixRestricted("bypassModes") ? [] : [autoAccept];
+}
+
+/**
+ * A stored config (resume, reload) may carry a mode that was allowed when the agent was made.
+ * Drop it so the agent starts in the provider's default mode instead of failing to load.
+ */
+export function withoutIrixBypassConfig<
+  T extends { modeId?: string | null; featureValues?: Record<string, unknown> | null },
+>(config: T): T {
+  if (!isIrixRestricted("bypassModes")) {
+    return config;
+  }
+  const next = { ...config };
+  if (isBypassModeId(next.modeId)) {
+    delete next.modeId;
+  }
+  if (next.featureValues?.[AUTO_ACCEPT_FEATURE_ID] === true) {
+    next.featureValues = { ...next.featureValues, [AUTO_ACCEPT_FEATURE_ID]: false };
+  }
+  return next;
 }
 
 export function assertIrixModeAllowed(input: {

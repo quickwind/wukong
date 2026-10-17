@@ -26,7 +26,6 @@ else if (command === "personal-access-token get") {
 else { console.error("unexpected command: " + command); process.exit(1); }
 `;
 
-
 export interface FakeState {
   self: unknown;
   user: unknown;
@@ -36,7 +35,12 @@ export interface FakeState {
 
 export function seedFake(statePath: string, partial: Partial<FakeState> = {}): void {
   const state: FakeState = {
-    self: { active: true, revoked: false, expires_at: null, scopes: ["api", "read_repository", "write_repository"] },
+    self: {
+      active: true,
+      revoked: false,
+      expires_at: null,
+      scopes: ["api", "read_repository", "write_repository"],
+    },
     user: { id: 1, username: "me" },
     calls: [],
     ...partial,
@@ -46,4 +50,3 @@ export function seedFake(statePath: string, partial: Partial<FakeState> = {}): v
 
 export const fakeCalls = (statePath: string): FakeState["calls"] =>
   (JSON.parse(readFileSync(statePath, "utf8")) as FakeState).calls;
-
