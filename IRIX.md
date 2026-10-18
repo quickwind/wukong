@@ -200,8 +200,8 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
 - **`ui.AgentView` for plugins** (`app/src/irix/agent-view.tsx`, `agent-view-shell.tsx`; types in
   `plugin/src/client/irix-ui.ts`; how to use it: `irix/README.md`): Paseo's own conversation
-  embedded in a plugin screen, so the Bots chat gets timeline renderers, composer pills, slash
-  commands and the model, mode and thinking pickers without a copy of the chat UI. Props are
+  embedded in a plugin screen, so the Bots chat gets timeline renderers, composer pills and the model,
+  mode and thinking pickers without a copy of the chat UI. Props are
   `agentId`, `serverId`, `workspaceId` (all required, the plugin passes them; Irix does not look the
   workspace up) and an optional `onOpenWorkspaceFile`. Irix builds only: elsewhere both exports are
   `undefined`. Plugins detect it with `typeof ui.AgentView === "function"` and
