@@ -94,6 +94,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | `app/composer/input-mode.ts`                                                                                               | No dictation or voice mode                                                                                   |
 | `app/screens/settings-screen.tsx`, `settings/host-page.tsx`, `settings/providers-section.tsx`, `settings/plugins-page.tsx` | No pairing, locked providers and terminal profiles, local-folder plugin text                                 |
 | `app/usage/queries.ts`                                                                                                     | Pinned usage re-reads on a timer (Irix builds only)                                                          |
+| `app/plugins/react-native/ui.ts`, `plugin/src/client/ui.ts`                                                                | Plugins get `ui.AgentView` and `ui.capabilities` (one re-export each; code and types are Irix files)         |
 
 ## Design decisions, and why
 
@@ -189,6 +190,20 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   terminal opened inside Paseo.
 - **Web UI:** served by the daemon, on by default. English only: Irix's added strings are not in
   the translation tables, to keep i18n files untouched.
+
+- **`ui.AgentView` for plugins** (`app/src/irix/agent-view.tsx`, `agent-view-shell.tsx`; types in
+  `plugin/src/client/irix-ui.ts`): Paseo's own conversation embedded in a plugin screen, so the Bots
+  chat gets timeline renderers, composer pills, slash commands and the model, mode and thinking
+  pickers without a copy of the chat UI. Props are `agentId`, `serverId`, `workspaceId` (and an
+  optional `onOpenWorkspaceFile`). Plugins detect it with `typeof ui.AgentView !== "undefined"`;
+  `ui.capabilities.agentView` is the props version. Three things to keep: the shell is `require`d on
+  first render, because a static import closes a loop through the plugin registry (`registry` ->
+  `evaluate` -> `ui` -> chat screen -> `registry`); it renders upstream's `AgentConversationPanel`
+  inside its own `PaneProvider`, so nothing in upstream is edited for it; and it registers the
+  agent with `viewedTimelineSync` under a source id of its own, because without a registered viewer
+  the conversation waits on history forever, and a shared id would let one view release another's.
+  Not provided, because there is no workspace behind it: opening subagent tracks, the import sheet,
+  and file links unless the plugin passes `onOpenWorkspaceFile`.
 
 ## License and attribution
 
