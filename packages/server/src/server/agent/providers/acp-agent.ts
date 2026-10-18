@@ -255,6 +255,9 @@ function resolveTerminalCommand(
   return { command: shell.shell, args: shell.args, shell: false };
 }
 
+// Released terminals kept for their tool call's output.
+const MAX_RELEASED_TERMINALS = 32;
+
 function formatDurationMs(startedAt: number): string {
   return `${Math.max(0, Date.now() - startedAt)}ms`;
 }
@@ -651,6 +654,11 @@ interface TerminalExit {
 interface TerminalEntry {
   id: string;
   child: ChildProcess;
+  command: string;
+  // Set once the provider has released it; the entry stays so a tool call that never named
+  // this terminal can still show its output (see findTerminalForToolCall).
+  released: boolean;
+  claimedBy: string | null;
   output: string;
   truncated: boolean;
   outputByteLimit: number | null;
@@ -2539,12 +2547,14 @@ export class ACPAgentSession implements AgentSession, ACPClient {
       }
     }
 
-    const terminalTerminations = Array.from(this.terminalEntries.values(), (terminal) =>
-      this.terminateProcess(terminal.child, {
-        gracefulTimeoutMs: 2_000,
-        forceTimeoutMs: 2_000,
-      }),
-    );
+    const terminalTerminations = Array.from(this.terminalEntries.values())
+      .filter((terminal) => !terminal.released)
+      .map((terminal) =>
+        this.terminateProcess(terminal.child, {
+          gracefulTimeoutMs: 2_000,
+          forceTimeoutMs: 2_000,
+        }),
+      );
     await Promise.all(terminalTerminations);
     this.terminalEntries.clear();
 
@@ -2748,6 +2758,9 @@ export class ACPAgentSession implements AgentSession, ACPClient {
     const entry: TerminalEntry = {
       id: terminalId,
       child,
+      command: [params.command, ...(params.args ?? [])].join(" "),
+      released: false,
+      claimedBy: null,
       output: "",
       truncated: false,
       outputByteLimit: params.outputByteLimit ?? null,
@@ -2797,7 +2810,15 @@ export class ACPAgentSession implements AgentSession, ACPClient {
     if (!entry.exit) {
       await this.terminateProcess(entry.child, { gracefulTimeoutMs: 2_000, forceTimeoutMs: 2_000 });
     }
-    this.terminalEntries.delete(params.terminalId);
+    entry.released = true;
+    this.evictReleasedTerminals();
+  }
+
+  private evictReleasedTerminals(): void {
+    const released = Array.from(this.terminalEntries.values()).filter((entry) => entry.released);
+    for (const entry of released.slice(0, Math.max(0, released.length - MAX_RELEASED_TERMINALS))) {
+      this.terminalEntries.delete(entry.id);
+    }
   }
 
   async killTerminal(params: KillTerminalRequest): Promise<Record<string, never>> {
@@ -3410,7 +3431,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
 
   private getTerminalEntry(terminalId: string): TerminalEntry {
     const entry = this.terminalEntries.get(terminalId);
-    if (!entry) {
+    if (!entry || entry.released) {
       throw new Error(`Unknown terminal '${terminalId}'`);
     }
     return entry;
@@ -3770,7 +3791,7 @@ function mapToolDetail(
     firstLocation: snapshot.locations?.[0]?.path,
     textContent: extractToolText(snapshot.content),
     diffContent: extractDiffContent(snapshot.content),
-    terminalContent: extractTerminalContent(snapshot.content, terminals),
+    terminalContent: extractTerminalContent(snapshot, terminals),
     rawInput: readRecord(snapshot.rawInput),
     rawOutput: readRecord(snapshot.rawOutput),
   };
@@ -3919,8 +3940,43 @@ function extractDiffContent(
   return diff ? { oldText: diff.oldText ?? undefined, newText: diff.newText } : null;
 }
 
+// Standard ACP names the terminal in the tool call's content. Devin does not: the call
+// carries only the command, and the terminal is released before the call completes. For
+// those (Irix), the terminal that ran the same command and has not served another call is theirs.
+function findTerminalForToolCall(
+  snapshot: ACPToolSnapshot,
+  terminals: Map<string, TerminalEntry>,
+): TerminalEntry | undefined {
+  const named = snapshot.content?.find(
+    (item): item is Extract<ToolCallContent, { type: "terminal" }> => item.type === "terminal",
+  );
+  if (named) {
+    return terminals.get(named.terminalId);
+  }
+  if (snapshot.kind !== "execute") {
+    return undefined;
+  }
+  const rawInput = readRecord(snapshot.rawInput);
+  const command = (buildShellCommand(rawInput) ?? readString(rawInput, ["command"]))?.trim();
+  if (!command) {
+    return undefined;
+  }
+  const entries = Array.from(terminals.values());
+  const claimed = entries.find((entry) => entry.claimedBy === snapshot.toolCallId);
+  if (claimed) {
+    return claimed;
+  }
+  const match = entries.findLast(
+    (entry) => entry.claimedBy === null && entry.command.trim() === command,
+  );
+  if (match) {
+    match.claimedBy = snapshot.toolCallId;
+  }
+  return match;
+}
+
 function extractTerminalContent(
-  content: ToolCallContent[] | null | undefined,
+  snapshot: ACPToolSnapshot,
   terminals: Map<string, TerminalEntry>,
 ):
   | {
@@ -3930,13 +3986,7 @@ function extractTerminalContent(
       exitCode?: number | null;
     }
   | undefined {
-  const terminal = content?.find(
-    (item): item is Extract<ToolCallContent, { type: "terminal" }> => item.type === "terminal",
-  );
-  if (!terminal) {
-    return undefined;
-  }
-  const entry = terminals.get(terminal.terminalId);
+  const entry = findTerminalForToolCall(snapshot, terminals);
   if (!entry) {
     return undefined;
   }

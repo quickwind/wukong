@@ -134,6 +134,11 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   arguments through `mendSplitQuotedArgs` (`packages/cli/src/irix/argv.ts`), which joins an opening
   quote and its later closing quote back into one message. The cause on the Windows side (which shell
   Devin runs commands in) is not known; only the symptom is handled.
+  **Devin's shell output in the chat:** Devin runs commands through ACP `terminal/create`, reads them with
+  `terminal/output`, releases the terminal, and only then completes the tool call with the text
+  `Exited with code 0`. It never puts the terminal in the call's content, so the chat showed no output
+  while Devin had it (seen with `devin acp` on macOS and Windows). `acp-agent.ts` keeps released terminals
+  (up to 32) and gives a call without terminal content the output of the terminal that ran the same command.
   Two gaps the guide covers: an agent started or messaged from the CLI does not notify its caller when
   it finishes (only the MCP tools arm that; verified, the child's `ParentAgentId` is set but no message
   comes back), so Devin is told to wait or to ask the agent to `irix send` its answer back; and the
