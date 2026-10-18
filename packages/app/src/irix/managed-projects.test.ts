@@ -14,6 +14,13 @@ async function load(irix: boolean) {
 const POSIX = "/home/me/.irix/plugin-data/bot-crew/shared/Bots";
 const WINDOWS = "C:\\Users\\Me\\.irix\\plugin-data\\bot-crew\\shared\\Bots\\bot-abc";
 
+describe("MANAGED_PROJECTS_HIDDEN", () => {
+  it("is on in an Irix build, the same switch that exports the capability", async () => {
+    const { MANAGED_PROJECTS_HIDDEN } = await load(true);
+    expect(MANAGED_PROJECTS_HIDDEN).toBe(true);
+  });
+});
+
 describe("isManagedProjectPath", () => {
   it("matches the Bot Crew folder on POSIX and on Windows, at any depth and in any case", async () => {
     const { isManagedProjectPath } = await load(true);
@@ -36,7 +43,9 @@ describe("isManagedProjectPath", () => {
   });
 
   it("does nothing outside an Irix build", async () => {
-    const { isManagedProjectPath, withoutManagedProjects } = await load(false);
+    const { isManagedProjectPath, withoutManagedProjects, MANAGED_PROJECTS_HIDDEN } =
+      await load(false);
+    expect(MANAGED_PROJECTS_HIDDEN).toBe(false);
     expect(isManagedProjectPath(POSIX)).toBe(false);
     const projects = [{ iconWorkingDir: POSIX, hosts: [] }];
     expect(withoutManagedProjects(projects)).toBe(projects);

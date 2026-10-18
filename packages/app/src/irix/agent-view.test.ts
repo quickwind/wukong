@@ -28,7 +28,7 @@ describe("plugin ui.AgentView", () => {
     vi.stubEnv("EXPO_PUBLIC_IRIX", "1");
     const ui = await load();
     expect(ui.AgentView).toBeTypeOf("function");
-    expect(ui.capabilities).toEqual({ agentView: 1 });
+    expect(ui.capabilities).toEqual({ agentView: 1, managedProjectsHidden: 1 });
   });
 
   it("does not import the conversation screen until it renders", async () => {
@@ -41,6 +41,6 @@ describe("plugin ui.AgentView", () => {
     vi.stubEnv("EXPO_PUBLIC_IRIX", "1");
     const runtime = await import("@/plugins/react-native/ui");
     expect(runtime.AgentView).toBeTypeOf("function");
-    expect(runtime.capabilities).toEqual({ agentView: 1 });
+    expect(runtime.capabilities).toEqual({ agentView: 1, managedProjectsHidden: 1 });
   });
 });

@@ -104,6 +104,16 @@ return AgentView ? (
 - Detect it, do not compare versions: Irix's version number is not Paseo's. Types ship in
   `@irix/plugin` (`dist/client/irix-ui.d.ts`); the public `@getpaseo/plugin@0.11.2` has none, so a
   plugin built against it declares `AgentView` and `capabilities` itself.
+- `ui.capabilities.managedProjectsHidden === 1`: the sidebar and New workspace leave out the project
+  Bot Crew manages (`<home>/plugin-data/bot-crew/...`), so a plugin may draw its own tree of those
+  workspaces. Where it is absent (Paseo, older Irix), keep using the native project.
+- A sidebar item (`addSidebarHeaderItem`, Paseo 0.11 and later; 0.9.x and 0.10.x have only
+  `addSidebarItem`, so test `typeof client.addSidebarHeaderItem === "function"`) can render several
+  `SidebarRow`s, and runs under the plugin's own providers: `useSettings`, `useRpc`, `usePaseo`,
+  `useWorkspace` and `useAgent` work, and `useQuery` uses the plugin's host-made `QueryClient`
+  (shared with its screens), so a `QueryClientProvider` of its own is not needed. A row reaches a
+  screen with `openScreen({ screenId })`; `addSurface("bots", ...)` registers the screen id `bots`.
+  `navigation.openWorkspace/openAgent` exist on screens only, not on sidebar items.
 - Not available inside it: opening subagent tracks and the import sheet. In a narrow pane the mode
   picker is hidden by upstream's layout.
 - A new chat with no model chosen shows no "/" commands (upstream). For Devin, the daemon waits up to

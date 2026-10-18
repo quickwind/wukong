@@ -19,5 +19,12 @@ export interface AgentViewProps {
  */
 export declare const AgentView: ComponentType<AgentViewProps> | undefined;
 
-/** Versioned features of `AgentView`. `agentView: 1` is the `AgentViewProps` above. */
-export declare const capabilities: { readonly agentView: 1 } | undefined;
+/**
+ * What this Irix host offers. `agentView: 1` is the `AgentViewProps` above. `managedProjectsHidden: 1`
+ * means the sidebar and New workspace leave out the project a plugin manages (for Bot Crew, the
+ * `Bots` project under `plugin-data/bot-crew`), so a plugin that draws its own tree of it will not
+ * be duplicated by the native one. Absent on hosts that still list it.
+ */
+export declare const capabilities:
+  | { readonly agentView: 1; readonly managedProjectsHidden?: 1 }
+  | undefined;

@@ -1,6 +1,13 @@
 import { IRIX_BUILD } from "./build";
 
 /**
+ * Whether managed projects are hidden in this build. `ui.capabilities.managedProjectsHidden` is
+ * exported from the same switch, so a plugin that draws its own tree never meets a host that also
+ * lists the project.
+ */
+export const MANAGED_PROJECTS_HIDDEN = IRIX_BUILD;
+
+/**
  * Plugins whose projects the plugin itself manages. Bot Crew keeps one workspace per bot under
  * `<home>/plugin-data/bot-crew/shared/Bots/<botId>` and draws its own sidebar tree and Bots page,
  * so the sidebar's project list and "New workspace" must not offer that project.
@@ -17,7 +24,7 @@ function normalize(path: string): string {
 }
 
 export function isManagedProjectPath(path: string | null | undefined): boolean {
-  if (!IRIX_BUILD || !path) return false;
+  if (!MANAGED_PROJECTS_HIDDEN || !path) return false;
   const normalized = normalize(path);
   return MANAGED_PLUGIN_IDS.some((id) => normalized.includes(`/plugin-data/${id}/`));
 }
@@ -44,7 +51,7 @@ const filtered = new WeakMap<readonly object[], readonly object[]>();
 export function withoutManagedProjects<Project extends ProjectWithPaths>(
   projects: Project[],
 ): Project[] {
-  if (!IRIX_BUILD) return projects;
+  if (!MANAGED_PROJECTS_HIDDEN) return projects;
   const cached = filtered.get(projects);
   if (cached) return cached as Project[];
   const kept = projects.filter((project) => !isPluginManagedProject(project));

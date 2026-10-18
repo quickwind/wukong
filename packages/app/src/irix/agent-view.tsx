@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { IRIX_BUILD } from "./build";
+import { MANAGED_PROJECTS_HIDDEN } from "./managed-projects";
 import type { AgentViewProps } from "./agent-view-shell";
 
 /**
@@ -21,7 +22,13 @@ export const AgentView: ComponentType<AgentViewProps> | undefined = IRIX_BUILD
   ? LazyAgentView
   : undefined;
 
-/** Versioned features of the embedded view; bumped when the props change incompatibly. */
-export const capabilities: { readonly agentView: 1 } | undefined = IRIX_BUILD
-  ? { agentView: 1 }
+/**
+ * What this host offers. `agentView` is the version of `AgentView`'s props.
+ * `managedProjectsHidden: 1` means the sidebar and New workspace leave out the project a plugin
+ * manages (see `managed-projects.ts`), so a plugin that draws its own tree of it may do so.
+ */
+export const capabilities:
+  | { readonly agentView: 1; readonly managedProjectsHidden?: 1 }
+  | undefined = IRIX_BUILD
+  ? { agentView: 1, ...(MANAGED_PROJECTS_HIDDEN ? { managedProjectsHidden: 1 as const } : {}) }
   : undefined;

@@ -234,7 +234,9 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   daemon, `paseo.workspaces.list`, `paseo.projects.list` and the other plugins still see the project:
   paseo-workboard reads both through the plugin host API on the server, so a task whose workspace is
   a bot's still lists, and a plugin's own workspace page still opens by `workspaceId`. Not hidden:
-  the import-session sheet's project list, and anything that opens a workspace by id.
+  the import-session sheet's project list, and anything that opens a workspace by id. `ui.capabilities.managedProjectsHidden` is exported from the same switch
+  (`MANAGED_PROJECTS_HIDDEN`), so a plugin that draws its own tree of the project can tell whether the
+  host also lists it.
 
 ## License and attribution
 
