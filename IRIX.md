@@ -50,7 +50,7 @@ node irix/scripts/upstream-footprint.mjs     # lists every upstream file we modi
 ```
 
 It fails if an upstream file is deleted or renamed, if a modified upstream file has no `Irix`
-marker in the lines added, or if the totals pass the budget (40 files, 400 lines; change with
+marker in the lines added, or if the totals pass the budget (45 files, 420 lines; change with
 `--max-files`/`--max-lines`). **Run it before every commit that touches upstream files** and when
 you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
@@ -93,6 +93,9 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | `app/components/add-host-method-modal.tsx`                                                                                 | No pairing-link option (it reaches the public relay)                                                         |
 | `app/composer/input-mode.ts`                                                                                               | No dictation or voice mode                                                                                   |
 | `app/screens/settings-screen.tsx`, `settings/host-page.tsx`, `settings/providers-section.tsx`, `settings/plugins-page.tsx` | No pairing, locked providers and terminal profiles, local-folder plugin text                                 |
+| `app/screens/new-workspace-screen.tsx`                                                                                     | Name + Create bar (`app/irix/workspace-name.tsx`): create the workspace first, chat after                    |
+| `app/composer/draft/workspace-tab.tsx`                                                                                     | Same bar for a new chat tab (`IrixCreateAgentBar`): name it and create it with no first message              |
+| `app/panels/agent-panel.tsx`                                                                                               | A new chat tab is titled with the name given in `IrixCreateAgentBar`                                         |
 | `app/usage/queries.ts`                                                                                                     | Pinned usage re-reads on a timer (Irix builds only)                                                          |
 
 ## Design decisions, and why

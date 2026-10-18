@@ -2,6 +2,7 @@ import type {
   CreateAgentRequestOptions,
   CreateWorkspaceRequestOptions,
 } from "@getpaseo/client/internal/daemon-client";
+import { IrixCreateWorkspaceBar, irixWorkspaceTitleField } from "@/irix/workspace-name"; // Irix
 import type { AgentSnapshotPayload, CreationSnapshot } from "@getpaseo/protocol/messages";
 import { encodeImages } from "@/utils/encode-images";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
@@ -846,6 +847,7 @@ async function createMultiplicityWorkspace(input: {
           projectId,
         },
     ...(firstAgentContext ? { firstAgentContext } : {}),
+    ...irixWorkspaceTitleField(), // Irix: the name typed on this screen
   });
   if (payload.error || !payload.workspace) {
     throw new Error(payload.error ?? input.createFailedMessage);
@@ -2440,6 +2442,7 @@ export function NewWorkspaceScreen({
           formStack={formStack}
           onImportSession={importSession.open}
         >
+          <IrixCreateWorkspaceBar submit={handleSubmitNewWorkspace} pending={isPending} />
           {composer}
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
         </NewWorkspaceLayout>

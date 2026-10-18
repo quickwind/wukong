@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { IrixCreateAgentBar, irixAgentTitleField } from "@/irix/workspace-name"; // Irix
 import { Keyboard, ScrollView, StyleSheet as RNStyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
@@ -194,7 +195,7 @@ async function submitDraftCreateRequest(input: {
   const imagesData = await encodeImages(images);
   const options = {
     idempotencyKey: input.draftId,
-    config,
+    config: { ...config, ...irixAgentTitleField(input.draftId) }, // Irix: the chat name
     workspaceId,
     initialPrompt: text,
     clientMessageId: attempt.clientMessageId,
@@ -658,6 +659,7 @@ export function WorkspaceDraftAgentTab({
               </View>
             </View>
           ) : null}
+          <IrixCreateAgentBar draftId={draftId} />
           <Composer
             agentId={tabId}
             serverId={serverId}

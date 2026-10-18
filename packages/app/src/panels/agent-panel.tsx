@@ -1,4 +1,5 @@
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
+import { useIrixDraftDescriptor } from "@/irix/workspace-name"; // Irix
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
@@ -454,10 +455,13 @@ export function useDraftPanelDescriptor(
     }),
   );
 
-  return buildDraftPanelDescriptor({
-    ...createDescriptorState,
-    icon: SquarePen,
-  });
+  return useIrixDraftDescriptor(
+    buildDraftPanelDescriptor({
+      ...createDescriptorState,
+      icon: SquarePen,
+    }),
+    target.draftId,
+  );
 }
 
 const EMPTY_STREAM_ITEMS: StreamItem[] = [];
