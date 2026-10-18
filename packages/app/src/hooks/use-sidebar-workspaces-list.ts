@@ -8,6 +8,7 @@ import { useHostProjects } from "@/projects/host-projects";
 import { getHostRuntimeStore, useHostRegistryLoaded, useHosts } from "@/runtime/host-runtime";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
+import { withoutManagedProjects } from "@/irix/managed-projects"; // Irix
 import {
   buildSidebarWorkspacePlacementModel,
   computeSidebarOrderUpdates,
@@ -143,7 +144,7 @@ export function useSidebarWorkspacesList(options?: {
   const sidebarModel = useMemo(
     () =>
       buildSidebarWorkspacePlacementModel({
-        projects: hostProjects,
+        projects: withoutManagedProjects(hostProjects), // Irix: no plugin-managed project
       }),
     [hostProjects],
   );
