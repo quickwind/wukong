@@ -23,6 +23,15 @@ export const FIXES = [
     replacement: 'shell: process.platform === "win32",',
     applied: 'process.platform === "win32"',
   },
+  {
+    // Metro keeps a transform cache in the system temp folder, shared by every checkout. It is
+    // keyed on file contents, not on EXPO_PUBLIC_* variables, so a new EXPO_PUBLIC_IRIX_VERSION
+    // was ignored and About showed the version of an earlier pack. `--clear` skips the cache.
+    file: "packages/app/package.json",
+    pattern: /expo export --platform web"/u,
+    replacement: 'expo export --platform web --clear"',
+    applied: "expo export --platform web --clear",
+  },
 ];
 
 export function applyBuildFixes({ root = REPO_ROOT, dryRun = false, log = () => {} } = {}) {

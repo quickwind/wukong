@@ -57,3 +57,11 @@ test("fails loudly when upstream rewrites the line", () => {
     /found nothing to change in scripts\/build-daemon-web-ui\.mjs/,
   );
 });
+
+test("makes the web UI build skip Metro's shared transform cache", () => {
+  const root = copyTarget();
+  const file = path.join(root, "packages/app/package.json");
+  assert.doesNotMatch(readFileSync(file, "utf8"), /--clear/);
+  applyBuildFixes({ root });
+  assert.match(readFileSync(file, "utf8"), /expo export --platform web --clear"/);
+});
