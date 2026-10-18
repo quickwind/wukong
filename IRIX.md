@@ -21,8 +21,13 @@ Paseo on company Windows machines, where nothing may be sent to cloud services:
 
 We want to merge upstream often and cheaply. Every line changed in an upstream file is a future
 merge conflict. An earlier attempt (the `internal-edition` branch, kept only for reference) edited
-126 upstream files and was abandoned for exactly that reason. This branch edits **24 upstream
-files, about 200 lines**; everything else is new files.
+126 upstream files and was abandoned for exactly that reason. This branch edits **44 upstream files, 428 lines** (`upstream-footprint.mjs`, 2026-10-19). The
+budget is 45 files and 440 lines. It was 40 and 400. Two features used the room, and nothing else
+may: the Name + Create bar (the New workspace screen and the new chat tab are upstream code, so no
+Irix-owned file can replace them) took it to 45 files and 420 lines, and hiding a plugin-managed
+project from the sidebar (same reason) took the lines to 440. The two lists of changes were merged,
+so the numbers above are measured on the merge, not the sum of the two branches. The next upstream edit has to pay for itself by
+removing another; everything else is new files.
 
 Before editing an upstream file, go down this ladder and stop at the first rung that works:
 
@@ -50,7 +55,7 @@ node irix/scripts/upstream-footprint.mjs     # lists every upstream file we modi
 ```
 
 It fails if an upstream file is deleted or renamed, if a modified upstream file has no `Irix`
-marker in the lines added, or if the totals pass the budget (45 files, 420 lines; change with
+marker in the lines added, or if the totals pass the budget (45 files, 440 lines; change with
 `--max-files`/`--max-lines`). **Run it before every commit that touches upstream files** and when
 you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
@@ -74,29 +79,30 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 `upstream-footprint.mjs` is the source of truth; this is the why. Paths are under `packages/`
 (`server/src/...`, `app/src/...`) unless they start with `CLAUDE.md`.
 
-| File                                                                                                                       | Why                                                                                                          |
-| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `CLAUDE.md` (`AGENTS.md` links to it)                                                                                      | One line at the top pointing agents here                                                                     |
-| `server/daemon-worker.ts`                                                                                                  | Imports the edition entry first (egress guard, policy)                                                       |
-| `server/agent/providers/acp-agent.ts`, `terminal/terminal.ts`                                                              | One line each: Windows shell comes from `irixWindowsShell()` (PowerShell by default)                         |
-| `server/config.ts`                                                                                                         | Terminal profiles fixed to Claude Code                                                                       |
-| `server/session.ts`                                                                                                        | Clone requests only from the company GitLab                                                                  |
-| `server/agent/provider-registry.ts`                                                                                        | Restrict to Claude and Devin; Devin as configured ACP, with Irix's Devin client                              |
-| `server/plugins/index.ts`                                                                                                  | No managed sources; only Irix's bundled plugins                                                              |
-| `server/plugins/compiler.ts`                                                                                               | Lets plugins written for `@getpaseo/plugin` build here                                                       |
-| `server/services/forge-registry.ts`                                                                                        | GitLab is the only forge                                                                                     |
-| `server/scripts/supervisor.ts`                                                                                             | `windowsHide` so Windows shows no daemon console window                                                      |
-| `server/session/daemon/daemon-self-updater.ts`                                                                             | Refuses "Update daemon": it would install upstream's packages from npm                                       |
-| `app/screens/settings/host-page.tsx`                                                                                       | Hides Update daemon, the agent tools, browser tools and skills cards, and Remove host (Restart daemon stays) |
-| `app/add-project-flow/options.ts`, `components/add-project-flow.tsx`                                                       | "Clone from GitLab" in place of GitHub                                                                       |
-| `app/components/sidebar/sidebar-help-menu.tsx`, `community-links.tsx`, `changelog/.../changelog-source.ts`                 | No upstream links, no What's new request                                                                     |
-| `app/components/add-host-method-modal.tsx`                                                                                 | No pairing-link option (it reaches the public relay)                                                         |
-| `app/composer/input-mode.ts`                                                                                               | No dictation or voice mode                                                                                   |
-| `app/screens/settings-screen.tsx`, `settings/host-page.tsx`, `settings/providers-section.tsx`, `settings/plugins-page.tsx` | No pairing, locked providers and terminal profiles, local-folder plugin text                                 |
-| `app/screens/new-workspace-screen.tsx`                                                                                     | Name + Create bar (`app/irix/workspace-name.tsx`): create the workspace first, chat after                    |
-| `app/composer/draft/workspace-tab.tsx`                                                                                     | Same bar for a new chat tab (`IrixCreateAgentBar`): name it and create it with no first message              |
-| `app/panels/agent-panel.tsx`                                                                                               | A new chat tab is titled with the name given in `IrixCreateAgentBar`                                         |
-| `app/usage/queries.ts`                                                                                                     | Pinned usage re-reads on a timer (Irix builds only)                                                          |
+| File                                                                                                                       | Why                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CLAUDE.md` (`AGENTS.md` links to it)                                                                                      | One line at the top pointing agents here                                                                                                                                                                                                                                               |
+| `server/daemon-worker.ts`                                                                                                  | Imports the edition entry first (egress guard, policy)                                                                                                                                                                                                                                 |
+| `server/agent/providers/acp-agent.ts`, `terminal/terminal.ts`                                                              | One line each: Windows shell comes from `irixWindowsShell()` (PowerShell by default)                                                                                                                                                                                                   |
+| `server/config.ts`                                                                                                         | Terminal profiles fixed to Claude Code                                                                                                                                                                                                                                                 |
+| `server/session.ts`                                                                                                        | Clone requests only from the company GitLab                                                                                                                                                                                                                                            |
+| `server/agent/provider-registry.ts`                                                                                        | Restrict to Claude and Devin; Devin as configured ACP, with Irix's Devin client                                                                                                                                                                                                        |
+| `server/plugins/index.ts`                                                                                                  | No managed sources; only Irix's bundled plugins                                                                                                                                                                                                                                        |
+| `server/plugins/compiler.ts`                                                                                               | Lets plugins written for `@getpaseo/plugin` build here                                                                                                                                                                                                                                 |
+| `server/services/forge-registry.ts`                                                                                        | GitLab is the only forge                                                                                                                                                                                                                                                               |
+| `server/scripts/supervisor.ts`                                                                                             | `windowsHide` so Windows shows no daemon console window                                                                                                                                                                                                                                |
+| `server/session/daemon/daemon-self-updater.ts`                                                                             | Refuses "Update daemon": it would install upstream's packages from npm                                                                                                                                                                                                                 |
+| `app/screens/settings/host-page.tsx`                                                                                       | Hides Update daemon, the agent tools, browser tools and skills cards, and Remove host (Restart daemon stays)                                                                                                                                                                           |
+| `app/add-project-flow/options.ts`, `components/add-project-flow.tsx`                                                       | "Clone from GitLab" in place of GitHub                                                                                                                                                                                                                                                 |
+| `app/components/sidebar/sidebar-help-menu.tsx`, `community-links.tsx`, `changelog/.../changelog-source.ts`                 | No upstream links, no What's new request                                                                                                                                                                                                                                               |
+| `app/components/add-host-method-modal.tsx`                                                                                 | No pairing-link option (it reaches the public relay)                                                                                                                                                                                                                                   |
+| `app/composer/input-mode.ts`                                                                                               | No dictation or voice mode                                                                                                                                                                                                                                                             |
+| `app/screens/settings-screen.tsx`, `settings/host-page.tsx`, `settings/providers-section.tsx`, `settings/plugins-page.tsx` | No pairing, locked providers and terminal profiles, local-folder plugin text                                                                                                                                                                                                           |
+| `app/usage/queries.ts`                                                                                                     | Pinned usage re-reads on a timer (Irix builds only)                                                                                                                                                                                                                                    |
+| `app/plugins/react-native/ui.ts`, `plugin/src/client/ui.ts`                                                                | Plugins get `ui.AgentView` and `ui.capabilities` (one re-export each; code and types are Irix files)                                                                                                                                                                                   |
+| `app/hooks/use-sidebar-workspaces-list.ts`, `app/screens/new-workspace-screen.tsx`                                         | A plugin-managed project (Bot Crew's `Bots`) is left out of the sidebar and the New workspace project list and preselection; one call each into `app/src/irix/managed-projects.ts`; also the Name + Create bar (`app/irix/workspace-name.tsx`): create the workspace first, chat after |
+| `app/composer/draft/workspace-tab.tsx`                                                                                     | Same bar for a new chat tab (`IrixCreateAgentBar`): name it and create it with no first message                                                                                                                                                                                        |
+| `app/panels/agent-panel.tsx`                                                                                               | A new chat tab is titled with the name given in `IrixCreateAgentBar`                                                                                                                                                                                                                   |
 
 ## Design decisions, and why
 
@@ -115,7 +121,12 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   that block to the user's first message when a session resumes, so the client also cuts it back out
   of `streamHistory`. Verified with the real Devin: it answers with the instruction, the chat shows
   only what was typed before and after a daemon restart, and later messages need no re-injection.
-  It also waits up to 10 s, not 1.5 s, for the "/" command list (a hedge; not shown to be needed).
+  It also turns on `waitForInitialCommands`: Devin sends the "/" command list in a notification after
+  the session opens, and upstream's ACP client answers from its cache unless that switch is on, so
+  the 10 s wait (`DEVIN_COMMANDS_WAIT_MS`, upstream's is 1.5 s) was never used before. A gap was not
+  reproduced on macOS (52 commands in 130-160 ms, also with 30 sessions starting at once, old build
+  and new alike); the switch is a hedge for a slower machine (Windows reports of a late popover are
+  unconfirmed).
   For bots the Bots plugin goes one better: it keeps an always-on Devin rule (`.devin/rules/bot-identity.md`)
   in each bot's own folder and, for a Devin chat in that folder, does not pass `systemPrompt`, so the two
   never both deliver the same text. Devin fixes a session's rules when it is created, and caps each
@@ -192,6 +203,44 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   terminal opened inside Paseo.
 - **Web UI:** served by the daemon, on by default. English only: Irix's added strings are not in
   the translation tables, to keep i18n files untouched.
+
+- **`ui.AgentView` for plugins** (`app/src/irix/agent-view.tsx`, `agent-view-shell.tsx`; types in
+  `plugin/src/client/irix-ui.ts`; how to use it: `irix/README.md`): Paseo's own conversation
+  embedded in a plugin screen, so the Bots chat gets timeline renderers, composer pills and the model,
+  mode and thinking pickers without a copy of the chat UI. Props are
+  `agentId`, `serverId`, `workspaceId` (all required, the plugin passes them; Irix does not look the
+  workspace up) and an optional `onOpenWorkspaceFile`. Irix builds only: elsewhere both exports are
+  `undefined`. Plugins detect it with `typeof ui.AgentView === "function"` and
+  `ui.capabilities?.agentView === 1`, as Bot Crew does in `client/native-agent-view.ts`, and fall
+  back to their own chat window otherwise; `agentView` is the props version, bumped on an
+  incompatible change. Three things to keep: the shell is `require`d on first render, because a
+  static import closes a loop through the plugin registry (`registry` -> `evaluate` -> `ui` -> chat
+  screen -> `registry`); it renders upstream's `AgentConversationPanel` inside its own
+  `PaneProvider`, so nothing in upstream is edited for it (the upstream footprint is one re-export
+  line in each of `plugins/react-native/ui.ts` and `plugin/src/client/ui.ts`); and it registers the
+  agent with `viewedTimelineSync` under a source id of its own, because without a registered viewer
+  the conversation waits on history forever, and a shared id would let one view release another's.
+  Not provided, because there is no workspace behind it: opening subagent tracks, the import sheet,
+  and file links unless the plugin passes `onOpenWorkspaceFile`. Checked with the real Devin and
+  Bot Crew 0.2.0-offline.25: history and streaming, scrolling, model and mode pickers, permission
+  cards, plugin timeline renderers and composer pills, switching `agentId`, two views at once.
+  Unit tests: `app/src/irix/agent-view*.test.ts(x)`.
+
+- **Plugin-managed projects stay out of the sidebar** (`app/src/irix/managed-projects.ts`): Bot Crew
+  puts one workspace per bot under `<home>/plugin-data/bot-crew/shared/Bots/<botId>` and draws its
+  own tree and Bots page, so the native `Bots` project would be a second, worse list, and its "+"
+  would let people create workspaces in a folder the plugin owns. A project counts as managed when
+  its root, or one of its hosts' roots, contains `/plugin-data/<plugin id>/` (Windows backslashes and
+  letter case are folded; the ids are the list `MANAGED_PLUGIN_IDS`). The filter is display only,
+  in two places: the sidebar's project list (`useSidebarWorkspacesList`) and `useNewWorkspaceInitialContext`
+  in the New workspace screen, which also drops the preselected project when it came from the route
+  (the global New workspace row passes the open workspace's project) or from the last workspace. The
+  daemon, `paseo.workspaces.list`, `paseo.projects.list` and the other plugins still see the project:
+  paseo-workboard reads both through the plugin host API on the server, so a task whose workspace is
+  a bot's still lists, and a plugin's own workspace page still opens by `workspaceId`. Not hidden:
+  the import-session sheet's project list, and anything that opens a workspace by id. `ui.capabilities.managedProjectsHidden` is exported from the same switch
+  (`MANAGED_PROJECTS_HIDDEN`), so a plugin that draws its own tree of the project can tell whether the
+  host also lists it.
 
 ## License and attribution
 
@@ -424,6 +473,11 @@ Not verified, so do not claim otherwise:
   mostly MIT or Apache-2.0, ask for theirs to be kept). Upstream ships the same bundle; for any
   distribution beyond the company we need a generated third-party notices file.
 - Third-party plugins are not covered by the guard (see above); only install ones you trust.
+- `ui.AgentView`: in a narrow pane (for example Bot Crew with its settings panel open) upstream's
+  responsive composer hides the mode picker. In a new chat that has no model chosen yet, "/" lists
+  nothing for any provider, Devin included: upstream's `listDraftCommands` returns `[]` without a
+  model. A plugin slash command was not seen in the "/" popover with a Devin chat in this test
+  setup; not investigated.
 - Claude usage is off (upstream's `claude-usage-source` is not enabled).
 - Settings has "Enable terminal agent hooks", which edits the user's agent config files. It is
   upstream's and installs hooks only when switched on (unset means off). Keep it off while Paseo

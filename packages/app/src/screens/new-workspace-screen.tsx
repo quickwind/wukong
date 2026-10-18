@@ -36,6 +36,7 @@ import { SidebarMenuToggle } from "@/components/headers/menu-header";
 import { ScreenHeader } from "@/components/headers/screen-header";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useToast } from "@/contexts/toast-context";
+import { isManagedProjectPath, withoutManagedProjects } from "@/irix/managed-projects"; // Irix
 import { useAgentInputDraft } from "@/composer/draft/input-draft";
 import { useForgeSearchQuery } from "@/git/use-forge-search-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
@@ -1299,7 +1300,7 @@ function useNewWorkspaceInitialContext({
 }: NewWorkspaceScreenProps): NewWorkspaceInitialContextState {
   const allHosts = useHosts();
   const allServerIds = useMemo(() => allHosts.map((h) => h.serverId), [allHosts]);
-  const projects = useHostProjects(allServerIds);
+  const projects = withoutManagedProjects(useHostProjects(allServerIds)); // Irix
   const routeDisplayName = displayNameProp?.trim() ?? "";
   const routePlacement = useMemo(
     () =>
@@ -1312,7 +1313,7 @@ function useNewWorkspaceInitialContext({
     [projectId, routeDisplayName, serverId, sourceDirectoryProp],
   );
   const routeProject = useMemo(() => {
-    if (!routePlacement) return null;
+    if (!routePlacement || isManagedProjectPath(routePlacement.iconWorkingDir)) return null; // Irix
     return (
       resolveHostProjectCandidate({
         candidate: routePlacement,
@@ -1333,7 +1334,7 @@ function useNewWorkspaceInitialContext({
   const lastWorkspace = useWorkspace(lastWorkspaceServerId, lastWorkspaceId);
   const lastActiveProject = useMemo(
     () =>
-      lastWorkspaceServerId
+      lastWorkspaceServerId && !isManagedProjectPath(lastWorkspace?.projectRootPath) // Irix
         ? hostProjectFromWorkspace({ serverId: lastWorkspaceServerId, workspace: lastWorkspace })
         : null,
     [lastWorkspace, lastWorkspaceServerId],

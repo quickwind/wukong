@@ -33,6 +33,9 @@ They are a handful of one-line hooks, not rewrites.
   back. This is the one place to configure it (`packages/server/src/irix/windows-shell.ts`).
 - **Plugins:** local directories only, plus the bundled `irix-gitlab` and `irix-devin-usage`. npm, Git and registry
   installs and the other bundled plugins are off.
+- **Plugins can embed Paseo's chat.** `@getpaseo/plugin/client/ui` exports `AgentView` and
+  `capabilities` in Irix builds only (they are `undefined` elsewhere); see
+  [Plugins: `ui.AgentView`](#plugins-uiagentview).
 - **Voice:** dictation, voice mode and speech model downloads are off.
 - **Web UI:** served by the daemon by default. Built with `EXPO_PUBLIC_IRIX=1`, it has no voice
   buttons, no upstream links, no What's new, no pairing-link option, and every Add Project entry
@@ -75,6 +78,46 @@ Merge request status, checks, merge, auto-merge and issues run through upstream'
 A glab-compatible runner (`packages/server/src/irix/gitlab/glab-runner.ts`) answers the `glab`
 command lines that service issues with python-gitlab calls; no `glab` executable is involved. Not
 supported: rebase merges. The daemon's clone request clones only from this GitLab.
+
+## Plugins: `ui.AgentView`
+
+A plugin screen can show Paseo's own conversation for an agent (history, streaming, composer, model,
+mode and thinking pickers, permission cards, and the timeline renderers and composer pills of every installed plugin) instead of drawing a chat itself.
+
+```tsx
+import * as ui from "@getpaseo/plugin/client/ui";
+
+const AgentView =
+  typeof ui.AgentView === "function" && ui.capabilities?.agentView === 1 ? ui.AgentView : null;
+// ...
+return AgentView ? (
+  <AgentView agentId={chat.id} serverId={host.key} workspaceId={chat.agent.workspaceId} />
+) : (
+  <MyOwnChatWindow />
+);
+```
+
+- Props: `agentId`, `serverId`, `workspaceId` (all required) and `onOpenWorkspaceFile?(request)`;
+  without the last one file links do nothing. `ui.capabilities.agentView` is `1` for these props.
+- Give the parent `flex: 1` and `minHeight: 0`; the view fills it and scrolls inside. Two views, or
+  one view whose `agentId` changes, do not affect each other.
+- Detect it, do not compare versions: Irix's version number is not Paseo's. Types ship in
+  `@irix/plugin` (`dist/client/irix-ui.d.ts`); the public `@getpaseo/plugin@0.11.2` has none, so a
+  plugin built against it declares `AgentView` and `capabilities` itself.
+- `ui.capabilities.managedProjectsHidden === 1`: the sidebar and New workspace leave out the project
+  Bot Crew manages (`<home>/plugin-data/bot-crew/...`), so a plugin may draw its own tree of those
+  workspaces. Where it is absent (Paseo, older Irix), keep using the native project.
+- A sidebar item (`addSidebarHeaderItem`, Paseo 0.11 and later; 0.9.x and 0.10.x have only
+  `addSidebarItem`, so test `typeof client.addSidebarHeaderItem === "function"`) can render several
+  `SidebarRow`s, and runs under the plugin's own providers: `useSettings`, `useRpc`, `usePaseo`,
+  `useWorkspace` and `useAgent` work, and `useQuery` uses the plugin's host-made `QueryClient`
+  (shared with its screens), so a `QueryClientProvider` of its own is not needed. A row reaches a
+  screen with `openScreen({ screenId })`; `addSurface("bots", ...)` registers the screen id `bots`.
+  `navigation.openWorkspace/openAgent` exist on screens only, not on sidebar items.
+- Not available inside it: opening subagent tracks and the import sheet. In a narrow pane the mode
+  picker is hidden by upstream's layout.
+- A new chat with no model chosen shows no "/" commands (upstream). For Devin, the daemon waits up to
+  10 s for the command list that Devin sends after a session opens.
 
 ## Building the packages yourself
 
