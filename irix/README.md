@@ -82,8 +82,7 @@ supported: rebase merges. The daemon's clone request clones only from this GitLa
 ## Plugins: `ui.AgentView`
 
 A plugin screen can show Paseo's own conversation for an agent (history, streaming, composer, model,
-mode and thinking pickers, permission cards, and the timeline renderers, composer pills and slash
-commands of every installed plugin) instead of drawing a chat itself.
+mode and thinking pickers, permission cards, and the timeline renderers and composer pills of every installed plugin) instead of drawing a chat itself.
 
 ```tsx
 import * as ui from "@getpaseo/plugin/client/ui";
