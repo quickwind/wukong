@@ -100,6 +100,10 @@ describe("Devin system prompt delivery", () => {
         (client as unknown as { initialCommandsWaitTimeoutMs: number })
           .initialCommandsWaitTimeoutMs,
       ).toBe(DEVIN_COMMANDS_WAIT_MS);
+      // Without this the wait above is never used: the request is answered from the cache.
+      expect(
+        (client as unknown as { waitForInitialCommands: boolean }).waitForInitialCommands,
+      ).toBe(true);
       expect(createIrixAcpClient("cursor", options)).toBeUndefined();
     } finally {
       deactivate();

@@ -175,16 +175,23 @@ export function hideInjectedInstructions(session: AgentSession): void {
 
 type DevinClientOptions = ConstructorParameters<typeof GenericACPAgentClient>[0];
 
-// Upstream waits 1.5 s for the "/" command list after a session starts. Devin sends it about a
-// second after the session opens on a quiet machine, later on a busy one (MCP servers starting,
-// several sessions resuming at once); a list that misses the wait leaves "/" empty.
+// Devin sends the "/" command list in a notification after the session opens: about a second
+// later on a quiet machine, later on a busy one (MCP servers starting, several sessions resuming
+// at once). Upstream's ACP client answers a request for the list from what it has cached unless
+// `waitForInitialCommands` is on, so without it "/" typed in that gap gets an empty list, which
+// the app then keeps for a minute. With it the request waits for the list, up to this long (upstream
+// waits 1.5 s).
 export const DEVIN_COMMANDS_WAIT_MS = 10_000;
 
 export class DevinACPAgentClient extends GenericACPAgentClient {
   private readonly clientLogger: Logger;
 
   constructor(options: DevinClientOptions) {
-    super({ initialCommandsWaitTimeoutMs: DEVIN_COMMANDS_WAIT_MS, ...options });
+    super({
+      waitForInitialCommands: true,
+      initialCommandsWaitTimeoutMs: DEVIN_COMMANDS_WAIT_MS,
+      ...options,
+    });
     this.clientLogger = options.logger;
   }
 
