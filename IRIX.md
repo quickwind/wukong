@@ -21,8 +21,10 @@ Paseo on company Windows machines, where nothing may be sent to cloud services:
 
 We want to merge upstream often and cheaply. Every line changed in an upstream file is a future
 merge conflict. An earlier attempt (the `internal-edition` branch, kept only for reference) edited
-126 upstream files and was abandoned for exactly that reason. This branch edits **24 upstream
-files, about 200 lines**; everything else is new files.
+126 upstream files and was abandoned for exactly that reason. This branch edits **40 upstream
+files, 399 lines** (`upstream-footprint.mjs`, 2026-10-18), which is the whole budget (40 files, 400
+lines): the next upstream edit has to pay for itself by removing another; everything else is new
+files.
 
 Before editing an upstream file, go down this ladder and stop at the first rung that works:
 
@@ -113,7 +115,12 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   that block to the user's first message when a session resumes, so the client also cuts it back out
   of `streamHistory`. Verified with the real Devin: it answers with the instruction, the chat shows
   only what was typed before and after a daemon restart, and later messages need no re-injection.
-  It also waits up to 10 s, not 1.5 s, for the "/" command list (a hedge; not shown to be needed).
+  It also turns on `waitForInitialCommands`: Devin sends the "/" command list in a notification after
+  the session opens, and upstream's ACP client answers from its cache unless that switch is on, so
+  the 10 s wait (`DEVIN_COMMANDS_WAIT_MS`, upstream's is 1.5 s) was never used before. A gap was not
+  reproduced on macOS (52 commands in 130-160 ms, also with 30 sessions starting at once, old build
+  and new alike); the switch is a hedge for a slower machine (Windows reports of a late popover are
+  unconfirmed).
   For bots the Bots plugin goes one better: it keeps an always-on Devin rule (`.devin/rules/bot-identity.md`)
   in each bot's own folder and, for a Devin chat in that folder, does not pass `systemPrompt`, so the two
   never both deliver the same text. Devin fixes a session's rules when it is created, and caps each
@@ -192,18 +199,26 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   the translation tables, to keep i18n files untouched.
 
 - **`ui.AgentView` for plugins** (`app/src/irix/agent-view.tsx`, `agent-view-shell.tsx`; types in
-  `plugin/src/client/irix-ui.ts`): Paseo's own conversation embedded in a plugin screen, so the Bots
-  chat gets timeline renderers, composer pills, slash commands and the model, mode and thinking
-  pickers without a copy of the chat UI. Props are `agentId`, `serverId`, `workspaceId` (and an
-  optional `onOpenWorkspaceFile`). Plugins detect it with `typeof ui.AgentView !== "undefined"`;
-  `ui.capabilities.agentView` is the props version. Three things to keep: the shell is `require`d on
-  first render, because a static import closes a loop through the plugin registry (`registry` ->
-  `evaluate` -> `ui` -> chat screen -> `registry`); it renders upstream's `AgentConversationPanel`
-  inside its own `PaneProvider`, so nothing in upstream is edited for it; and it registers the
+  `plugin/src/client/irix-ui.ts`; how to use it: `irix/README.md`): Paseo's own conversation
+  embedded in a plugin screen, so the Bots chat gets timeline renderers, composer pills, slash
+  commands and the model, mode and thinking pickers without a copy of the chat UI. Props are
+  `agentId`, `serverId`, `workspaceId` (all required, the plugin passes them; Irix does not look the
+  workspace up) and an optional `onOpenWorkspaceFile`. Irix builds only: elsewhere both exports are
+  `undefined`. Plugins detect it with `typeof ui.AgentView === "function"` and
+  `ui.capabilities?.agentView === 1`, as Bot Crew does in `client/native-agent-view.ts`, and fall
+  back to their own chat window otherwise; `agentView` is the props version, bumped on an
+  incompatible change. Three things to keep: the shell is `require`d on first render, because a
+  static import closes a loop through the plugin registry (`registry` -> `evaluate` -> `ui` -> chat
+  screen -> `registry`); it renders upstream's `AgentConversationPanel` inside its own
+  `PaneProvider`, so nothing in upstream is edited for it (the upstream footprint is one re-export
+  line in each of `plugins/react-native/ui.ts` and `plugin/src/client/ui.ts`); and it registers the
   agent with `viewedTimelineSync` under a source id of its own, because without a registered viewer
   the conversation waits on history forever, and a shared id would let one view release another's.
   Not provided, because there is no workspace behind it: opening subagent tracks, the import sheet,
-  and file links unless the plugin passes `onOpenWorkspaceFile`.
+  and file links unless the plugin passes `onOpenWorkspaceFile`. Checked with the real Devin and
+  Bot Crew 0.2.0-offline.25: history and streaming, scrolling, model and mode pickers, permission
+  cards, plugin timeline renderers and composer pills, switching `agentId`, two views at once.
+  Unit tests: `app/src/irix/agent-view*.test.ts(x)`.
 
 ## License and attribution
 
@@ -436,6 +451,11 @@ Not verified, so do not claim otherwise:
   mostly MIT or Apache-2.0, ask for theirs to be kept). Upstream ships the same bundle; for any
   distribution beyond the company we need a generated third-party notices file.
 - Third-party plugins are not covered by the guard (see above); only install ones you trust.
+- `ui.AgentView`: in a narrow pane (for example Bot Crew with its settings panel open) upstream's
+  responsive composer hides the mode picker. In a new chat that has no model chosen yet, "/" lists
+  nothing for any provider, Devin included: upstream's `listDraftCommands` returns `[]` without a
+  model. A plugin slash command was not seen in the "/" popover with a Devin chat in this test
+  setup; not investigated.
 - Claude usage is off (upstream's `claude-usage-source` is not enabled).
 - Settings has "Enable terminal agent hooks", which edits the user's agent config files. It is
   upstream's and installs hooks only when switched on (unset means off). Keep it off while Paseo
