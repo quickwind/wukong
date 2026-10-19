@@ -135,7 +135,9 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   (Devin does); entries that are not absolute paths are dropped with a warning, and the chat starts anyway.
   Verified with the real Devin: the extra directory's `.devin/rules` load, and writing there asks no
   approval. Without it Devin loads rules from the working directory and its git root only, and asks once
-  per session before a write elsewhere.
+  per session before a write elsewhere. `session/load` does not remember the directories: a resumed
+  session asks again unless they are sent again, which is why `session/load` and `session/resume` carry
+  them too (the stored `providerOptions` come back with the agent's saved config).
   **Host capabilities** (`irix/host-caps.ts`): plugin servers are forked from the daemon and inherit its
   environment, so `edition.ts` sets `IRIX_HOST_CAPS` to JSON (`devinSystemPrompt`,
   `devinAdditionalDirectories`). A plugin reads `JSON.parse(process.env.IRIX_HOST_CAPS ?? "{}")`, and anything
