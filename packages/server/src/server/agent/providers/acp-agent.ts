@@ -124,6 +124,7 @@ import {
   createStringCommandShellEnvOverlay,
 } from "../../../utils/string-command-shell.js";
 import { spawnProcess } from "../../../utils/spawn.js";
+import { additionalDirectoriesParams } from "../../../irix/additional-directories.js";
 import { irixWindowsShell } from "../../../irix/windows-shell.js"; // Irix: configurable Windows shell
 import {
   type DiagnosticEntry,
@@ -1817,6 +1818,11 @@ export class ACPAgentSession implements AgentSession, ACPClient {
         this.connection!.newSession({
           cwd: this.config.cwd,
           mcpServers: this.acpMcpServers(),
+          ...additionalDirectoriesParams({
+            providerOptions: this.config.providerOptions,
+            agentCapabilities: this.agentCapabilities,
+            logger: this.logger,
+          }),
         }),
       );
       this.sessionId = response.sessionId;
@@ -1860,6 +1866,11 @@ export class ACPAgentSession implements AgentSession, ACPClient {
             sessionId: handle.sessionId,
             cwd: this.config.cwd,
             mcpServers: this.acpMcpServers(),
+            ...additionalDirectoriesParams({
+              providerOptions: this.config.providerOptions,
+              agentCapabilities: this.agentCapabilities,
+              logger: this.logger,
+            }),
           }),
         );
         this.deliverTranslatedEvents(this.flushPendingUserMessage());
@@ -1872,6 +1883,11 @@ export class ACPAgentSession implements AgentSession, ACPClient {
             sessionId: handle.sessionId,
             cwd: this.config.cwd,
             mcpServers: this.acpMcpServers(),
+            ...additionalDirectoriesParams({
+              providerOptions: this.config.providerOptions,
+              agentCapabilities: this.agentCapabilities,
+              logger: this.logger,
+            }),
           }),
         );
         this.applySessionState(response);
