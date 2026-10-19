@@ -83,7 +83,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CLAUDE.md` (`AGENTS.md` links to it)                                                                                      | One line at the top pointing agents here                                                                                                                                                                                                                                               |
 | `server/daemon-worker.ts`                                                                                                  | Imports the edition entry first (egress guard, policy)                                                                                                                                                                                                                                 |
-| `server/agent/providers/acp-agent.ts`, `terminal/terminal.ts`                                                              | One line each: Windows shell comes from `irixWindowsShell()` (PowerShell by default)                                                                                                                                                                                                   |
+| `server/agent/providers/acp-agent.ts`, `terminal/terminal.ts`                                                              | One line each: Windows shell comes from `irixWindowsShell()` (PowerShell by default); `acp-agent.ts` also spreads `additionalDirectoriesParams(...)` into `session/new`, `session/load` and `session/resume`                                                                           |
 | `server/config.ts`                                                                                                         | Terminal profiles fixed to Claude Code                                                                                                                                                                                                                                                 |
 | `server/session.ts`                                                                                                        | Clone requests only from the company GitLab                                                                                                                                                                                                                                            |
 | `server/agent/provider-registry.ts`                                                                                        | Restrict to Claude and Devin; Devin as configured ACP, with Irix's Devin client                                                                                                                                                                                                        |
@@ -127,6 +127,19 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   reproduced on macOS (52 commands in 130-160 ms, also with 30 sessions starting at once, old build
   and new alike); the switch is a hedge for a slower machine (Windows reports of a late popover are
   unconfirmed).
+  **Additional directories** (`irix/additional-directories.ts`, spread into `session/new`, `session/load`
+  and `session/resume` in `acp-agent.ts`): a plugin that runs a chat in one directory and wants the agent
+  to work in another (a bot's folder next to a project worktree) sets
+  `config.providerOptions.additionalDirectories`, an array of absolute paths, the field Claude already takes.
+  It is sent only when the agent lists `additionalDirectories` under `sessionCapabilities` in `initialize`
+  (Devin does); entries that are not absolute paths are dropped with a warning, and the chat starts anyway.
+  Verified with the real Devin: the extra directory's `.devin/rules` load, and writing there asks no
+  approval. Without it Devin loads rules from the working directory and its git root only, and asks once
+  per session before a write elsewhere.
+  **Host capabilities** (`irix/host-caps.ts`): plugin servers are forked from the daemon and inherit its
+  environment, so `edition.ts` sets `IRIX_HOST_CAPS` to JSON (`devinSystemPrompt`,
+  `devinAdditionalDirectories`). A plugin reads `JSON.parse(process.env.IRIX_HOST_CAPS ?? "{}")`, and anything
+  but `true` means no: stock Paseo never sets it.
   For bots the Bots plugin goes one better: it keeps an always-on Devin rule (`.devin/rules/bot-identity.md`)
   in each bot's own folder and, for a Devin chat in that folder, does not pass `systemPrompt`, so the two
   never both deliver the same text. Devin fixes a session's rules when it is created, and caps each
