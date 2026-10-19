@@ -99,6 +99,7 @@ export interface ProviderDefinition extends AgentProviderDefinition {
 
 /** Provider metadata and an unconfigured factory; the registry owns override application. */
 export interface RegisteredProviderDefinition extends AgentProviderDefinition {
+  requiresConfiguration?: boolean;
   iconSvg?: string;
   supportsExactMcpPreapproval: boolean;
   createClient: (logger: Logger, runtimeSettings?: ProviderRuntimeSettings) => AgentClient;
@@ -913,6 +914,7 @@ export function buildProviderRegistry(
   logger: Logger,
   options?: BuildProviderRegistryOptions,
 ): Record<AgentProvider, ProviderDefinition> {
+  const isDev = options?.isDev === true;
   const runtimeSettings = options?.runtimeSettings;
   const providerOverrides = withIrixProviderOverrides(options?.providerOverrides ?? {}); // Irix
   const resolvedProviders = buildResolvedBuiltinProviders(
@@ -924,13 +926,15 @@ export function buildProviderRegistry(
       ompRuntime: options?.ompRuntime,
       openCodeBridge: options?.openCodeBridge,
     },
-    options?.isDev === true,
+    isDev,
   );
   for (const [provider, definition] of Object.entries(options?.pluginProviders ?? {})) {
     if (resolvedProviders.has(provider)) {
       throw new Error(`Plugin provider '${provider}' conflicts with a built-in provider`);
     }
     const override = providerOverrides[provider];
+    if (definition.requiresConfiguration && !override) continue;
+
     if (override?.extends) {
       logger.warn({ provider }, "Plugin provider shadowed by configured provider");
       continue;
@@ -961,7 +965,7 @@ export function buildProviderRegistry(
       ]),
     ) as Record<AgentProvider, ProviderDefinition>,
     {
-      isDev: options?.isDev === true,
+      isDev,
       devProviderIds: DEV_PROVIDER_IDS,
       registryOptions: options,
     }, // Irix

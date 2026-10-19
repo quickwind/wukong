@@ -48,3 +48,19 @@ export function additionalDirectoriesParams(input: AdditionalDirectoriesInput): 
   }
   return directories.length > 0 ? { additionalDirectories: directories } : {};
 }
+
+/** Helper taking the ACPAgentSession instance directly to minimize upstream call site lines. */
+export function irixAdditionalDirectoriesParams(session: unknown): {
+  additionalDirectories?: string[];
+} {
+  const target = session as {
+    config?: { providerOptions?: Record<string, unknown> };
+    agentCapabilities?: { sessionCapabilities?: Record<string, unknown> | null } | null;
+    logger?: Pick<Logger, "warn">;
+  };
+  return additionalDirectoriesParams({
+    providerOptions: target.config?.providerOptions,
+    agentCapabilities: target.agentCapabilities ?? null,
+    logger: target.logger ?? console,
+  });
+}

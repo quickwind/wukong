@@ -93,32 +93,54 @@ function optionalLimit(flags: Map<string, string>): number | undefined {
 
 const API_PATH =
   /^projects\/([^/]+)\/merge_requests\/(\d+)\/(approvals|discussions|cancel_merge_when_pipeline_succeeds)(?:\?(.*))?$/u;
+const API_LIST_PATH = /^projects\/([^/]+)\/(merge_requests|issues)(?:\?(.*))?$/u;
 
 export function createGlabCompatRunner(client: GitLabClient): GlabCommandRunner {
-  async function api(args: string[], cwd: string) {
-    const { positionals, flags } = parseArgs(args.slice(1));
-    const target = positionals[0] ?? "";
-    const method = (flags.get("--method") ?? "GET").toUpperCase();
-    // `:fullpath` is glab's placeholder for the project of the checkout in `cwd`.
-    const resolved = target.replace(
-      ":fullpath",
-      encodeURIComponent(await client.resolveProject(cwd)),
-    );
-    const match = API_PATH.exec(resolved);
-    if (!match) {
-      fail(`Unsupported GitLab API request: ${method} ${target}`);
+  async function apiList(
+    match: RegExpExecArray,
+    cwd: string,
+  ): Promise<{ stdout: string; stderr: string }> {
+    const project = decodeURIComponent(match[1] ?? "");
+    const resource = match[2];
+    const query = new URLSearchParams(match[3] ?? "");
+    const iidParam = query.get("iids[]") ?? query.get("iid");
+    const iid = iidParam ? Number(iidParam) : null;
+    const state = query.get("state");
+    if (!iid) return json([]);
+
+    try {
+      if (resource === "merge_requests") {
+        const mr = await client.getMergeRequest({ cwd, project, iid });
+        return json(!state || mr.state === state ? [mr] : []);
+      }
+      if (resource === "issues") {
+        const issue = await client.getIssue({ cwd, project, iid });
+        return json(!state || issue.state === state ? [issue] : []);
+      }
+    } catch {
+      return json([]);
     }
+    return json([]);
+  }
+
+  async function apiMergeRequestAction(
+    match: RegExpExecArray,
+    method: string,
+    cwd: string,
+  ): Promise<{ stdout: string; stderr: string }> {
     const project = decodeURIComponent(match[1] ?? "");
     const iid = Number(match[2]);
+    const action = match[3];
     const query = new URLSearchParams(match[4] ?? "");
-    if (match[3] === "cancel_merge_when_pipeline_succeeds" && method === "POST") {
+
+    if (action === "cancel_merge_when_pipeline_succeeds" && method === "POST") {
       await client.cancelAutoMerge({ cwd, project, iid });
       return json({});
     }
     if (method !== "GET") {
-      fail(`Unsupported GitLab API request: ${method} ${target}`);
+      fail(`Unsupported GitLab API request: ${method} ${action}`);
     }
-    if (match[3] === "approvals") {
+    if (action === "approvals") {
       return json(await client.getApprovals({ cwd, project, iid }));
     }
     const page = query.get("page");
@@ -131,6 +153,26 @@ export function createGlabCompatRunner(client: GitLabClient): GlabCommandRunner 
         ...(page ? { page: positiveInt(page, "page") } : {}),
       }),
     );
+  }
+
+  async function api(args: string[], cwd: string) {
+    const { positionals, flags } = parseArgs(args.slice(1));
+    const target = positionals[0] ?? "";
+    const method = (flags.get("--method") ?? "GET").toUpperCase();
+    const projectEncoded = encodeURIComponent(await client.resolveProject(cwd));
+    const resolved = target.replace(":fullpath", projectEncoded).replace(":id", projectEncoded);
+
+    const listMatch = API_LIST_PATH.exec(resolved);
+    if (listMatch) {
+      if (method !== "GET") fail(`Unsupported GitLab API request: ${method} ${target}`);
+      return await apiList(listMatch, cwd);
+    }
+
+    const mrMatch = API_PATH.exec(resolved);
+    if (mrMatch) {
+      return await apiMergeRequestAction(mrMatch, method, cwd);
+    }
+    return fail(`Unsupported GitLab API request: ${method} ${target}`);
   }
 
   async function ciGet(flags: Map<string, string>, cwd: string) {

@@ -58,6 +58,12 @@ function fakeClient(): { client: GitLabClient; calls: Record<string, unknown[]> 
         state: "opened",
       },
     ]),
+    getIssue: record("getIssue", {
+      iid: 3,
+      title: "Bug",
+      web_url: "https://gitlab.example.com/group/sub/app/-/issues/3",
+      state: "opened",
+    }),
     createMergeRequest: record("createMergeRequest", {
       iid: 8,
       webUrl: "https://gitlab.example.com/group/sub/app/-/merge_requests/8",
@@ -117,6 +123,27 @@ describe("glab-compatible runner behind upstream's GitLab service", () => {
     });
     expect(await service.listIssues({ cwd, query: "bug", limit: 4 })).toHaveLength(1);
     expect(calls.listIssues?.[0]).toMatchObject({ search: "bug", limit: 4, project: PROJECT });
+  });
+
+  it("searches issues and merge requests by numeric iid via the api", async () => {
+    const { service, calls } = setup();
+    const result = await service.searchIssuesAndPrs({
+      cwd,
+      query: "7",
+      limit: 5,
+      kinds: ["change_request"],
+    });
+    expect(result.items.some((item) => item.number === 7)).toBe(true);
+    expect(calls.getMergeRequest?.[0]).toMatchObject({ iid: 7, project: PROJECT });
+
+    const issueResult = await service.searchIssuesAndPrs({
+      cwd,
+      query: "3",
+      limit: 5,
+      kinds: ["issue"],
+    });
+    expect(issueResult.items.some((item) => item.number === 3)).toBe(true);
+    expect(calls.getIssue?.[0]).toMatchObject({ iid: 3, project: PROJECT });
   });
 
   it("creates a merge request and reads the number from the URL", async () => {

@@ -208,6 +208,7 @@ export interface GitLabClient {
     input: ProjectScope & { iid: number },
   ): Promise<GitLabPipelineDetails | null>;
   getPipelineWithJobs(input: ProjectScope & { pipelineId: number }): Promise<GitLabPipelineDetails>;
+  getIssue(input: ProjectScope & { iid: number }): Promise<GitLabIssue>;
   listIssues(input: ListIssuesInput): Promise<GitLabIssue[]>;
   createMergeRequest(input: CreateMergeRequestInput): Promise<{ iid: number; webUrl: string }>;
   merge(input: MergeMergeRequestInput): Promise<void>;
@@ -456,6 +457,14 @@ export function createGitLabPythonClient(options: GitLabPythonClientOptions): Gi
       );
       const jobs = await listJobs(input, input.pipelineId);
       return GitLabPipelineDetailsSchema.parse({ ...pipeline, jobs });
+    },
+
+    getIssue(input) {
+      return runJson(
+        ["project-issue", "get", option("project-id", input.project), option("iid", input.iid)],
+        { cwd: input.cwd },
+        GitLabIssueSchema,
+      );
     },
 
     listIssues(input) {
