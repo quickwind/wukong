@@ -55,7 +55,10 @@ export function IrixSubagentApprovalCard({ serverId }: { serverId: string }) {
         requireSubagentApproval: next,
       } as unknown as MutableDaemonConfigPatch)
         .catch((error) => {
-          Alert.alert("无法更新设置", error instanceof Error ? error.message : String(error));
+          Alert.alert(
+            "Unable to update setting",
+            error instanceof Error ? error.message : String(error),
+          );
         })
         .finally(() => {
           setIsSaving(false);
@@ -72,18 +75,18 @@ export function IrixSubagentApprovalCard({ serverId }: { serverId: string }) {
     <View style={settingsStyles.card} testID="host-page-subagent-approval-card">
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>强制子代理人工审批</Text>
+          <Text style={settingsStyles.rowTitle}>Require Subagent Approval</Text>
           <Text style={settingsStyles.rowHint}>
             {enabled
-              ? "全局强制拦截所有子代理派生请求，必须经过人工确认后方可执行。"
-              : "未开启全局强制审批，子代理派生将根据各个场景的具体设置（如 ask 模式或 bypass 模式）进行控制。"}
+              ? "Require human approval before spawning subagents or running CLI agent tasks."
+              : "Global mandatory approval is disabled. Subagent execution is controlled by individual scenario settings."}
           </Text>
         </View>
         <Switch
           value={enabled}
           disabled={locked || isSaving}
           onValueChange={handleValueChange}
-          accessibilityLabel="强制子代理人工审批"
+          accessibilityLabel="Require Subagent Approval"
           testID="host-page-subagent-approval-switch"
         />
       </View>

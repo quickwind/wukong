@@ -80,11 +80,11 @@ export async function promptCliSubagentApproval(
 
   output.write(
     [
-      "\n[强制子代理人工审批] 即将启动代理任务:",
+      "\n[Require Subagent Approval] Agent task launch requested:",
       `  Provider : ${summary.provider}`,
       `  Directory: ${summary.cwd}`,
       `  Prompt   : ${preview}`,
-      "是否批准启动？请输入 yes 或 no: ",
+      "Approve task launch? (yes/no): ",
     ].join("\n"),
   );
 
@@ -110,7 +110,7 @@ export async function promptCliSubagentApproval(
   };
 
   const timer = setTimeout(() => {
-    output.write("\n审批等待已超过 10 分钟，自动按拒绝处理。\n");
+    output.write("\nApproval timed out after 10 minutes. Automatically rejected.\n");
     finish(false);
   }, timeoutMs);
   timer.unref?.();
@@ -125,7 +125,7 @@ export async function promptCliSubagentApproval(
       finish(false);
       return;
     }
-    output.write("请输入 yes 或 no: ");
+    output.write("Please enter yes or no: ");
   });
 
   rl.on("close", () => {
@@ -164,7 +164,7 @@ function attachRunApprovalHook(runCommand: Command | undefined): void {
     if (!approved) {
       throw {
         code: "SUBAGENT_APPROVAL_REJECTED",
-        message: "已拒绝启动代理任务（人工拒绝或审批超时）。",
+        message: "Agent task launch rejected (denied by user or approval timed out).",
       };
     }
   });

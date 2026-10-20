@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { paseoCommandLineGuide } from "./devin-client.js";
@@ -29,8 +32,13 @@ const VARIABLES = [
 
 describe("Irix restrictions", () => {
   let deactivate: () => void;
+  let originalPaseoHome: string | undefined;
+  let tempHome: string;
 
   beforeEach(() => {
+    originalPaseoHome = process.env.PASEO_HOME;
+    tempHome = mkdtempSync(path.join(os.tmpdir(), "irix-restrictions-test-"));
+    process.env.PASEO_HOME = tempHome;
     for (const name of VARIABLES) delete process.env[name];
     resetSubagentApprovalCacheForTests(null);
     deactivate = activateIrixPolicy();
@@ -40,6 +48,12 @@ describe("Irix restrictions", () => {
     deactivate();
     resetSubagentApprovalCacheForTests(null);
     for (const name of VARIABLES) delete process.env[name];
+    if (originalPaseoHome === undefined) {
+      delete process.env.PASEO_HOME;
+    } else {
+      process.env.PASEO_HOME = originalPaseoHome;
+    }
+    rmSync(tempHome, { recursive: true, force: true });
   });
 
   it("blocks schedules, agent messaging and bypass modes by default", () => {

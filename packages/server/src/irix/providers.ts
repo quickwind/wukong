@@ -11,7 +11,7 @@ import {
   type ResolvedProviderLaunch,
 } from "../server/agent/provider-launch-config.js";
 
-export const IRIX_PROVIDER_IDS: readonly string[] = ["claude", "devin", "opencode"];
+export const IRIX_PROVIDER_IDS: readonly string[] = ["claude", "devin"];
 
 // Providers a locally installed plugin may add. Each shows only while its plugin is loaded:
 // the registry has the id only when the plugin registered it.
