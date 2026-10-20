@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentSession } from "../server/agent/agent-sdk-types.js";
 import { activateIrixPolicy } from "./policy.js";
 import {
+  attachDevinSubagentApprovalGate,
   createIrixAcpClient,
   DEVIN_COMMANDS_WAIT_MS,
   DevinACPAgentClient,
@@ -13,6 +14,7 @@ import {
   paseoCommandLineGuide,
   withoutInjectedInstructions,
 } from "./devin-client.js";
+import { resetSubagentApprovalCacheForTests } from "./subagent-approval.js";
 
 function sessionWithConnection() {
   const calls: unknown[] = [];
@@ -226,6 +228,86 @@ describe("Devin system prompt delivery", () => {
       const text = (calls[0] as { prompt: Array<{ text: string }> }).prompt[0]?.text ?? "";
       expect(text).toContain("Your name is Zorblax.");
       expect(text).toContain("irix send");
+    });
+  });
+
+  describe("Devin ACP subagent approval gate", () => {
+    it("deduplicates run_subagent updates, gates createTerminal, and permanently blocks rejected subagents", async () => {
+      const deactivate = activateIrixPolicy();
+      resetSubagentApprovalCacheForTests(null);
+      try {
+        const events: unknown[] = [];
+        const createdTerminals: unknown[] = [];
+        const fakeSession = {
+          replayingHistory: false,
+          activeForegroundTurnId: "turn-1",
+          pushEvent: (event: unknown) => events.push(event),
+          sessionUpdate: async () => {},
+          createTerminal: async (params: unknown) => {
+            createdTerminals.push(params);
+            return { terminalId: `term-${createdTerminals.length}` };
+          },
+          getPendingPermissions: () => [],
+          respondToPermission: async () => {},
+          interrupt: async () => {},
+          close: async () => {},
+        } as unknown as AgentSession & {
+          sessionUpdate: (params: Record<string, unknown>) => Promise<void>;
+          createTerminal: (params: Record<string, unknown>) => Promise<{ terminalId: string }>;
+        };
+
+        attachDevinSubagentApprovalGate(fakeSession);
+
+        // First tool_call and subsequent tool_call_update for the same subagent produce only 1 permission request
+        await fakeSession.sessionUpdate({
+          sessionId: "s-1",
+          update: {
+            sessionUpdate: "tool_call",
+            toolCallId: "tc-1",
+            title: "run_subagent",
+            _meta: {
+              "cognition.ai/subagent_started": { agentId: "sub-1", subagentType: "explore" },
+            },
+          },
+        });
+        await fakeSession.sessionUpdate({
+          sessionId: "s-1",
+          update: {
+            sessionUpdate: "tool_call_update",
+            toolCallId: "tc-1",
+            title: "run_subagent",
+            _meta: {
+              "cognition.ai/subagent_started": { agentId: "sub-1", subagentType: "explore" },
+            },
+          },
+        });
+
+        expect(events).toHaveLength(1);
+        expect(fakeSession.getPendingPermissions()).toHaveLength(1);
+        const reqId = fakeSession.getPendingPermissions()[0]!.id;
+
+        const termPromise = fakeSession.createTerminal({
+          command: "ls",
+          _meta: { "cognition.ai/subagent_id": "sub-1" },
+        });
+        expect(createdTerminals).toHaveLength(0);
+
+        // Reject sub-1
+        await fakeSession.respondToPermission(reqId, { behavior: "deny" });
+        await expect(termPromise).rejects.toThrow(/rejected/);
+        expect(createdTerminals).toHaveLength(0);
+
+        // Subsequent terminal attempts from the same rejected subagent remain blocked
+        await expect(
+          fakeSession.createTerminal({
+            command: "whoami",
+            _meta: { "cognition.ai/subagent_id": "sub-1" },
+          }),
+        ).rejects.toThrow(/rejected/);
+      } finally {
+        resetSubagentApprovalCacheForTests(null);
+        deactivate();
+      }
     });
   });
 });

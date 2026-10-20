@@ -1,7 +1,9 @@
+import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import { createCli } from "../cli.js";
 import { createCliParseArgv } from "../run.js";
 import { markIrixCli } from "./defaults.js";
+import { isCliSubagentApprovalRequired, promptCliSubagentApproval } from "./surface.js";
 
 describe("Irix CLI surface", () => {
   const unused = ["clone", "onboard", "pair", "hub", "speech"];
@@ -80,5 +82,27 @@ describe("Irix CLI surface", () => {
       "irix",
       ".",
     ]);
+  });
+
+  it("prompts for yes/no in the CLI terminal when subagent approval is required", async () => {
+    expect(isCliSubagentApprovalRequired("/nonexistent-home", {})).toBe(true);
+
+    const inputYes = new PassThrough();
+    const outputYes = new PassThrough();
+    const approvePromise = promptCliSubagentApproval(
+      { provider: "claude", cwd: "/tmp", prompt: "fix bug" },
+      { input: inputYes, output: outputYes },
+    );
+    inputYes.write("yes\n");
+    await expect(approvePromise).resolves.toBe(true);
+
+    const inputNo = new PassThrough();
+    const outputNo = new PassThrough();
+    const rejectPromise = promptCliSubagentApproval(
+      { provider: "claude", cwd: "/tmp", prompt: "fix bug" },
+      { input: inputNo, output: outputNo },
+    );
+    inputNo.write("invalid\nno\n");
+    await expect(rejectPromise).resolves.toBe(false);
   });
 });
