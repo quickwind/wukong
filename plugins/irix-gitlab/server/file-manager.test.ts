@@ -45,9 +45,13 @@ describe("file manager", () => {
     expect(launches[0]).toMatchObject({
       command: "explorer.exe",
       args: ["C:\\Work\\repo"],
-      options: { detached: true, stdio: "ignore", windowsHide: true },
+      options: { detached: true, stdio: "ignore", windowsHide: false },
     });
     expect(launches[0]!.options.env).toEqual({ PATH: "C:\\Windows" });
+  });
+
+  it("gives Explorer backslashes, which it needs to open the folder itself", () => {
+    expect(fileManagerCommand("win32", "C:/Work/repo")?.args).toEqual(["C:\\Work\\repo"]);
   });
 
   it("refuses a relative path and a folder that does not exist", async () => {

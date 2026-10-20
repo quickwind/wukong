@@ -173,7 +173,7 @@ export function requireWorkspaceFolder(
 export async function launchDetached(
   command: string,
   args: string[],
-  options: Pick<DevinDesktopRuntimeOptions, "env" | "spawn"> = {},
+  options: Pick<DevinDesktopRuntimeOptions, "env" | "spawn"> & { windowsHide?: boolean } = {},
 ): Promise<void> {
   const spawn = options.spawn ?? spawnProcess;
   await new Promise<void>((resolve, reject) => {
@@ -183,7 +183,7 @@ export async function launchDetached(
         detached: true,
         env: sanitizeEnv(options.env ?? process.env),
         stdio: "ignore",
-        windowsHide: true,
+        windowsHide: options.windowsHide ?? true,
       });
     } catch (error) {
       reject(error);

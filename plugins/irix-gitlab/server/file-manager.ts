@@ -1,3 +1,5 @@
+import { win32 } from "node:path";
+
 import {
   type DevinDesktopRuntimeOptions,
   launchDetached,
@@ -11,7 +13,8 @@ export function fileManagerCommand(
 ): { command: string; args: string[] } | null {
   switch (platform) {
     case "win32":
-      return { command: "explorer.exe", args: [folder] };
+      // Explorer opens "Documents" instead when given forward slashes, so normalize them.
+      return { command: "explorer.exe", args: [win32.normalize(folder)] };
     case "darwin":
       return { command: "/usr/bin/open", args: [folder] };
     case "linux":
@@ -31,6 +34,7 @@ export async function openInFileManager(
   if (!launch) {
     throw new Error("Opening a folder is not supported on this system.");
   }
-  await launchDetached(launch.command, launch.args, options);
+  // A hidden window would hide the Explorer window itself, so unlike a background tool it must show.
+  await launchDetached(launch.command, launch.args, { ...options, windowsHide: false });
   return { ok: true };
 }
