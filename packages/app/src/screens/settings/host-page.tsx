@@ -22,7 +22,12 @@ import {
   DEFAULT_TERMINAL_PROFILES,
 } from "@getpaseo/protocol/terminal-profiles";
 import { AgentProfilesSection } from "@/agent-profiles";
-import { HIDDEN_ROW_STYLE, upstreamOnly, IRIX_BUILD } from "@/irix/build"; // Irix
+import {
+  HIDDEN_ROW_STYLE,
+  upstreamOnly,
+  IRIX_BUILD,
+  irixAgentsCard,
+} from "@/irix/subagent-approval-setting"; // Irix
 import { AgentSkillsSection } from "@/agent-skills";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { SettingsTextAreaCard } from "@/components/settings-textarea";
@@ -861,8 +866,7 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
 }
 
 const OfferedUpdateDaemonCard = upstreamOnly(UpdateDaemonCard); // Irix: no self-update
-// Irix: the agent tools and skills are fixed by its config.
-const OfferedInjectPaseoToolsCard = upstreamOnly(InjectPaseoToolsCard);
+const OfferedInjectPaseoToolsCard = irixAgentsCard(InjectPaseoToolsCard); // Irix
 const OfferedBrowserToolsOptInCard = upstreamOnly(BrowserToolsOptInCard);
 const OfferedAgentSkillsSection = upstreamOnly(AgentSkillsSection);
 

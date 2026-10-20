@@ -17,20 +17,31 @@
 // HTTP support, connected the registry's servers, and never tried ours). So Devin is told, in the
 // same first-prompt block, to use the `irix` command line from its shell instead.
 
+import { randomUUID } from "node:crypto";
 import type { Logger } from "pino";
 
 import type {
   AgentCreateSessionOptions,
   AgentLaunchContext,
+  AgentPermissionRequest,
+  AgentPermissionResponse,
   AgentPersistenceHandle,
   AgentResumeSessionOptions,
   AgentSession,
   AgentSessionConfig,
   AgentStreamEvent,
+  AgentTimelineItem,
 } from "../server/agent/agent-sdk-types.js";
 import { GenericACPAgentClient } from "../server/agent/providers/generic-acp-agent.js";
 import { isIrixActive } from "./policy.js";
-import { isIrixRestricted } from "./restrictions.js";
+import { isBypassModeId, isIrixRestricted } from "./restrictions.js";
+import { DevinSubagentCards } from "./devin-subagent-card.js";
+import {
+  ensureSubagentGateRunning,
+  registerSubagentApprover,
+  writeGatedDevinConfig,
+} from "./devin-subagent-gate.js";
+import { isSubagentApprovalRequired, SUBAGENT_APPROVAL_TIMEOUT_MS } from "./subagent-approval.js";
 
 const DEVIN_PROVIDER_ID = "devin";
 
@@ -104,6 +115,15 @@ export function paseoCommandLineGuide(agentId?: string): string {
     "Pass the message straight on the command line; do not write it to a file in the project. Keep it on " +
       "one line and avoid double quotes inside it. Only if it truly needs line breaks or quotes, write it " +
       "to a file in the system temp folder (not the project), pass --prompt-file, and delete the file after.",
+    ...(isSubagentApprovalRequired()
+      ? [
+          "POLICY - MANDATORY SUBAGENT APPROVAL: every `run_subagent` call waits for a human to approve " +
+            "it. It may take minutes; wait for it. If it is blocked by a hook, the user denied it: do not " +
+            "retry it or work around it (for example with `irix run`) unless the user asks. Always start " +
+            "subagents in the foreground (`is_background` false): a background subagent cannot ask the user " +
+            "to approve its shell commands, so they fail.",
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -173,6 +193,190 @@ export function hideInjectedInstructions(session: AgentSession): void {
   };
 }
 
+interface SubagentGateEntry {
+  requestId: string;
+  status: "pending" | "settled";
+  request: AgentPermissionRequest;
+  resolve: (approved: boolean) => void;
+  timer: ReturnType<typeof setTimeout>;
+  turnId?: string;
+}
+
+interface PermissionOptionLike {
+  optionId: string;
+}
+
+interface MutableACPSession extends AgentSession {
+  activeForegroundTurnId?: string | null;
+  pushEvent?: (event: AgentStreamEvent) => void;
+  requestPermission?: (params: { options: PermissionOptionLike[] }) => Promise<unknown>;
+  replayingHistory?: boolean;
+  persistedHistory?: AgentTimelineItem[];
+  sessionUpdate?: (params: Record<string, unknown>) => Promise<void>;
+}
+
+/**
+ * Turns Devin's own subagents into subagent cards (see devin-subagent-card.ts): after each update
+ * is handled as usual, the card it belongs to is sent again with the subagent's task, commands and
+ * answer. During the history replay after a resume the session collects the items it will hand out
+ * later in `persistedHistory` (a private field of upstream's session), so the card goes there; a
+ * later item with the same call id replaces the empty placeholder.
+ */
+export function attachDevinSubagentCards(sessionInput: AgentSession): void {
+  const session = sessionInput as MutableACPSession;
+  const original = session.sessionUpdate?.bind(session);
+  if (typeof original !== "function") {
+    return;
+  }
+  const cards = new DevinSubagentCards();
+  session.sessionUpdate = async (params) => {
+    await original(params);
+    const event = cards.observe(
+      params,
+      DEVIN_PROVIDER_ID,
+      session.activeForegroundTurnId ?? undefined,
+    );
+    if (!event) {
+      return;
+    }
+    if (!session.replayingHistory) {
+      session.pushEvent?.(event);
+    } else if (Array.isArray(session.persistedHistory)) {
+      session.persistedHistory.push(event.item);
+    }
+  };
+}
+
+/**
+ * Devin's permission prompts can carry "Yes, switch to bypass mode" (option id `switch_bypass`),
+ * which would turn the session into a bypass one behind the back of the mode list we already
+ * filter. Drops such options while bypass modes are restricted.
+ */
+export function attachDevinBypassOptionFilter(sessionInput: AgentSession): void {
+  const session = sessionInput as MutableACPSession;
+  const original = session.requestPermission?.bind(session);
+  if (typeof original !== "function") {
+    return;
+  }
+  session.requestPermission = (params) =>
+    original(
+      isIrixRestricted("bypassModes")
+        ? {
+            ...params,
+            options: params.options.filter((option) => !isBypassModeId(option.optionId)),
+          }
+        : params,
+    );
+}
+
+/**
+ * Asks the user before Devin runs `run_subagent`. The question arrives from Devin's `PreToolUse`
+ * hook (see devin-subagent-gate.ts), which holds Devin until this resolves; a 10-minute timeout,
+ * an interrupt or closing the session denies it. The request shows as a normal permission card.
+ */
+export function attachDevinSubagentApprovalGate(
+  sessionInput: AgentSession,
+  agentId: string | undefined,
+): void {
+  const session = sessionInput as MutableACPSession;
+  const gates = new Map<string, SubagentGateEntry>();
+
+  const settleGate = (entry: SubagentGateEntry, response: AgentPermissionResponse) => {
+    if (entry.status !== "pending") {
+      return;
+    }
+    clearTimeout(entry.timer);
+    entry.status = "settled";
+    gates.delete(entry.requestId);
+    session.pushEvent?.({
+      type: "permission_resolved",
+      provider: DEVIN_PROVIDER_ID,
+      requestId: entry.requestId,
+      resolution: response,
+      turnId: entry.turnId,
+    });
+    entry.resolve(response.behavior === "allow");
+  };
+
+  const cancelAllPendingGates = (reason: string) => {
+    for (const entry of gates.values()) {
+      settleGate(entry, { behavior: "deny", message: reason });
+    }
+  };
+
+  const unregister = agentId
+    ? registerSubagentApprover(agentId, ({ toolInput, toolUseId }) => {
+        if (!isSubagentApprovalRequired()) {
+          return Promise.resolve(true);
+        }
+        const requestId = `devin-subagent-${randomUUID()}`;
+        const turnId = session.activeForegroundTurnId ?? undefined;
+        const request: AgentPermissionRequest = {
+          id: requestId,
+          provider: DEVIN_PROVIDER_ID,
+          name: "SpawnSubagent",
+          kind: "other",
+          title: "Require Subagent Approval (Devin subagent)",
+          description:
+            "Devin is requesting to spawn an internal subagent. Human approval is required.",
+          input: { ...(toolUseId ? { toolUseId } : {}), ...toolInput },
+        };
+        return new Promise<boolean>((resolve) => {
+          const entry: SubagentGateEntry = {
+            requestId,
+            status: "pending",
+            request,
+            resolve,
+            turnId,
+            timer: setTimeout(() => {
+              settleGate(entry, {
+                behavior: "deny",
+                message: "Subagent approval timed out after 10 minutes.",
+              });
+            }, SUBAGENT_APPROVAL_TIMEOUT_MS),
+          };
+          entry.timer.unref?.();
+          gates.set(requestId, entry);
+          session.pushEvent?.({
+            type: "permission_requested",
+            provider: DEVIN_PROVIDER_ID,
+            request,
+            turnId,
+          });
+        });
+      })
+    : () => {};
+
+  const originalGetPending = session.getPendingPermissions.bind(session);
+  session.getPendingPermissions = () => [
+    ...originalGetPending(),
+    ...Array.from(gates.values(), (entry) => entry.request),
+  ];
+
+  const originalRespond = session.respondToPermission.bind(session);
+  session.respondToPermission = async (requestId: string, response: AgentPermissionResponse) => {
+    const entry = gates.get(requestId);
+    if (entry) {
+      settleGate(entry, response);
+      return;
+    }
+    return originalRespond(requestId, response);
+  };
+
+  const originalInterrupt = session.interrupt.bind(session);
+  session.interrupt = async () => {
+    cancelAllPendingGates("Subagent approval canceled on turn interrupt.");
+    return originalInterrupt();
+  };
+
+  const originalClose = session.close.bind(session);
+  session.close = async () => {
+    unregister();
+    cancelAllPendingGates("Subagent approval canceled on session close.");
+    return originalClose();
+  };
+}
+
 type DevinClientOptions = ConstructorParameters<typeof GenericACPAgentClient>[0];
 
 // Devin sends the "/" command list in a notification after the session opens: about a second
@@ -183,6 +387,23 @@ type DevinClientOptions = ConstructorParameters<typeof GenericACPAgentClient>[0]
 // waits 1.5 s).
 export const DEVIN_COMMANDS_WAIT_MS = 10_000;
 
+/**
+ * Adds `--config <gated config>` in front of `acp`, so Devin runs the `PreToolUse` hook for
+ * `run_subagent` (see devin-subagent-gate.ts). A session starts Devin from this command, so the
+ * flag has to be in it. The hook allows at once while approval is switched off.
+ */
+export function withSubagentGate(
+  command: DevinClientOptions["command"],
+): DevinClientOptions["command"] {
+  const acpAt = command.indexOf("acp");
+  if (acpAt < 0) {
+    throw new Error("Cannot gate Devin subagents: the launch command has no `acp` argument.");
+  }
+  const gated = [...command];
+  gated.splice(acpAt, 0, "--config", writeGatedDevinConfig());
+  return gated as DevinClientOptions["command"];
+}
+
 export class DevinACPAgentClient extends GenericACPAgentClient {
   private readonly clientLogger: Logger;
 
@@ -191,6 +412,7 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
       waitForInitialCommands: true,
       initialCommandsWaitTimeoutMs: DEVIN_COMMANDS_WAIT_MS,
       ...options,
+      command: withSubagentGate(options.command),
     });
     this.clientLogger = options.logger;
   }
@@ -200,6 +422,7 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     launchContext?: AgentLaunchContext,
     options?: AgentCreateSessionOptions,
   ): Promise<AgentSession> {
+    await ensureSubagentGateRunning();
     const session = await super.createSession(config, launchContext, options);
     injectInstructionsIntoFirstPrompt(
       session,
@@ -214,6 +437,9 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
       this.clientLogger,
     );
     hideInjectedInstructions(session);
+    attachDevinSubagentApprovalGate(session, launchContext?.agentId);
+    attachDevinBypassOptionFilter(session);
+    attachDevinSubagentCards(session);
     return session;
   }
 
@@ -223,8 +449,12 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     launchContext?: AgentLaunchContext,
     options?: AgentResumeSessionOptions,
   ): Promise<AgentSession> {
+    await ensureSubagentGateRunning();
     const session = await super.resumeSession(handle, overrides, launchContext, options);
     hideInjectedInstructions(session);
+    attachDevinSubagentApprovalGate(session, launchContext?.agentId);
+    attachDevinBypassOptionFilter(session);
+    attachDevinSubagentCards(session);
     return session;
   }
 }

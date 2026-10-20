@@ -152,15 +152,13 @@ export function getDevinDesktopStatus(options: DevinDesktopRuntimeOptions = {}):
   };
 }
 
-export async function openInDevinDesktop(
+/** The absolute local folder to open, or an error saying why it cannot be. */
+export function requireWorkspaceFolder(
   workspacePath: string,
-  options: DevinDesktopRuntimeOptions = {},
-): Promise<{ ok: true }> {
+  options: Pick<DevinDesktopRuntimeOptions, "platform" | "pathExists"> = {},
+): string {
   const platform = options.platform ?? process.platform;
-  const env = options.env ?? process.env;
   const pathExists = options.pathExists ?? nodeExistsSync;
-  const spawn = options.spawn ?? spawnProcess;
-
   const trimmed = workspacePath.trim();
   if (!trimmed || !isAbsolutePath(trimmed, platform)) {
     throw new Error("Workspace path must be an absolute local path.");
@@ -168,21 +166,24 @@ export async function openInDevinDesktop(
   if (!pathExists(trimmed)) {
     throw new Error(`Workspace path does not exist: ${trimmed}`);
   }
+  return trimmed;
+}
 
-  const installation = resolveDevinDesktopInstallation(options);
-  if (!installation) {
-    throw new Error("Devin Desktop is not installed.");
-  }
-
-  const args = installation.buildArgs(trimmed);
+/** Starts a program that outlives the daemon's request; resolves once it has spawned. */
+export async function launchDetached(
+  command: string,
+  args: string[],
+  options: Pick<DevinDesktopRuntimeOptions, "env" | "spawn"> & { windowsHide?: boolean } = {},
+): Promise<void> {
+  const spawn = options.spawn ?? spawnProcess;
   await new Promise<void>((resolve, reject) => {
     let child: SpawnedProcess;
     try {
-      child = spawn(installation.command, args, {
+      child = spawn(command, args, {
         detached: true,
-        env: sanitizeEnv(env),
+        env: sanitizeEnv(options.env ?? process.env),
         stdio: "ignore",
-        windowsHide: true,
+        windowsHide: options.windowsHide ?? true,
       });
     } catch (error) {
       reject(error);
@@ -194,6 +195,17 @@ export async function openInDevinDesktop(
       resolve();
     });
   });
+}
 
+export async function openInDevinDesktop(
+  workspacePath: string,
+  options: DevinDesktopRuntimeOptions = {},
+): Promise<{ ok: true }> {
+  const folder = requireWorkspaceFolder(workspacePath, options);
+  const installation = resolveDevinDesktopInstallation(options);
+  if (!installation) {
+    throw new Error("Devin Desktop is not installed.");
+  }
+  await launchDetached(installation.command, installation.buildArgs(folder), options);
   return { ok: true };
 }

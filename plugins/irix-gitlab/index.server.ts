@@ -6,6 +6,7 @@ import {
   devinDesktopStatusRpc,
   listFoldersRpc,
   openInDevinDesktopRpc,
+  openInFileManagerRpc,
   searchProjectsRpc,
   setupCreateSectionRpc,
   setupSaveRpc,
@@ -16,6 +17,7 @@ import {
   type CloneResult,
 } from "./shared/rpc.js";
 import { getDevinDesktopStatus, openInDevinDesktop } from "./server/devin-desktop.js";
+import { openInFileManager } from "./server/file-manager.js";
 import { pickFolder } from "./server/pick-folder.js";
 import { createFolderPickerSessions } from "./server/pick-folder-sessions.js";
 import { createFolder, listFolders } from "./server/list-folders.js";
@@ -53,6 +55,7 @@ export default function contribute(server: PluginServerContext) {
   server.handle(createFolderRpc, ({ parent, name }) => createFolder(parent, name));
   server.handle(devinDesktopStatusRpc, () => getDevinDesktopStatus());
   server.handle(openInDevinDesktopRpc, ({ workspacePath }) => openInDevinDesktop(workspacePath));
+  server.handle(openInFileManagerRpc, ({ workspacePath }) => openInFileManager(workspacePath));
   server.handle(startCloneRpc, (input) => ({
     id: cloneJobs.start((report) => runClone(input, report), "Starting…"),
   }));
