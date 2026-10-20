@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentSession } from "../server/agent/agent-sdk-types.js";
 import { activateIrixPolicy } from "./policy.js";
 import {
-  attachDevinSubagentApprovalGate,
+  attachDevinBypassOptionFilter,
+  attachDevinSubagentCards,
   createIrixAcpClient,
   DEVIN_COMMANDS_WAIT_MS,
   DevinACPAgentClient,
@@ -14,7 +15,6 @@ import {
   paseoCommandLineGuide,
   withoutInjectedInstructions,
 } from "./devin-client.js";
-import { resetSubagentApprovalCacheForTests } from "./subagent-approval.js";
 
 function sessionWithConnection() {
   const calls: unknown[] = [];
@@ -231,83 +231,85 @@ describe("Devin system prompt delivery", () => {
     });
   });
 
-  describe("Devin ACP subagent approval gate", () => {
-    it("deduplicates run_subagent updates, gates createTerminal, and permanently blocks rejected subagents", async () => {
+  describe("bypass option on Devin's permission prompts", () => {
+    const options = [
+      { optionId: "allow_once", name: "Allow", kind: "allow_once" },
+      { optionId: "switch_bypass", name: "Yes, switch to bypass mode", kind: "allow_always" },
+      { optionId: "reject_once", name: "Reject", kind: "reject_once" },
+    ];
+
+    async function optionIdsSeenByDevin(): Promise<string[]> {
+      const received: Array<{ options: Array<{ optionId: string }> }> = [];
+      const session = {
+        requestPermission: async (params: { options: Array<{ optionId: string }> }) => {
+          received.push(params);
+          return {};
+        },
+      };
+      attachDevinBypassOptionFilter(session as unknown as AgentSession);
+      await session.requestPermission({ options });
+      return received[0]!.options.map((option) => option.optionId);
+    }
+
+    it("drops the switch-to-bypass option while bypass modes are restricted", async () => {
       const deactivate = activateIrixPolicy();
-      resetSubagentApprovalCacheForTests(null);
       try {
-        const events: unknown[] = [];
-        const createdTerminals: unknown[] = [];
-        const fakeSession = {
-          replayingHistory: false,
-          activeForegroundTurnId: "turn-1",
-          pushEvent: (event: unknown) => events.push(event),
-          sessionUpdate: async () => {},
-          createTerminal: async (params: unknown) => {
-            createdTerminals.push(params);
-            return { terminalId: `term-${createdTerminals.length}` };
-          },
-          getPendingPermissions: () => [],
-          respondToPermission: async () => {},
-          interrupt: async () => {},
-          close: async () => {},
-        } as unknown as AgentSession & {
-          sessionUpdate: (params: Record<string, unknown>) => Promise<void>;
-          createTerminal: (params: Record<string, unknown>) => Promise<{ terminalId: string }>;
-        };
-
-        attachDevinSubagentApprovalGate(fakeSession);
-
-        // First tool_call and subsequent tool_call_update for the same subagent produce only 1 permission request
-        await fakeSession.sessionUpdate({
-          sessionId: "s-1",
-          update: {
-            sessionUpdate: "tool_call",
-            toolCallId: "tc-1",
-            title: "run_subagent",
-            _meta: {
-              "cognition.ai/subagent_started": { agentId: "sub-1", subagentType: "explore" },
-            },
-          },
-        });
-        await fakeSession.sessionUpdate({
-          sessionId: "s-1",
-          update: {
-            sessionUpdate: "tool_call_update",
-            toolCallId: "tc-1",
-            title: "run_subagent",
-            _meta: {
-              "cognition.ai/subagent_started": { agentId: "sub-1", subagentType: "explore" },
-            },
-          },
-        });
-
-        expect(events).toHaveLength(1);
-        expect(fakeSession.getPendingPermissions()).toHaveLength(1);
-        const reqId = fakeSession.getPendingPermissions()[0]!.id;
-
-        const termPromise = fakeSession.createTerminal({
-          command: "ls",
-          _meta: { "cognition.ai/subagent_id": "sub-1" },
-        });
-        expect(createdTerminals).toHaveLength(0);
-
-        // Reject sub-1
-        await fakeSession.respondToPermission(reqId, { behavior: "deny" });
-        await expect(termPromise).rejects.toThrow(/rejected/);
-        expect(createdTerminals).toHaveLength(0);
-
-        // Subsequent terminal attempts from the same rejected subagent remain blocked
-        await expect(
-          fakeSession.createTerminal({
-            command: "whoami",
-            _meta: { "cognition.ai/subagent_id": "sub-1" },
-          }),
-        ).rejects.toThrow(/rejected/);
+        expect(await optionIdsSeenByDevin()).toEqual(["allow_once", "reject_once"]);
       } finally {
-        resetSubagentApprovalCacheForTests(null);
         deactivate();
       }
+    });
+
+    it("leaves the options alone when bypass modes are allowed", async () => {
+      const deactivate = activateIrixPolicy();
+      vi.stubEnv("IRIX_ALLOW_BYPASS_MODES", "1");
+      try {
+        expect(await optionIdsSeenByDevin()).toHaveLength(3);
+      } finally {
+        vi.unstubAllEnvs();
+        deactivate();
+      }
+    });
+  });
+
+  describe("subagent cards", () => {
+    const started = {
+      update: {
+        sessionUpdate: "tool_call_update",
+        toolCallId: "abc12345",
+        _meta: {
+          "cognition.ai/subagent_started": { agentId: "abc12345", title: "Sleep", task: "t" },
+        },
+      },
+    };
+
+    function sessionWith(replaying: boolean) {
+      const pushed: unknown[] = [];
+      const persistedHistory: unknown[] = [];
+      const session = {
+        replayingHistory: replaying,
+        persistedHistory,
+        pushEvent: (event: unknown) => pushed.push(event),
+        sessionUpdate: async () => {},
+      };
+      attachDevinSubagentCards(session as unknown as AgentSession);
+      return { session, pushed, persistedHistory };
+    }
+
+    it("sends the card to the chat as it happens", async () => {
+      const { session, pushed, persistedHistory } = sessionWith(false);
+      await session.sessionUpdate(started);
+      expect(pushed).toHaveLength(1);
+      expect(persistedHistory).toHaveLength(0);
+    });
+
+    it("puts the card into the history the session replays after a resume", async () => {
+      const { session, pushed, persistedHistory } = sessionWith(true);
+      await session.sessionUpdate(started);
+      expect(pushed).toHaveLength(0);
+      expect(persistedHistory).toMatchObject([
+        { callId: "abc12345", detail: { type: "sub_agent" } },
+      ]);
     });
   });
 });
