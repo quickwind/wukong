@@ -18,6 +18,7 @@ function createFakeClient(options: FakeHarnessOptions) {
   const removedButtons: string[] = [];
   const commandCenterItems: PluginCommandCenterItemContribution[] = [];
   const openCalls: string[] = [];
+  const explorerCalls: string[] = [];
   let workspaceObserver: {
     snapshot: (data: { entries: Array<{ id: string; workspaceDirectory: string }> }) => void;
     update: (msg: unknown) => void;
@@ -33,6 +34,10 @@ function createFakeClient(options: FakeHarnessOptions) {
       }
       if (contract.name === "irix.devin-desktop.open") {
         openCalls.push((input as { workspacePath: string }).workspacePath);
+        return { ok: true as const };
+      }
+      if (contract.name === "irix.file-manager.open") {
+        explorerCalls.push((input as { workspacePath: string }).workspacePath);
         return { ok: true as const };
       }
       throw new Error(`Unexpected RPC: ${contract.name}`);
@@ -88,6 +93,7 @@ function createFakeClient(options: FakeHarnessOptions) {
     removedButtons,
     commandCenterItems,
     openCalls,
+    explorerCalls,
     emitWorkspaceUpdate(payload: unknown) {
       workspaceObserver?.update({ type: "workspace_update", payload });
     },
@@ -95,7 +101,7 @@ function createFakeClient(options: FakeHarnessOptions) {
 }
 
 describe("contributeDevinDesktopButton", () => {
-  it("registers nothing when Devin Desktop is not installed", async () => {
+  it("offers File Explorer as the button when Devin Desktop is not installed", async () => {
     const harness = createFakeClient({
       installed: false,
       initialWorkspaces: [{ id: "ws-1", workspaceDirectory: "C:\\Work\\repo" }],
@@ -104,12 +110,44 @@ describe("contributeDevinDesktopButton", () => {
     const cleanup = contributeDevinDesktopButton(harness.client);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(harness.headerButtons.size).toBe(0);
-    expect(harness.commandCenterItems).toHaveLength(0);
+    const button = harness.headerButtons.get("ws-1:open-in-devin");
+    expect(button?.button.title).toBe("Open in File Explorer");
+    expect(button?.button.behavior.kind).toBe("action");
+    if (button?.button.behavior.kind === "action") {
+      await button.button.behavior.onPress();
+    }
+    expect(harness.explorerCalls).toEqual(["C:\\Work\\repo"]);
+    expect(harness.openCalls).toEqual([]);
+    expect(harness.commandCenterItems.map((item) => item.id)).toEqual(["open-in-file-explorer"]);
     cleanup();
   });
 
-  it("registers header buttons for workspaces when installed and opens Devin Desktop on press", async () => {
+  it("still offers File Explorer when Devin's status cannot be read", async () => {
+    const harness = createFakeClient({
+      installed: false,
+      initialWorkspaces: [{ id: "ws-1", workspaceDirectory: "C:\\Work\\repo" }],
+    });
+    const failing = {
+      ...harness.client,
+      rpc: async (contract: { name: string }, input: unknown) => {
+        if (contract.name === "irix.devin-desktop.status") throw new Error("boom");
+        return (harness.client.rpc as (c: unknown, i: unknown) => Promise<unknown>)(
+          contract,
+          input,
+        );
+      },
+    } as unknown as PluginClientContext;
+
+    const cleanup = contributeDevinDesktopButton(failing);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(harness.headerButtons.get("ws-1:open-in-devin")?.button.title).toBe(
+      "Open in File Explorer",
+    );
+    cleanup();
+  });
+
+  it("puts Devin Desktop and File Explorer in one menu when Devin is installed", async () => {
     const harness = createFakeClient({
       installed: true,
       iconDataUrl: "data:image/svg+xml;base64,PHN2Zy8+",
@@ -120,15 +158,22 @@ describe("contributeDevinDesktopButton", () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(harness.headerButtons.size).toBe(1);
-    expect(harness.commandCenterItems).toHaveLength(1);
+    expect(harness.commandCenterItems).toHaveLength(2);
     const button = harness.headerButtons.get("ws-1:open-in-devin");
     expect(button?.button.title).toBe("Open in Devin");
     expect(typeof button?.button.icon).toBe("function");
 
-    if (button?.button.behavior.kind === "action") {
-      await button.button.behavior.onPress();
+    const behavior = button?.button.behavior;
+    expect(behavior?.kind).toBe("menu");
+    if (behavior?.kind === "menu") {
+      const items = behavior.items.flatMap((entry) => (entry.kind === "item" ? [entry] : []));
+      expect(items.map((item) => item.title)).toEqual(["Open in Devin", "Open in File Explorer"]);
+      for (const item of items) {
+        if (item.behavior.kind === "action") await item.behavior.onPress();
+      }
     }
     expect(harness.openCalls).toEqual(["C:\\Work\\repo"]);
+    expect(harness.explorerCalls).toEqual(["C:\\Work\\repo"]);
 
     harness.emitWorkspaceUpdate({
       kind: "upsert",

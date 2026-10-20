@@ -137,6 +137,16 @@ export const openInDevinDesktopRpc = defineRpc({
   }),
 });
 
+export const openInFileManagerRpc = defineRpc({
+  name: "irix.file-manager.open",
+  input: z.object({
+    workspacePath: z.string().min(1).max(4096),
+  }),
+  output: z.object({
+    ok: z.literal(true),
+  }),
+});
+
 // GitLab setup screen (Settings > Plugins > GitLab). The token in `setupCreateSectionRpc` is the
 // only secret that crosses an RPC: it is tested, written to the python-gitlab config and dropped.
 export const SETUP_OVERRIDE_VARIABLES = [
