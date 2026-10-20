@@ -3,13 +3,26 @@
 // the daemon's environment lifts all three; the IRIX_ALLOW_* variables lift one each.
 
 import { isIrixActive } from "./policy.js";
+import {
+  applyIrixClaudeSubagentApprovalConfig,
+  attachIrixAgentManager,
+  attachIrixPaseoToolsGate,
+  attachIrixWsServer,
+  isSubagentApprovalLocked,
+  isSubagentApprovalRequired,
+} from "./subagent-approval.js";
 
-export type IrixRestriction = "schedules" | "agentMessaging" | "bypassModes";
+export type IrixRestriction =
+  | "schedules"
+  | "agentMessaging"
+  | "bypassModes"
+  | "subagentApprovalControl";
 
 const ALLOW_VARIABLE: Record<IrixRestriction, string> = {
   schedules: "IRIX_ALLOW_SCHEDULES",
   agentMessaging: "IRIX_ALLOW_AGENT_MESSAGING",
   bypassModes: "IRIX_ALLOW_BYPASS_MODES",
+  subagentApprovalControl: "IRIX_ALLOW_SUBAGENT_APPROVAL_CONTROL",
 };
 
 function isOn(value: string | undefined): boolean {
@@ -41,7 +54,14 @@ const SCHEDULE_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /** Agent tools Irix does not hand out: the schedule family and agent-to-agent send. */
-export function isIrixToolBlocked(toolName: string): boolean {
+export function isIrixToolBlocked(
+  toolName: string,
+  toolsMap?: unknown,
+  options?: { agentManager?: unknown; callerAgentId?: string; paseoHome?: string },
+): boolean {
+  if (toolsMap && options) {
+    attachIrixPaseoToolsGate(toolsMap, options);
+  }
   if (SCHEDULE_TOOLS.has(toolName)) {
     return isIrixRestricted("schedules");
   }
@@ -100,12 +120,17 @@ export function irixFeatures<T>(autoAccept: T): T[] {
  * Drop it so the agent starts in the provider's default mode instead of failing to load.
  */
 export function withoutIrixBypassConfig<
-  T extends { modeId?: string | null; featureValues?: Record<string, unknown> | null },
+  T extends {
+    provider?: string;
+    modeId?: string | null;
+    featureValues?: Record<string, unknown> | null;
+    providerOptions?: Record<string, unknown>;
+  },
 >(config: T): T {
+  const next = applyIrixClaudeSubagentApprovalConfig({ ...config });
   if (!isIrixRestricted("bypassModes")) {
-    return config;
+    return next;
   }
-  const next = { ...config };
   if (isBypassModeId(next.modeId)) {
     delete next.modeId;
   }
@@ -115,16 +140,43 @@ export function withoutIrixBypassConfig<
   return next;
 }
 
-export function assertIrixModeAllowed(input: {
-  modeId?: string | null;
-  featureValues?: Record<string, unknown> | null;
-}): void {
+export function assertIrixModeAllowed(
+  input: {
+    provider?: string;
+    modeId?: string | null;
+    featureValues?: Record<string, unknown> | null;
+    providerOptions?: Record<string, unknown>;
+  },
+  agentManager?: unknown,
+): void {
+  if (agentManager) {
+    attachIrixAgentManager(agentManager);
+  }
+  applyIrixClaudeSubagentApprovalConfig(input);
   if (!isIrixRestricted("bypassModes")) {
     return;
   }
   if (isBypassModeId(input.modeId) || input.featureValues?.[AUTO_ACCEPT_FEATURE_ID] === true) {
     throw new Error("Bypass permission modes are not available on this daemon.");
   }
+}
+
+export function irixServerFeatures(wsServer?: unknown): {
+  schedulesDisabled?: boolean;
+  subagentApprovalLocked?: boolean;
+  requireSubagentApproval?: boolean;
+} {
+  if (wsServer) {
+    attachIrixWsServer(wsServer);
+  }
+  if (!isIrixActive()) {
+    return {};
+  }
+  return {
+    ...(isIrixRestricted("schedules") ? { schedulesDisabled: true } : {}),
+    subagentApprovalLocked: isSubagentApprovalLocked(),
+    requireSubagentApproval: isSubagentApprovalRequired(),
+  };
 }
 
 export function assertIrixSchedulesAllowed(): void {

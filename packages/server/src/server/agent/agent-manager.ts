@@ -5306,7 +5306,7 @@ export class AgentManager {
       env: options.env,
       purpose: options.purpose,
     });
-    assertIrixModeAllowed(storedConfig); // Irix: no bypass modes
+    assertIrixModeAllowed(storedConfig, this); // Irix: no bypass modes
     const paseoToolPolicy = this.paseoToolsEnabled
       ? this.resolvePaseoToolPolicy(storedConfig.provider)
       : { enabled: false };

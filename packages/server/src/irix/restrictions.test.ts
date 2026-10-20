@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { paseoCommandLineGuide } from "./devin-client.js";
@@ -7,29 +10,50 @@ import {
   assertIrixModeAllowed,
   assertIrixSchedulesAllowed,
   irixSafeDefaultModeId,
+  irixServerFeatures,
   withoutIrixBypassConfig,
   isIrixToolBlocked,
   withoutIrixBypassModes,
 } from "./restrictions.js";
+import {
+  isSubagentApprovalLocked,
+  isSubagentApprovalRequired,
+  resetSubagentApprovalCacheForTests,
+  setSubagentApprovalRequired,
+} from "./subagent-approval.js";
 
 const VARIABLES = [
   "IRIX_UNRESTRICTED",
   "IRIX_ALLOW_SCHEDULES",
   "IRIX_ALLOW_AGENT_MESSAGING",
   "IRIX_ALLOW_BYPASS_MODES",
+  "IRIX_ALLOW_SUBAGENT_APPROVAL_CONTROL",
 ];
 
 describe("Irix restrictions", () => {
   let deactivate: () => void;
+  let originalPaseoHome: string | undefined;
+  let tempHome: string;
 
   beforeEach(() => {
+    originalPaseoHome = process.env.PASEO_HOME;
+    tempHome = mkdtempSync(path.join(os.tmpdir(), "irix-restrictions-test-"));
+    process.env.PASEO_HOME = tempHome;
     for (const name of VARIABLES) delete process.env[name];
+    resetSubagentApprovalCacheForTests(null);
     deactivate = activateIrixPolicy();
   });
 
   afterEach(() => {
     deactivate();
+    resetSubagentApprovalCacheForTests(null);
     for (const name of VARIABLES) delete process.env[name];
+    if (originalPaseoHome === undefined) {
+      delete process.env.PASEO_HOME;
+    } else {
+      process.env.PASEO_HOME = originalPaseoHome;
+    }
+    rmSync(tempHome, { recursive: true, force: true });
   });
 
   it("blocks schedules, agent messaging and bypass modes by default", () => {
@@ -92,5 +116,123 @@ describe("Irix restrictions", () => {
     expect(isIrixToolBlocked("create_schedule")).toBe(false);
     expect(() => assertIrixModeAllowed({ modeId: "bypassPermissions" })).not.toThrow();
     deactivate = activateIrixPolicy();
+  });
+
+  it("enforces mandatory subagent approval by default and locks the control switch", () => {
+    expect(isSubagentApprovalLocked()).toBe(true);
+    expect(isSubagentApprovalRequired()).toBe(true);
+    expect(() => setSubagentApprovalRequired(false)).toThrow();
+    expect(irixServerFeatures()).toMatchObject({
+      subagentApprovalLocked: true,
+      requireSubagentApproval: true,
+    });
+
+    const claudeConfig = withoutIrixBypassConfig({
+      provider: "claude",
+      modeId: "default",
+      providerOptions: {
+        allowedTools: ["Read", "Task", "Agent"],
+        settings: { permissions: { allow: ["Task", "Read"] } },
+      },
+    });
+    expect(claudeConfig.providerOptions).toEqual({
+      allowedTools: ["Read"],
+      settings: {
+        permissions: {
+          allow: ["Read"],
+          ask: ["Task", "Agent"],
+        },
+      },
+    });
+  });
+
+  it("allows toggling mandatory subagent approval off when unlocked, falling back to scenario settings", () => {
+    process.env.IRIX_ALLOW_SUBAGENT_APPROVAL_CONTROL = "1";
+    expect(isSubagentApprovalLocked()).toBe(false);
+    expect(isSubagentApprovalRequired()).toBe(true);
+
+    setSubagentApprovalRequired(false);
+    expect(isSubagentApprovalRequired()).toBe(false);
+    expect(irixServerFeatures()).toMatchObject({
+      subagentApprovalLocked: false,
+      requireSubagentApproval: false,
+    });
+
+    const claudeConfig = withoutIrixBypassConfig({
+      provider: "claude",
+      modeId: "default",
+      providerOptions: {
+        allowedTools: ["Read", "Task"],
+      },
+    });
+    expect(claudeConfig.providerOptions).toEqual({
+      allowedTools: ["Read", "Task"],
+    });
+  });
+
+  it("gates MCP create_agent on parent agent approval when mandatory subagent approval is enabled", async () => {
+    const parentAgent = {
+      id: "parent-1",
+      config: { provider: "claude", cwd: "/tmp" },
+      pendingPermissions: new Map(),
+    };
+    const emitted: Array<Record<string, unknown>> = [];
+    const fakeAgentManager = {
+      agents: new Map([["parent-1", parentAgent]]),
+      emit: (event: Record<string, unknown>) => emitted.push(event),
+      respondToPermission: async () => {},
+    };
+    const tools = new Map<
+      string,
+      {
+        name: string;
+        handler: (
+          input: Record<string, unknown>,
+          context?: { callerAgentId?: string },
+        ) => Promise<unknown>;
+      }
+    >();
+    expect(
+      isIrixToolBlocked("create_agent", tools, {
+        agentManager: fakeAgentManager,
+        callerAgentId: "parent-1",
+      }),
+    ).toBe(false);
+
+    let created = 0;
+    tools.set("create_agent", {
+      name: "create_agent",
+      handler: async () => {
+        created += 1;
+        return { id: "child-1" };
+      },
+    });
+
+    const tool = tools.get("create_agent")!;
+    const createPromise = tool.handler({ provider: "claude", prompt: "run child" });
+    expect(created).toBe(0);
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]).toMatchObject({
+      type: "permission_requested",
+      agentId: "parent-1",
+    });
+    const firstEvent = emitted[0]!;
+    const requestId = (firstEvent.request as { id: string }).id;
+
+    await fakeAgentManager.respondToPermission("parent-1", requestId, {
+      behavior: "allow",
+    } as never);
+    await expect(createPromise).resolves.toEqual({ id: "child-1" });
+    expect(created).toBe(1);
+
+    // Rejecting blocks child creation before handler runs
+    const rejectPromise = tool.handler({ provider: "claude", prompt: "run child 2" });
+    const thirdEvent = emitted[2]!;
+    const secondRequestId = (thirdEvent.request as { id: string }).id;
+    await fakeAgentManager.respondToPermission("parent-1", secondRequestId, {
+      behavior: "deny",
+    } as never);
+    await expect(rejectPromise).rejects.toThrow(/rejected/);
+    expect(created).toBe(1);
   });
 });
