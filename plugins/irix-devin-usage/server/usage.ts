@@ -78,22 +78,85 @@ export async function readDevinLogin(path = credentialsPath()): Promise<DevinLog
   return apiKey && serverUrl ? { apiKey, serverUrl } : null;
 }
 
-let cachedVersion: string | undefined;
+const VERSION_PROBE_TIMEOUT_MS = 5_000;
+// A failing probe is retried rarely: the usage view refetches every few minutes, and a devin
+// that is missing, slow or broken must not be spawned on every one of those.
+const VERSION_PROBE_BACKOFF_MS = 10 * 60_000;
 
-async function devinCliVersion(): Promise<string> {
-  if (cachedVersion) return cachedVersion;
-  try {
-    const { stdout } = await promisify(execFile)("devin", ["--version"], {
-      timeout: 5_000,
-      shell: process.platform === "win32",
+export type VersionExec = (
+  file: string,
+  args: readonly string[],
+  options: { timeout: number; shell: boolean },
+) => Promise<{ stdout: string }>;
+
+export interface VersionDeps {
+  /** Spawns the probe; injected in tests. */
+  exec?: VersionExec;
+  /** Milliseconds since the epoch; injected in tests. */
+  now?: () => number;
+  /** The platform the probe runs on; injected in tests. */
+  platform?: NodeJS.Platform;
+}
+
+const defaultExec: VersionExec = async (file, args, options) => {
+  const { stdout } = await promisify(execFile)(file, [...args], {
+    timeout: options.timeout,
+    shell: options.shell,
+  });
+  return { stdout };
+};
+
+/**
+ * The Devin CLI's version, for the usage request's metadata. A success is kept for the life of
+ * the process; a failure backs off, so a broken CLI is probed once in a while, not every fetch.
+ */
+export function createDevinCliVersion(deps: VersionDeps = {}): () => Promise<string> {
+  const exec = deps.exec ?? defaultExec;
+  const now = deps.now ?? Date.now;
+  const platform = deps.platform ?? process.platform;
+  let cached: string | undefined;
+  let inflight: Promise<string> | undefined;
+  let failedAt: number | undefined;
+
+  const probe = async (): Promise<string> => {
+    // On Windows the CLI is a real devin.exe, and spawning it without a shell means the timeout
+    // kills devin.exe itself; through cmd.exe it would only kill the shell and leave it orphaned.
+    const file = platform === "win32" ? "devin.exe" : "devin";
+    const { stdout } = await exec(file, ["--version"], {
+      timeout: VERSION_PROBE_TIMEOUT_MS,
+      shell: false,
     });
     const version = stdout.match(/\d+\.\d+\.\d+/)?.[0];
-    if (version) cachedVersion = version;
-    return version ?? "0.0.0";
-  } catch {
-    return "0.0.0";
-  }
+    if (!version) throw new Error(`no version in ${JSON.stringify(stdout)}`);
+    return version;
+  };
+
+  const runProbe = async (): Promise<string> => {
+    try {
+      const version = await probe();
+      cached = version;
+      failedAt = undefined;
+      return version;
+    } catch {
+      failedAt = now();
+      return "0.0.0";
+    }
+  };
+
+  return async function devinCliVersion(): Promise<string> {
+    if (cached) return cached;
+    // Callers that arrive while a probe runs share it instead of starting their own.
+    if (inflight) return inflight;
+    if (failedAt !== undefined && now() - failedAt < VERSION_PROBE_BACKOFF_MS) return "0.0.0";
+    const pending = runProbe();
+    inflight = pending;
+    return pending.finally(() => {
+      if (inflight === pending) inflight = undefined;
+    });
+  };
 }
+
+const devinCliVersion = createDevinCliVersion();
 
 // Proto3 JSON leaves out zero values, so a missing number means zero.
 const UserStatusSchema = z.object({

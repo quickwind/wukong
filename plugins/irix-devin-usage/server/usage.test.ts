@@ -4,11 +4,13 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   allowedHosts,
+  createDevinCliVersion,
   discover,
   fetchUsage,
   readDevinLogin,
   reportFromStatus,
   type DevinLogin,
+  type VersionExec,
 } from "./usage.js";
 
 const input = { store: "devin-cli" } as const;
@@ -292,6 +294,102 @@ describe("fetchUsage", () => {
         deps(respond({}), async () => null as never),
       ),
     ).rejects.toThrow(/not signed in/);
+  });
+});
+
+describe("Devin CLI version probe", () => {
+  const TEN_MINUTES = 10 * 60_000;
+
+  function probe(exec: VersionExec) {
+    let clock = 1_000;
+    const version = createDevinCliVersion({
+      exec,
+      now: () => clock,
+      platform: "linux",
+    });
+    return {
+      version,
+      advance: (ms: number) => {
+        clock += ms;
+      },
+    };
+  }
+
+  it("runs the probe once for concurrent callers", async () => {
+    let calls = 0;
+    const exec = vi.fn(async () => {
+      calls += 1;
+      return { stdout: "devin 3000.6.2\n" };
+    });
+    const { version } = probe(exec);
+    const [first, second] = await Promise.all([version(), version()]);
+    expect(first).toBe("3000.6.2");
+    expect(second).toBe("3000.6.2");
+    expect(calls).toBe(1);
+  });
+
+  it("keeps a version it found for the life of the process", async () => {
+    let calls = 0;
+    const exec = vi.fn(async () => {
+      calls += 1;
+      return { stdout: "devin 3000.6.2\n" };
+    });
+    const { version } = probe(exec);
+    expect(await version()).toBe("3000.6.2");
+    expect(await version()).toBe("3000.6.2");
+    expect(calls).toBe(1);
+  });
+
+  it("does not probe again after a failure until the back-off is over", async () => {
+    let calls = 0;
+    const exec = vi.fn(async () => {
+      calls += 1;
+      throw new Error("devin not found");
+    });
+    const { version, advance } = probe(exec);
+    expect(await version()).toBe("0.0.0");
+    expect(await version()).toBe("0.0.0");
+    expect(calls).toBe(1);
+    advance(TEN_MINUTES - 1);
+    expect(await version()).toBe("0.0.0");
+    expect(calls).toBe(1);
+    advance(1);
+    expect(await version()).toBe("0.0.0");
+    expect(calls).toBe(2);
+  });
+
+  it("treats output without a version as a failure", async () => {
+    let calls = 0;
+    const exec = vi.fn(async () => {
+      calls += 1;
+      return { stdout: "devin (unknown build)\n" };
+    });
+    const { version } = probe(exec);
+    expect(await version()).toBe("0.0.0");
+    expect(await version()).toBe("0.0.0");
+    expect(calls).toBe(1);
+  });
+
+  it("runs devin.exe without a shell on Windows", async () => {
+    const exec = vi.fn(async () => ({ stdout: "devin 3000.6.2\n" }));
+    const version = createDevinCliVersion({ exec, platform: "win32" });
+    expect(await version()).toBe("3000.6.2");
+    expect(exec).toHaveBeenCalledWith(
+      "devin.exe",
+      ["--version"],
+      expect.objectContaining({ shell: false }),
+    );
+  });
+
+  it("runs devin on the other platforms", async () => {
+    const exec = vi.fn(async () => ({ stdout: "devin 3000.6.2\n" }));
+    const version = createDevinCliVersion({ exec, platform: "darwin" });
+    expect(await version()).toBe("3000.6.2");
+    expect(exec).toHaveBeenCalledWith(
+      "devin",
+      ["--version"],
+      expect.objectContaining({ shell: false }),
+    );
   });
 });
 
