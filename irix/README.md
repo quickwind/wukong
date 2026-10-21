@@ -117,7 +117,8 @@ return AgentView ? (
 - Not available inside it: opening subagent tracks and the import sheet. In a narrow pane the mode
   picker is hidden by upstream's layout.
 - A new chat with no model chosen shows no "/" commands (upstream). For Devin, the daemon waits up to
-  10 s for the command list that Devin sends after a session opens.
+  10 s for the command list that Devin sends after a session opens. A "/" in the middle of a message
+  offers Devin's skills only: the other commands run only at the start of a message.
 
 ## Building the packages yourself
 

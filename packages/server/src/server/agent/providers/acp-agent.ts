@@ -1,5 +1,6 @@
 import { ACPProviderOptionsSchema } from "./acp-options.js";
 import { irixFeatures } from "../../../irix/restrictions.js";
+import { irixCommandKind } from "../../../irix/command-kind.js"; // Irix: a provider's skills work mid-prompt
 import { type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
@@ -3156,7 +3157,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
           name: command.name,
           description: command.description,
           argumentHint: command.input?.hint ?? "",
-          kind: "command",
+          kind: irixCommandKind(command),
         }));
         this.settleCommandsReady();
         return pendingUserEvents;

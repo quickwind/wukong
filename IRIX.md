@@ -83,7 +83,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CLAUDE.md` (`AGENTS.md` links to it)                                                                                      | One line at the top pointing agents here                                                                                                                                                                                                                                               |
 | `server/daemon-worker.ts`                                                                                                  | Imports the edition entry first (egress guard, policy)                                                                                                                                                                                                                                 |
-| `server/agent/providers/acp-agent.ts`, `terminal/terminal.ts`                                                              | One line each: Windows shell comes from `irixWindowsShell()` (PowerShell by default); `acp-agent.ts` also spreads `additionalDirectoriesParams(...)` into `session/new`, `session/load` and `session/resume`                                                                           |
+| `server/agent/providers/acp-agent.ts`, `terminal/terminal.ts`                                                              | One line each: Windows shell comes from `irixWindowsShell()` (PowerShell by default); `acp-agent.ts` also spreads `additionalDirectoriesParams(...)` into `session/new`, `session/load` and `session/resume`, and reads a provider's skills from `irix/command-kind.ts`                |
 | `server/config.ts`                                                                                                         | Terminal profiles fixed to Claude Code                                                                                                                                                                                                                                                 |
 | `server/session.ts`                                                                                                        | Clone requests only from the company GitLab                                                                                                                                                                                                                                            |
 | `server/agent/provider-registry.ts`                                                                                        | Restrict to Claude and Devin; Devin as configured ACP, with Irix's Devin client                                                                                                                                                                                                        |
@@ -127,6 +127,17 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   reproduced on macOS (52 commands in 130-160 ms, also with 30 sessions starting at once, old build
   and new alike); the switch is a hedge for a slower machine (Windows reports of a late popover are
   unconfirmed).
+  **Devin's slash commands** (`irix/command-kind.ts`, one line in `acp-agent.ts`): upstream shows the
+  commands a provider reports at the start of a message, and only its skills inside one, because a skill
+  also works there. ACP has no skill/command distinction, so upstream marked every command a plain one and
+  the mid-prompt list was empty for Devin. Devin does say which are skills: it files them under the
+  "Skills" category in the command's `_meta` (`cognition.ai/category`), so that is what the hook reads.
+  Verified with the real Devin: 54 commands, 32 of them skills. Only the skills are offered mid-prompt,
+  because the others do not work there — Devin's ACP server runs a command only when it opens the message
+  ("hello /context" reaches the model as text), while a skill's instructions are injected wherever
+  "/<skill>" appears. The ACP session cannot tell which provider it belongs to (every ACP client
+  registers under the "acp" sentinel), so the marker in the command is the only signal there; no other
+  provider writes Cognition's namespace, so the other ACP providers are unaffected.
   **Additional directories** (`irix/additional-directories.ts`, spread into `session/new`, `session/load`
   and `session/resume` in `acp-agent.ts`): a plugin that runs a chat in one directory and wants the agent
   to work in another (a bot's folder next to a project worktree) sets
