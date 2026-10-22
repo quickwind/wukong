@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Alert, Text, View } from "react-native";
 import type { MutableDaemonConfigPatch } from "@getpaseo/protocol/messages";
 import { Switch } from "@/components/ui/switch";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
+import { IrixIdleReleaseCard } from "@/irix/idle-release-setting";
 import { HIDDEN_ROW_STYLE, IRIX_BUILD, upstreamOnly } from "@/irix/build";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
@@ -10,8 +11,17 @@ import { settingsStyles } from "@/styles/settings";
 
 export { HIDDEN_ROW_STYLE, IRIX_BUILD, upstreamOnly };
 
+function IrixAgentsCards({ serverId }: { serverId: string }) {
+  return (
+    <>
+      <IrixSubagentApprovalCard serverId={serverId} />
+      <IrixIdleReleaseCard serverId={serverId} />
+    </>
+  );
+}
+
 export function irixAgentsCard<Component>(component: Component): Component {
-  return IRIX_BUILD ? (IrixSubagentApprovalCard as unknown as Component) : component;
+  return IRIX_BUILD ? (IrixAgentsCards as unknown as Component) : component;
 }
 
 export function IrixSubagentApprovalCard({ serverId }: { serverId: string }) {
