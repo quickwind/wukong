@@ -363,7 +363,13 @@ export function attachIrixAgentManager(managerInput: unknown): void {
           );
           if (session && typeof session === "object") {
             attachClaudeSessionSubagentGate(session as Record<string, unknown>);
-            trackClaudeBackgroundShells(session);
+            if (isIrixActive()) {
+              try {
+                trackClaudeBackgroundShells(session);
+              } catch {
+                // Tracking must never fail session creation.
+              }
+            }
           }
           return session;
         };
@@ -593,5 +599,7 @@ export function attachIrixWsServer(wsServerInput: unknown): void {
   }
 
   // After the approval wrapper above so both chains compose.
-  wrapIdleReleaseConfigStore(wsServer);
+  if (isIrixActive()) {
+    wrapIdleReleaseConfigStore(wsServer);
+  }
 }

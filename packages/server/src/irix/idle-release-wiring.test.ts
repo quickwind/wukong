@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -156,5 +156,31 @@ describe("idle release wiring", () => {
     attachIrixWsServer(wsServer);
     await vi.advanceTimersByTimeAsync(15);
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it("leaves the config store untouched when the Irix policy is off", () => {
+    deactivate();
+    const store = {
+      get: (): Record<string, unknown> => ({ base: 1 }),
+      patch: (p: Record<string, unknown>): Record<string, unknown> => ({ base: 1, ...p }),
+    };
+    attachIrixWsServer({ paseoHome: home, daemonConfigStore: store });
+    expect(store.get()).not.toHaveProperty("idleRelease");
+    // Passed through to the original store untouched (not validated, not persisted by us).
+    expect(store.patch({ idleRelease: { minutes: 0 } })).toMatchObject({
+      idleRelease: { minutes: 0 },
+    });
+    expect(existsSync(path.join(home, "daemon.json"))).toBe(false);
+  });
+
+  it("keeps the original translateMessageToEvents when the Irix policy is off", async () => {
+    deactivate();
+    const translate = () => [];
+    const claude = { createSession: async () => ({ translateMessageToEvents: translate }) };
+    const manager = fakeManager();
+    manager.clients.set("claude", claude);
+    attachIrixAgentManager(manager);
+    const session = (await claude.createSession()) as { translateMessageToEvents: unknown };
+    expect(session.translateMessageToEvents).toBe(translate);
   });
 });
