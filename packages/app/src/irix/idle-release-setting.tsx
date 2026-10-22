@@ -37,10 +37,13 @@ export function IrixIdleReleaseCard({ serverId }: { serverId: string }) {
 
   const [draft, setDraft] = useState(String(minutes));
   const [invalid, setInvalid] = useState(false);
+  // The input captures its text once; only a new resetKey makes it show `draft` again.
+  const [resetKey, setResetKey] = useState(0);
 
   useEffect(() => {
     setDraft(String(minutes));
     setInvalid(false);
+    setResetKey((key) => key + 1);
   }, [minutes]);
 
   const save = useCallback(
@@ -49,6 +52,8 @@ export function IrixIdleReleaseCard({ serverId }: { serverId: string }) {
       void patchConfig({ idleRelease } as unknown as MutableDaemonConfigPatch)
         .catch((error) => {
           setDraft(String(minutes));
+          setInvalid(false);
+          setResetKey((key) => key + 1);
           Alert.alert(
             "Unable to update setting",
             error instanceof Error ? error.message : String(error),
@@ -124,6 +129,7 @@ export function IrixIdleReleaseCard({ serverId }: { serverId: string }) {
         <FormTextInput
           size="sm"
           initialValue={draft}
+          resetKey={resetKey}
           onChangeText={handleChangeText}
           onBlur={commitMinutes}
           onSubmitEditing={commitMinutes}

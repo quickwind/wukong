@@ -55,19 +55,30 @@ vi.mock("@/components/ui/switch", async () => {
 });
 
 vi.mock("@/components/ui/form-field", async () => {
-  const { useCallback } = await import("react");
+  const { useCallback, useEffect, useRef, useState } = await import("react");
   return {
     FormTextInput: function FormTextInputStub(props: {
       initialValue?: string;
+      resetKey?: string | number;
       editable?: boolean;
       onChangeText?: (value: string) => void;
       onBlur?: () => void;
       onSubmitEditing?: () => void;
       testID?: string;
     }) {
-      const { onChangeText, onSubmitEditing } = props;
+      const { onChangeText, onSubmitEditing, initialValue, resetKey } = props;
+      // Like the real EditingTextInput: text is captured once and replaced only when resetKey changes.
+      const [text, setText] = useState(initialValue ?? "");
+      const initialRef = useRef(initialValue);
+      initialRef.current = initialValue;
+      useEffect(() => {
+        setText(initialRef.current ?? "");
+      }, [resetKey]);
       const onChange = useCallback(
-        (event: React.ChangeEvent<HTMLInputElement>) => onChangeText?.(event.target.value),
+        (event: React.ChangeEvent<HTMLInputElement>) => {
+          setText(event.target.value);
+          onChangeText?.(event.target.value);
+        },
         [onChangeText],
       );
       const onKeyDown = useCallback(
@@ -79,7 +90,7 @@ vi.mock("@/components/ui/form-field", async () => {
       return (
         <input
           data-testid={props.testID}
-          value={props.initialValue}
+          value={text}
           disabled={props.editable === false}
           onChange={onChange}
           onBlur={props.onBlur}
@@ -180,6 +191,26 @@ describe("IrixIdleReleaseCard", () => {
       fireEvent.click(view.getByTestId("host-page-idle-release-switch"));
     });
     expect(state.alert).toHaveBeenCalledWith("Unable to update setting", "boom");
+  });
+
+  it("reverts the field to the persisted value when the patch fails", async () => {
+    state.patchConfig.mockRejectedValueOnce(new Error("boom"));
+    const view = renderCard();
+    const input = view.getByTestId("host-page-idle-release-minutes") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "30" } });
+    await act(async () => {
+      fireEvent.blur(input);
+    });
+    expect(input.value).toBe("15");
+  });
+
+  it("follows an external change of the persisted minutes", () => {
+    const view = renderCard();
+    state.config = { idleRelease: { enabled: true, minutes: 40 } };
+    view.rerender(<IrixIdleReleaseCard serverId="s1" />);
+    expect((view.getByTestId("host-page-idle-release-minutes") as HTMLInputElement).value).toBe(
+      "40",
+    );
   });
 
   it("renders nothing when disconnected", () => {
