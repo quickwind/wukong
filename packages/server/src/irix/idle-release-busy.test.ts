@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   hasRunningAcpTerminal,
   hasRunningClaudeBackgroundShell,
@@ -128,7 +128,16 @@ describe("trackClaudeBackgroundShells", () => {
   it("is a no-op without the method and tolerates non-objects", () => {
     expect(() => trackClaudeBackgroundShells({})).not.toThrow();
     expect(() => trackClaudeBackgroundShells(null)).not.toThrow();
-    expect(hasRunningClaudeBackgroundShell({})).toBe(false);
+  });
+  it("fails closed: a session that was never tracked counts as running a shell", () => {
+    expect(hasRunningClaudeBackgroundShell({})).toBe(true);
+    expect(hasRunningClaudeBackgroundShell(fakeClaudeSession())).toBe(true);
+    expect(hasRunningClaudeBackgroundShell(null)).toBe(true);
+  });
+  it("a tracked session with no shell is not running one", () => {
+    const s = fakeClaudeSession();
+    trackClaudeBackgroundShells(s);
+    expect(hasRunningClaudeBackgroundShell(s)).toBe(false);
   });
   it("pins the upstream method and its this. call site", () => {
     const src = upstream("claude/agent.ts");
@@ -147,9 +156,9 @@ describe("isAgentBusy", () => {
   it("uses the ACP probe for devin and the shell probe for claude", () => {
     const devin = { terminalEntries: new Map([["t", { released: false, exit: null }]]) };
     expect(isAgentBusy(none, { id: "a", provider: "devin", session: devin })).toBe(true);
-    expect(isAgentBusy(none, { id: "a", provider: "claude", session: devin })).toBe(false);
     const s = fakeClaudeSession();
     trackClaudeBackgroundShells(s);
+    expect(isAgentBusy(none, { id: "a", provider: "claude", session: s })).toBe(false);
     s.translateMessageToEvents({
       type: "system",
       subtype: "task_started",
@@ -159,13 +168,29 @@ describe("isAgentBusy", () => {
     expect(isAgentBusy(none, { id: "a", provider: "claude", session: s })).toBe(true);
     expect(isAgentBusy(none, { id: "a", provider: "devin", session: s })).toBe(false);
   });
-  it("treats a manager that throws or lacks the method as not busy", () => {
+  it("an untracked Claude session is busy, so it is never released", () => {
+    expect(isAgentBusy(none, { id: "a", provider: "claude", session: {} })).toBe(true);
+  });
+  it("fails closed when listing subagents throws, and warns once per call", () => {
     const throwing = {
       listProviderSubagents: () => {
         throw new Error("nope");
       },
     };
-    expect(isAgentBusy(throwing, { id: "a", provider: "claude", session: {} })).toBe(false);
-    expect(isAgentBusy({}, { id: "a", provider: "claude", session: {} })).toBe(false);
+    const logger = { warn: vi.fn() };
+    const tracked = fakeClaudeSession();
+    trackClaudeBackgroundShells(tracked);
+    expect(isAgentBusy(throwing, { id: "a", provider: "claude", session: tracked }, logger)).toBe(
+      true,
+    );
+    expect(isAgentBusy(throwing, { id: "d", provider: "devin", session: {} })).toBe(true);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.warn.mock.calls[0]?.[0]).toMatchObject({ agentId: "a" });
+  });
+  it("treats a manager that lacks the method as having no subagents", () => {
+    const tracked = fakeClaudeSession();
+    trackClaudeBackgroundShells(tracked);
+    expect(isAgentBusy({}, { id: "a", provider: "claude", session: tracked })).toBe(false);
+    expect(isAgentBusy({}, { id: "a", provider: "devin", session: {} })).toBe(false);
   });
 });

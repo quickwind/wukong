@@ -208,14 +208,21 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   `terminalEntries` (`acp-agent.ts`), `translateMessageToEvents` (`claude/agent.ts`), and `sessions` and
   `getClientActivity` (the ws server and `Session`). A test pins each, so an upstream sync that renames one
   fails a test instead of quietly turning a probe off.
+  An agent is closed only when the same provider session was also releasable on the previous sweep, so
+  every release waits one extra tick. A resumed agent keeps its old `updatedAt` and is releasable as soon
+  as it loads; the extra tick keeps a prompt that resumes a released agent (an `irix send` to a child, a
+  schedule) from seeing it closed again before the turn starts. A replaced Claude client is wrapped on the
+  next create or resume, and a Claude session the tracker never saw counts as busy, so it is kept.
   **Known gap:** `closeAgent` does not check again, inside the agent's lifecycle lane, that the agent is
-  still idle, and `startAgentRun` does not wait for a close in flight. A prompt from the CLI, a schedule or
-  MCP to an agent that is loaded, unfocused and idle for the whole window can land between load and run on
-  the tick of the sweep; it is recorded and never answered. A prompt from a focused client is safe, since
-  a focused agent counts as viewed. Irix cannot close the gap without patching private `AgentManager`
-  methods. The fix belongs upstream: an only-if-idle `closeAgent`, or `startAgentRun` waiting on
-  `inFlightAgentCloses`. A `test.fails` in `idle-release.test.ts` pins it; when it starts failing, upstream
-  fixed it, and the test becomes a normal one.
+  still idle, and `startAgentRun` does not wait for a close in flight. What remains is an agent that is
+  loaded and was already releasable on the previous tick, for example one that crossed the idle window or
+  stopped being viewed or busy a minute earlier. A prompt from the CLI, a schedule or MCP that lands
+  between load and run on its closing tick is recorded and never answered. A prompt from a focused client
+  is safe: the viewers are read again right before each agent's close, and a focused agent counts as
+  viewed. Irix cannot close the gap without patching private `AgentManager` methods. The fix belongs
+  upstream: an only-if-idle `closeAgent`, or `startAgentRun` waiting on `inFlightAgentCloses`. The
+  "residual hazard" test in `idle-release.test.ts` asserts the current outcome; when upstream fixes it,
+  that test fails and becomes one that expects a reply.
 - **Plugins:** local folders only. npm, Git and registry sources are switched off because they run
   child processes the guard cannot see. A friendly error says so. Plugins written for Paseo still
   work: `irix/plugin-sdk-alias.ts` maps `@getpaseo/plugin` to the local SDK name. The upstream

@@ -49,13 +49,18 @@ function resolveConfigFilePath(paseoHome?: string | null): string | null {
   return path.join(home.trim(), "daemon.json");
 }
 
+/** Strips a UTF-8 BOM (PowerShell 5 `Set-Content -Encoding UTF8` writes one), like upstream. */
+function readConfigText(filePath: string): string {
+  return readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
+}
+
 function readPersisted(paseoHome?: string | null): IdleReleaseSettings {
   const filePath = resolveConfigFilePath(paseoHome);
   if (!filePath || !existsSync(filePath)) {
     return { ...DEFAULT_IDLE_RELEASE };
   }
   try {
-    const raw: unknown = JSON.parse(readFileSync(filePath, "utf8"));
+    const raw: unknown = JSON.parse(readConfigText(filePath));
     const daemon = isRecord(raw) ? raw.daemon : undefined;
     const stored = isRecord(daemon) ? daemon.idleRelease : undefined;
     if (isRecord(stored)) {
@@ -81,7 +86,7 @@ function writePersisted(settings: IdleReleaseSettings, paseoHome?: string | null
     let current: Record<string, unknown> = {};
     if (existsSync(filePath)) {
       try {
-        const parsed: unknown = JSON.parse(readFileSync(filePath, "utf8"));
+        const parsed: unknown = JSON.parse(readConfigText(filePath));
         if (isRecord(parsed)) {
           current = parsed;
         }

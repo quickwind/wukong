@@ -73,6 +73,20 @@ describe("idle release settings", () => {
     expect(raw.daemon.idleRelease).toEqual({ enabled: true, minutes: 7 });
   });
 
+  it("reads a daemon.json that starts with a UTF-8 BOM, and a later save keeps the other keys", () => {
+    writeFileSync(
+      configPath(),
+      `\uFEFF${JSON.stringify({ other: 1, daemon: { keep: true, idleRelease: { enabled: false, minutes: 30 } } })}`,
+      "utf8",
+    );
+    expect(getIdleReleaseSettings()).toEqual({ enabled: false, minutes: 30 });
+    setIdleReleaseSettings({ minutes: 9 });
+    const raw = JSON.parse(readFileSync(configPath(), "utf8").replace(/^\uFEFF/, ""));
+    expect(raw.other).toBe(1);
+    expect(raw.daemon.keep).toBe(true);
+    expect(raw.daemon.idleRelease).toEqual({ enabled: false, minutes: 9 });
+  });
+
   it("config store get/patch carry idleRelease", () => {
     const broadcast = vi.fn();
     const store = {

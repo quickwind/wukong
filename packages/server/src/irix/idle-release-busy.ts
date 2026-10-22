@@ -78,22 +78,34 @@ function observeTaskMessage(shells: Set<string>, message: unknown): void {
   }
 }
 
+/**
+ * Fails closed: a session the tracker never saw (its client was not wrapped, or the method moved)
+ * counts as running a shell, so it stays resident instead of having a dev server killed.
+ */
 export function hasRunningClaudeBackgroundShell(session: unknown): boolean {
   const target = asRecord(session);
-  return target ? (runningShells.get(target)?.size ?? 0) > 0 : false;
+  const shells = target ? runningShells.get(target) : undefined;
+  return shells === undefined || shells.size > 0;
 }
 
 export function isAgentBusy(
   manager: { listProviderSubagents?(id: string): { status: string }[] },
   agent: { id: string; provider: string; session: unknown },
+  logger?: { warn(fields: object, message: string): void },
 ): boolean {
   try {
     const subagents = manager.listProviderSubagents?.(agent.id) ?? [];
     if (subagents.some((s) => s.status === "running")) {
       return true;
     }
-  } catch {
-    // Unknown agent or provider without subagents: not busy on this probe.
+  } catch (error) {
+    // Unknown state: keep the agent. The sweep probes each agent once per tick, so this warns
+    // at most once per agent per tick.
+    logger?.warn(
+      { agentId: agent.id, provider: agent.provider, err: error },
+      "irix.idle_release.subagent_probe_failed",
+    );
+    return true;
   }
   if (agent.provider === "devin") {
     return hasRunningAcpTerminal(agent.session);

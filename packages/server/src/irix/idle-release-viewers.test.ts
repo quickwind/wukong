@@ -78,14 +78,19 @@ describe("viewedAgentIds", () => {
 });
 
 describe("upstream pins", () => {
-  it("Session.getClientActivity exists", () => {
+  it("Session.getClientActivity exists and defaults its source to the current delivery source", () => {
     expect(typeof Session.prototype.getClientActivity).toBe("function");
+    const source = readFileSync(path.join(here, "..", "server", "session.ts"), "utf8");
+    expect(source).toContain("getClientActivity(source = this.delivery.currentSource)");
   });
 
   it("the ws server still iterates sessions as the accessor expects", () => {
     const source = readFileSync(path.join(here, "..", "server", "websocket-server.ts"), "utf8");
     expect(source).toContain("class VoiceAssistantWebSocketServer");
     expect(source).toContain("for (const [ws, connection] of this.sessions)");
-    expect(source).toContain("connection.session");
+    // The session records activity under the ws it came from, which is the key the accessor
+    // passes back as `source`.
+    expect(source).toContain("updateClientCapabilities(clientCapabilities, ws");
+    expect(source).toContain("session.handleMessage(message.message, ws)");
   });
 });

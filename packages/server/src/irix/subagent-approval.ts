@@ -11,7 +11,7 @@ import type {
   AgentStreamEvent,
 } from "../server/agent/agent-sdk-types.js";
 import { isAgentBusy, trackClaudeBackgroundShells } from "./idle-release-busy.js";
-import { wrapIdleReleaseConfigStore } from "./idle-release-settings.js";
+import { getIdleReleaseSettings, wrapIdleReleaseConfigStore } from "./idle-release-settings.js";
 import { attachIdleReleaseWsServer, viewedAgentIds } from "./idle-release-viewers.js";
 import {
   type IdleReleaseDeps,
@@ -36,13 +36,18 @@ function resolveConfigFilePath(paseoHome?: string | null): string | null {
   return path.join(home.trim(), "daemon.json");
 }
 
+/** Strips a UTF-8 BOM (PowerShell 5 `Set-Content -Encoding UTF8` writes one), like upstream. */
+function readConfigText(filePath: string): string {
+  return readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
+}
+
 function readPersistedSubagentApproval(paseoHome?: string | null): boolean {
   const filePath = resolveConfigFilePath(paseoHome);
   if (!filePath || !existsSync(filePath)) {
     return true;
   }
   try {
-    const raw = JSON.parse(readFileSync(filePath, "utf8")) as Record<string, unknown>;
+    const raw = JSON.parse(readConfigText(filePath)) as Record<string, unknown>;
     if (typeof raw.requireSubagentApproval === "boolean") {
       return raw.requireSubagentApproval;
     }
@@ -66,7 +71,7 @@ function writePersistedSubagentApproval(enabled: boolean, paseoHome?: string | n
     let current: Record<string, unknown> = {};
     if (existsSync(filePath)) {
       try {
-        const parsed = JSON.parse(readFileSync(filePath, "utf8"));
+        const parsed = JSON.parse(readConfigText(filePath));
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
           current = parsed as Record<string, unknown>;
         }
@@ -326,24 +331,7 @@ function readManagerLogger(manager: object): IdleReleaseLogger {
   return NOOP_LOGGER;
 }
 
-export function attachIrixAgentManager(managerInput: unknown): void {
-  if (!managerInput || typeof managerInput !== "object") {
-    return;
-  }
-  const manager = managerInput as AgentManagerInternal;
-  if (hookedAgentManagers.has(manager)) {
-    return;
-  }
-  hookedAgentManagers.add(manager);
-
-  startIdleRelease(manager as unknown as IdleReleaseManager, {
-    isBusy: (agent: ManagedAgentLike) =>
-      isAgentBusy(manager as unknown as Parameters<typeof isAgentBusy>[0], agent as never),
-    viewed: viewedAgentIds,
-    logger: readManagerLogger(manager),
-    ...idleReleaseDepsOverride,
-  });
-
+function wrapClaudeClient(manager: AgentManagerInternal): void {
   const claudeClient = manager.clients?.get("claude") as Record<string, unknown> | undefined;
   if (claudeClient && typeof claudeClient === "object" && !hookedClaudeClients.has(claudeClient)) {
     hookedClaudeClients.add(claudeClient);
@@ -376,6 +364,31 @@ export function attachIrixAgentManager(managerInput: unknown): void {
       }
     }
   }
+}
+
+export function attachIrixAgentManager(managerInput: unknown): void {
+  if (!managerInput || typeof managerInput !== "object") {
+    return;
+  }
+  const manager = managerInput as AgentManagerInternal;
+  // Before the manager guard: upstream `updateProviderRegistry` installs a new Claude client
+  // whenever the `providers.claude` config changes, and this hook runs on every create and
+  // resume (from `prepareSessionConfig`, before the client is picked), so the replacement is
+  // wrapped before it makes a session. `hookedClaudeClients` keeps each client wrapped once.
+  wrapClaudeClient(manager);
+  if (hookedAgentManagers.has(manager)) {
+    return;
+  }
+  hookedAgentManagers.add(manager);
+
+  const logger = readManagerLogger(manager);
+  startIdleRelease(manager as unknown as IdleReleaseManager, {
+    isBusy: (agent: ManagedAgentLike) =>
+      isAgentBusy(manager as unknown as Parameters<typeof isAgentBusy>[0], agent as never, logger),
+    viewed: viewedAgentIds,
+    logger,
+    ...idleReleaseDepsOverride,
+  });
 
   const originalRespond = manager.respondToPermission.bind(manager);
   manager.respondToPermission = async (
@@ -601,5 +614,28 @@ export function attachIrixWsServer(wsServerInput: unknown): void {
   // After the approval wrapper above so both chains compose.
   if (isIrixActive()) {
     wrapIdleReleaseConfigStore(wsServer);
+    wrapDaemonConfigBroadcast(wsServer);
   }
+}
+
+/**
+ * Upstream `daemonConfigStore.onChange` broadcasts the store's own config, which has no Irix
+ * fields, and the app replaces its cached config with what it receives. The handler calls
+ * `this.broadcastDaemonConfigChanged`, so an instance property shadows the private method.
+ */
+function wrapDaemonConfigBroadcast(wsServer: WsServerInternal): void {
+  const original = wsServer.broadcastDaemonConfigChanged;
+  if (typeof original !== "function") {
+    return;
+  }
+  const bound = original.bind(wsServer);
+  wsServer.broadcastDaemonConfigChanged = (config: unknown) => {
+    const base = config && typeof config === "object" ? config : {};
+    bound({
+      ...base,
+      requireSubagentApproval: isSubagentApprovalRequired(),
+      subagentApprovalLocked: isSubagentApprovalLocked(),
+      idleRelease: getIdleReleaseSettings(),
+    });
+  };
 }
