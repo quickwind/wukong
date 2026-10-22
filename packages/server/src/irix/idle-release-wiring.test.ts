@@ -3,7 +3,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ACPAgentClient } from "../server/agent/providers/acp-agent.js";
+import { ClaudeAgentClient } from "../server/agent/providers/claude/agent.js";
 import { hasRunningClaudeBackgroundShell } from "./idle-release-busy.js";
+import {
+  rawSessionFor,
+  registerRawSession,
+  resetIdleReleaseSessionsForTests,
+} from "./idle-release-sessions.js";
 import { resetIdleReleaseSettingsForTests } from "./idle-release-settings.js";
 import { activateIrixPolicy } from "./policy.js";
 import {
@@ -14,6 +21,24 @@ import {
   setIdleReleaseWiringDepsForTests,
   setSubagentApprovalRequired,
 } from "./subagent-approval.js";
+
+type Method = (...args: unknown[]) => Promise<unknown>;
+type Proto = Record<"createSession" | "resumeSession", Method>;
+const claudeProto = ClaudeAgentClient.prototype as unknown as Proto;
+const acpProto = ACPAgentClient.prototype as unknown as Proto;
+const realMethods = {
+  claudeCreate: claudeProto.createSession,
+  claudeResume: claudeProto.resumeSession,
+  acpCreate: acpProto.createSession,
+  acpResume: acpProto.resumeSession,
+};
+
+function restorePrototypes(): void {
+  claudeProto.createSession = realMethods.claudeCreate;
+  claudeProto.resumeSession = realMethods.claudeResume;
+  acpProto.createSession = realMethods.acpCreate;
+  acpProto.resumeSession = realMethods.acpResume;
+}
 
 const MINUTE = 60_000;
 const NOW = Date.parse("2026-10-22T12:00:00.000Z");
@@ -58,6 +83,8 @@ describe("idle release wiring", () => {
   });
 
   afterEach(() => {
+    restorePrototypes();
+    resetIdleReleaseSessionsForTests();
     setIdleReleaseWiringDepsForTests(null);
     deactivate();
     vi.useRealTimers();
@@ -74,38 +101,31 @@ describe("idle release wiring", () => {
     expect(vi.getTimerCount()).toBe(1);
   });
 
-  it("wraps translateMessageToEvents on Claude sessions from both factories", async () => {
-    const translate = () => [];
-    const claude = {
-      createSession: async () => ({ translateMessageToEvents: translate }),
-      resumeSession: async () => ({ translateMessageToEvents: translate }),
-    };
-    const manager = fakeManager();
-    manager.clients.set("claude", claude);
-    attachIrixAgentManager(manager);
-    const created = (await claude.createSession()) as { translateMessageToEvents: unknown };
-    const resumed = (await claude.resumeSession()) as { translateMessageToEvents: unknown };
-    expect(created.translateMessageToEvents).not.toBe(translate);
-    expect(resumed.translateMessageToEvents).not.toBe(translate);
+  // The manager's clients come from the provider registry and hand out a facade, so the hook
+  // sits on the client classes, whatever client object the manager holds.
+  it("attaching the manager hooks the Claude and ACP client prototypes", async () => {
+    const raw = { translateMessageToEvents: () => [] };
+    const translate = raw.translateMessageToEvents;
+    claudeProto.createSession = async () => raw;
+    const stub = claudeProto.createSession;
+    attachIrixAgentManager(fakeManager());
+    expect(claudeProto.createSession).not.toBe(stub);
+    expect(acpProto.createSession).not.toBe(realMethods.acpCreate);
+
+    // A client created after attaching (upstream replaces clients on a providers config change).
+    const client = Object.create(ClaudeAgentClient.prototype) as typeof claudeProto;
+    const session = await client.createSession({}, { agentId: "late" });
+    expect(session).toBe(raw);
+    expect(rawSessionFor("late")).toBe(raw);
+    expect(raw.translateMessageToEvents).not.toBe(translate);
+    // Tracked with no shell: releasable. An untracked session would count as busy.
+    expect(hasRunningClaudeBackgroundShell(raw)).toBe(false);
   });
 
-  it("wraps a Claude client that replaced the original after the manager was attached", async () => {
-    const translate = () => [];
-    const first = { createSession: async () => ({ translateMessageToEvents: translate }) };
-    const manager = fakeManager();
-    manager.clients.set("claude", first);
-    attachIrixAgentManager(manager);
-
-    // Upstream updateProviderRegistry installs a new client object on a providers config change.
-    const replacement = { createSession: async () => ({ translateMessageToEvents: translate }) };
-    manager.clients.set("claude", replacement);
-    attachIrixAgentManager(manager);
-
-    const session = (await replacement.createSession()) as { translateMessageToEvents: unknown };
-    expect(session.translateMessageToEvents).not.toBe(translate);
-    // Tracked with no shell: releasable. An untracked session would count as busy.
-    expect(hasRunningClaudeBackgroundShell(session)).toBe(false);
-    expect(vi.getTimerCount()).toBe(1);
+  it("attaching the ws server hooks the client prototypes", () => {
+    attachIrixWsServer({ paseoHome: home });
+    expect(claudeProto.resumeSession).not.toBe(realMethods.claudeResume);
+    expect(acpProto.resumeSession).not.toBe(realMethods.acpResume);
   });
 
   it("config broadcasts triggered by another setting still carry idleRelease and approval", () => {
@@ -202,6 +222,9 @@ describe("idle release wiring", () => {
       intervalMs: 10,
       viewed: () => new Set(["viewed"]),
     });
+    for (const id of ["releasable", "busy", "viewed"]) {
+      registerRawSession(id, { terminalEntries: new Map() });
+    }
     const close = manager.closeAgent;
     attachIrixAgentManager(manager);
     // Two ticks: the first records candidates, the second closes them.
@@ -257,14 +280,13 @@ describe("idle release wiring", () => {
     expect(existsSync(path.join(home, "daemon.json"))).toBe(false);
   });
 
-  it("keeps the original translateMessageToEvents when the Irix policy is off", async () => {
+  it("leaves the client prototypes untouched when the Irix policy is off", () => {
     deactivate();
-    const translate = () => [];
-    const claude = { createSession: async () => ({ translateMessageToEvents: translate }) };
-    const manager = fakeManager();
-    manager.clients.set("claude", claude);
-    attachIrixAgentManager(manager);
-    const session = (await claude.createSession()) as { translateMessageToEvents: unknown };
-    expect(session.translateMessageToEvents).toBe(translate);
+    attachIrixAgentManager(fakeManager());
+    attachIrixWsServer({ paseoHome: home });
+    expect(claudeProto.createSession).toBe(realMethods.claudeCreate);
+    expect(claudeProto.resumeSession).toBe(realMethods.claudeResume);
+    expect(acpProto.createSession).toBe(realMethods.acpCreate);
+    expect(acpProto.resumeSession).toBe(realMethods.acpResume);
   });
 });

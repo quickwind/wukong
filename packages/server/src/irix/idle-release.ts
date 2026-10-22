@@ -112,7 +112,8 @@ export async function sweepOnce(
       if (!agent) continue;
       const now = clock();
       const viewed = deps.viewed?.(now, settings.minutes) ?? EMPTY_SET;
-      if (!isReleasable(agent, { now, settings, viewed, busy: isBusy(agent) })) continue;
+      // Busy is the last check and probing it can warn, so probe only otherwise releasable agents.
+      if (!isReleasable(agent, { now, settings, viewed, busy: false }) || isBusy(agent)) continue;
       if (!previous.has(agentId) || previous.get(agentId) !== agent.session) {
         next.set(agentId, agent.session);
         continue;

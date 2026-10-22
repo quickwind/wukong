@@ -10,7 +10,8 @@ import type {
   AgentSessionConfig,
   AgentStreamEvent,
 } from "../server/agent/agent-sdk-types.js";
-import { isAgentBusy, trackClaudeBackgroundShells } from "./idle-release-busy.js";
+import { isAgentBusy } from "./idle-release-busy.js";
+import { installIdleReleaseSessionHooks } from "./idle-release-sessions.js";
 import { getIdleReleaseSettings, wrapIdleReleaseConfigStore } from "./idle-release-settings.js";
 import { attachIdleReleaseWsServer, viewedAgentIds } from "./idle-release-viewers.js";
 import {
@@ -351,13 +352,6 @@ function wrapClaudeClient(manager: AgentManagerInternal): void {
           );
           if (session && typeof session === "object") {
             attachClaudeSessionSubagentGate(session as Record<string, unknown>);
-            if (isIrixActive()) {
-              try {
-                trackClaudeBackgroundShells(session);
-              } catch {
-                // Tracking must never fail session creation.
-              }
-            }
           }
           return session;
         };
@@ -371,6 +365,9 @@ export function attachIrixAgentManager(managerInput: unknown): void {
     return;
   }
   const manager = managerInput as AgentManagerInternal;
+  // Runs on every create and resume (from `prepareSessionConfig`), before the client makes a
+  // session. The hooks sit on the client prototypes, so replaced clients need nothing more.
+  installIdleReleaseSessionHooks();
   // Before the manager guard: upstream `updateProviderRegistry` installs a new Claude client
   // whenever the `providers.claude` config changes, and this hook runs on every create and
   // resume (from `prepareSessionConfig`, before the client is picked), so the replacement is
@@ -571,6 +568,7 @@ export function attachIrixWsServer(wsServerInput: unknown): void {
   }
   // Viewers first: the idle-release sweep reads them, and attaching is idempotent.
   attachIdleReleaseWsServer(wsServer);
+  installIdleReleaseSessionHooks();
   if (wsServer.agentManager) {
     attachIrixAgentManager(wsServer.agentManager);
   }

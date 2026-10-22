@@ -1,7 +1,10 @@
 // Irix edition: "is this agent doing work the idle release must not interrupt?"
-// Reads upstream private members (ACP `terminalEntries`, Claude `translateMessageToEvents`);
-// every read tolerates absence, and idle-release-busy.test.ts pins the upstream source text so a
-// rename fails a test instead of silently disabling the probe.
+// Reads upstream private members (ACP `terminalEntries`, Claude `translateMessageToEvents`) on the
+// real provider session (idle-release-sessions.ts), never on the registry facade the manager holds.
+// Every probe fails closed: a session it cannot resolve or inspect counts as busy.
+// idle-release-busy.test.ts pins the upstream source text so a rename fails a test.
+
+import { rawSessionFor } from "./idle-release-sessions.js";
 
 const TERMINAL_TASK_STATUSES: ReadonlySet<string> = new Set([
   "completed",
@@ -15,11 +18,14 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
 
-/** ACP: a terminal the provider created that has not been released and whose command has not exited. */
+/**
+ * ACP: a terminal the provider created that has not been released and whose command has not
+ * exited. Fails closed: a session without a `terminalEntries` Map cannot be inspected.
+ */
 export function hasRunningAcpTerminal(session: unknown): boolean {
   const entries = asRecord(session)?.terminalEntries;
   if (!(entries instanceof Map)) {
-    return false;
+    return true;
   }
   for (const entry of entries.values()) {
     const e = asRecord(entry);
@@ -43,7 +49,6 @@ export function trackClaudeBackgroundShells(session: unknown): void {
     return;
   }
   const shells = new Set<string>();
-  runningShells.set(target, shells);
   target.translateMessageToEvents = function (this: unknown, message: unknown, ...rest: unknown[]) {
     try {
       observeTaskMessage(shells, message);
@@ -52,6 +57,8 @@ export function trackClaudeBackgroundShells(session: unknown): void {
     }
     return (original as (...a: unknown[]) => unknown).call(this, message, ...rest);
   };
+  // Only after the wrap took: a session that refused it (frozen) stays untracked, so busy.
+  runningShells.set(target, shells);
 }
 
 function observeTaskMessage(shells: Set<string>, message: unknown): void {
@@ -90,7 +97,7 @@ export function hasRunningClaudeBackgroundShell(session: unknown): boolean {
 
 export function isAgentBusy(
   manager: { listProviderSubagents?(id: string): { status: string }[] },
-  agent: { id: string; provider: string; session: unknown },
+  agent: { id: string; provider: string; session?: unknown },
   logger?: { warn(fields: object, message: string): void },
 ): boolean {
   try {
@@ -107,11 +114,19 @@ export function isAgentBusy(
     );
     return true;
   }
-  if (agent.provider === "devin") {
-    return hasRunningAcpTerminal(agent.session);
+  if (agent.provider !== "devin" && agent.provider !== "claude") {
+    return false;
   }
-  if (agent.provider === "claude") {
-    return hasRunningClaudeBackgroundShell(agent.session);
+  const raw = rawSessionFor(agent.id);
+  if (raw === undefined) {
+    // The sweep probes only agents that passed every other check, once per tick.
+    logger?.warn(
+      { agentId: agent.id, provider: agent.provider },
+      "irix.idle_release.session_unresolved",
+    );
+    return true;
   }
-  return false;
+  return agent.provider === "devin"
+    ? hasRunningAcpTerminal(raw)
+    : hasRunningClaudeBackgroundShell(raw);
 }

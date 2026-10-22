@@ -204,15 +204,18 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   `<home>/daemon.json`, beside `requireSubagentApproval`: on and 15 by default, minutes an integer from 1 to
   1440, edited under Settings → host → Agents, read on every sweep so a change needs no restart.
   Nothing upstream is edited. It hangs off the hooks Irix already had (`attachIrixAgentManager`,
-  `attachIrixWsServer`, the Claude session factory wrapper) and reads four upstream private members:
-  `terminalEntries` (`acp-agent.ts`), `translateMessageToEvents` (`claude/agent.ts`), and `sessions` and
-  `getClientActivity` (the ws server and `Session`). A test pins each, so an upstream sync that renames one
-  fails a test instead of quietly turning a probe off.
+  `attachIrixWsServer`). Upstream hands the manager a facade (`wrapSessionProvider` in
+  `provider-registry.ts`) that hides the real provider session, so Irix patches the `createSession` and
+  `resumeSession` prototype methods of `ClaudeAgentClient` and `ACPAgentClient` and keeps the real session
+  by the launch context's agent id (`irix/idle-release-sessions.ts`). The probes read `terminalEntries`
+  (`acp-agent.ts`) and `translateMessageToEvents` (`claude/agent.ts`) on that session, and the viewers come
+  from `sessions` and `getClientActivity` (the ws server and `Session`). A test pins each upstream member
+  and argument position. An agent whose real session cannot be resolved or inspected counts as busy and
+  is never released.
   An agent is closed only when the same provider session was also releasable on the previous sweep, so
   every release waits one extra tick. A resumed agent keeps its old `updatedAt` and is releasable as soon
   as it loads; the extra tick keeps a prompt that resumes a released agent (an `irix send` to a child, a
-  schedule) from seeing it closed again before the turn starts. A replaced Claude client is wrapped on the
-  next create or resume, and a Claude session the tracker never saw counts as busy, so it is kept.
+  schedule) from seeing it closed again before the turn starts.
   **Known gap:** `closeAgent` does not check again, inside the agent's lifecycle lane, that the agent is
   still idle, and `startAgentRun` does not wait for a close in flight. What remains is an agent that is
   loaded and was already releasable on the previous tick, for example one that crossed the idle window or

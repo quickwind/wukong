@@ -175,6 +175,29 @@ describe("sweep", () => {
     expect(state.candidates.size).toBe(0);
   });
 
+  // An unresolved session counts as busy and warns, so probing every agent (closed, codex, in a
+  // turn) would warn about agents the sweep would never release anyway.
+  test("probes busy only for agents that pass every other check", async () => {
+    deactivate = activateIrixPolicy();
+    const manager = fakeManager(
+      [
+        agent({ id: "idle" }),
+        agent({ id: "closed", lifecycle: "closed" }),
+        agent({ id: "codex", provider: "codex" }),
+        agent({ id: "fresh", updatedAt: new Date(NOW - 5 * MINUTE) }),
+        agent({ id: "viewed" }),
+      ],
+      async () => undefined,
+    );
+    const isBusy = vi.fn((_entry: ManagedAgentLike) => false);
+    await sweepOnce(
+      manager,
+      { now: () => NOW, viewed: () => new Set(["viewed"]), isBusy },
+      newState(),
+    );
+    expect(isBusy.mock.calls.map(([entry]) => entry.id)).toEqual(["idle"]);
+  });
+
   test("a fresh session is not closed on the first tick it is seen idle, and is on the next", async () => {
     deactivate = activateIrixPolicy();
     const session = {};
