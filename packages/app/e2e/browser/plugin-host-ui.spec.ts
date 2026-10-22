@@ -12,6 +12,9 @@ import {
 
 const PLUGIN_ID = "plugin-host-ui-e2e";
 
+// Irix: mirrors upstream 995ad2f87 (#7579); take upstream's version when merging. Difference: the Markdown
+// import is its own line from client/ui, because this branch imports Icon, Modal and useToast
+// from client/react-native.
 const PLUGIN_SOURCE = `import { usePaseo } from "@getpaseo/plugin/client";
 import { Icon, Modal, useToast } from "@getpaseo/plugin/client/react-native";
 import { Markdown } from "@getpaseo/plugin/client/ui";

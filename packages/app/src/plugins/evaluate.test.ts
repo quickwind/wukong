@@ -622,6 +622,7 @@ describe("evaluatePluginClientBundle", () => {
     expect(plugin.surfaces.map((surface) => surface.id)).toEqual(["main"]);
   });
 
+  // Irix: mirrors upstream 995ad2f87 (#7579); take upstream's version when merging.
   it("keeps shared and client runtime exports separate", () => {
     expect(() =>
       evaluatePluginClientBundle(

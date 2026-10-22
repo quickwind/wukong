@@ -1117,6 +1117,8 @@ export function IssueActions({ theme }: PluginSurfaceProps) {
 }
 ```
 
+<!-- Irix: mirrors upstream 995ad2f87 (#7579); take upstream's version when merging. -->
+
 ### Markdown
 
 Import `Markdown` from `@getpaseo/plugin/client/ui` to render a string with Paseo's

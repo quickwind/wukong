@@ -8,6 +8,7 @@ import {
 } from "@getpaseo/plugin/client";
 import { useCallback, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
+// Irix: mirrors upstream 995ad2f87 (#7579); take upstream's version when merging.
 import { ExternalLink, Markdown } from "@getpaseo/plugin/client/ui";
 import { incrementRpc } from "../shared/increment";
 

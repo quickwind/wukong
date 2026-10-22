@@ -1,3 +1,4 @@
+// Irix: mirrors upstream 995ad2f87 (#7579); take upstream's version when merging.
 import { lightHighlightColors } from "@getpaseo/highlight";
 
 const testTheme = {

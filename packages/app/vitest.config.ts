@@ -65,6 +65,8 @@ export default defineConfig({
       deps: {
         fallbackCJS: true,
         inline: [
+          // Irix: mirrors upstream 995ad2f87 (#7579); take upstream's version when merging. The
+          // expo-clipboard alias further down is Irix-only and must stay.
           "react-native-enriched-markdown",
           "zustand",
           "@tanstack/react-query",
