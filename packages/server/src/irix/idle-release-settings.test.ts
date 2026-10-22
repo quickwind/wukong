@@ -106,4 +106,13 @@ describe("idle release settings", () => {
     wrapIdleReleaseConfigStore({ daemonConfigStore: store });
     expect(store.get()).toMatchObject({ a: 1, earlier: true, idleRelease: DEFAULT_IDLE_RELEASE });
   });
+
+  it("drops a cached read made before the daemon home was known", () => {
+    delete process.env.PASEO_HOME;
+    expect(getIdleReleaseSettings()).toEqual(DEFAULT_IDLE_RELEASE);
+    writeDaemon({ idleRelease: { enabled: false, minutes: 40 } });
+    const store = { get: (): object => ({}), patch: (p: Record<string, unknown>): object => p };
+    wrapIdleReleaseConfigStore({ paseoHome: home, daemonConfigStore: store });
+    expect(getIdleReleaseSettings()).toEqual({ enabled: false, minutes: 40 });
+  });
 });

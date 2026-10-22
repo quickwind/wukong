@@ -127,8 +127,10 @@ export function setIdleReleaseSettings(
 }
 
 export function wrapIdleReleaseConfigStore(wsServer: IdleReleaseWsServer): void {
-  if (wsServer.paseoHome) {
+  if (wsServer.paseoHome && wsServer.paseoHome !== runtimePaseoHome) {
     runtimePaseoHome = wsServer.paseoHome;
+    // A read made before the home was known holds defaults; drop it so the next read hits disk.
+    cached = null;
   }
   const store = wsServer.daemonConfigStore;
   if (!store || typeof store.get !== "function" || typeof store.patch !== "function") {

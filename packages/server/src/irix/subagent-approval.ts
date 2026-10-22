@@ -10,6 +10,16 @@ import type {
   AgentSessionConfig,
   AgentStreamEvent,
 } from "../server/agent/agent-sdk-types.js";
+import { isAgentBusy, trackClaudeBackgroundShells } from "./idle-release-busy.js";
+import { wrapIdleReleaseConfigStore } from "./idle-release-settings.js";
+import { attachIdleReleaseWsServer, viewedAgentIds } from "./idle-release-viewers.js";
+import {
+  type IdleReleaseDeps,
+  type IdleReleaseLogger,
+  type IdleReleaseManager,
+  type ManagedAgentLike,
+  startIdleRelease,
+} from "./idle-release.js";
 import { isIrixActive } from "./policy.js";
 import { isIrixRestricted } from "./restrictions.js";
 
@@ -294,6 +304,28 @@ function attachClaudeSessionSubagentGate(session: Record<string, unknown>): void
   }
 }
 
+let idleReleaseDepsOverride: IdleReleaseDeps = {};
+
+/** Test seam: inject the clock, interval or probes used by sweeps started from the hook. */
+export function setIdleReleaseWiringDepsForTests(deps: IdleReleaseDeps | null): void {
+  idleReleaseDepsOverride = deps ?? {};
+}
+
+const NOOP_LOGGER: IdleReleaseLogger = { info: () => undefined, warn: () => undefined };
+
+/** AgentManager keeps its pino logger in a private field; fall back to silence if it moves. */
+function readManagerLogger(manager: object): IdleReleaseLogger {
+  const logger = (manager as { logger?: Partial<IdleReleaseLogger> }).logger;
+  if (logger && typeof logger.info === "function" && typeof logger.warn === "function") {
+    const source = logger as IdleReleaseLogger;
+    return {
+      info: (fields, message) => source.info(fields, message),
+      warn: (fields, message) => source.warn(fields, message),
+    };
+  }
+  return NOOP_LOGGER;
+}
+
 export function attachIrixAgentManager(managerInput: unknown): void {
   if (!managerInput || typeof managerInput !== "object") {
     return;
@@ -303,6 +335,14 @@ export function attachIrixAgentManager(managerInput: unknown): void {
     return;
   }
   hookedAgentManagers.add(manager);
+
+  startIdleRelease(manager as unknown as IdleReleaseManager, {
+    isBusy: (agent: ManagedAgentLike) =>
+      isAgentBusy(manager as unknown as Parameters<typeof isAgentBusy>[0], agent as never),
+    viewed: viewedAgentIds,
+    logger: readManagerLogger(manager),
+    ...idleReleaseDepsOverride,
+  });
 
   const claudeClient = manager.clients?.get("claude") as Record<string, unknown> | undefined;
   if (claudeClient && typeof claudeClient === "object" && !hookedClaudeClients.has(claudeClient)) {
@@ -323,6 +363,7 @@ export function attachIrixAgentManager(managerInput: unknown): void {
           );
           if (session && typeof session === "object") {
             attachClaudeSessionSubagentGate(session as Record<string, unknown>);
+            trackClaudeBackgroundShells(session);
           }
           return session;
         };
@@ -509,6 +550,8 @@ export function attachIrixWsServer(wsServerInput: unknown): void {
   if (wsServer.paseoHome) {
     runtimePaseoHome = wsServer.paseoHome;
   }
+  // Viewers first: the idle-release sweep reads them, and attaching is idempotent.
+  attachIdleReleaseWsServer(wsServer);
   if (wsServer.agentManager) {
     attachIrixAgentManager(wsServer.agentManager);
   }
@@ -548,4 +591,7 @@ export function attachIrixWsServer(wsServerInput: unknown): void {
       return merged;
     };
   }
+
+  // After the approval wrapper above so both chains compose.
+  wrapIdleReleaseConfigStore(wsServer);
 }
