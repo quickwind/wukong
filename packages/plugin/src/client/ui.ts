@@ -85,5 +85,12 @@ export declare const SidebarRow: ComponentType<SidebarRowProps>;
 /** A line between groups of rows. Render it from a sidebar item's `Component`. */
 export declare const SidebarSeparator: ComponentType;
 
+export interface MarkdownProps {
+  children: string;
+}
+
+/** Renders Markdown using Paseo’s theme, selection, and link behavior. */
+export declare const Markdown: ComponentType<MarkdownProps>;
+
 // Irix: AgentView, capabilities (declared in irix-ui.ts)
 export * from "./irix-ui.js";

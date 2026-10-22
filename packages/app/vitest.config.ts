@@ -65,6 +65,7 @@ export default defineConfig({
       deps: {
         fallbackCJS: true,
         inline: [
+          "react-native-enriched-markdown",
           "zustand",
           "@tanstack/react-query",
           "react-native-web",
@@ -188,6 +189,11 @@ export default defineConfig({
       {
         find: /^react-native-reanimated\/scripts\/validate-worklets-version$/,
         replacement: path.resolve(__dirname, "test-stubs/reanimated-validate-worklets-version.ts"),
+      },
+      // Irix: see test-stubs/expo-clipboard.ts
+      {
+        find: /^expo-clipboard$/,
+        replacement: path.resolve(__dirname, "test-stubs/expo-clipboard.ts"),
       },
       {
         find: /^expo-linking$/,

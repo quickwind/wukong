@@ -629,7 +629,8 @@ describe("evaluatePluginClientBundle", () => {
         `(function(require) {
       const shared = require("@getpaseo/plugin");
       const client = require("@getpaseo/plugin/client");
-      const { ExternalLink } = require("@getpaseo/plugin/client/ui");
+      const { ExternalLink, Markdown } = require("@getpaseo/plugin/client/ui");
+      if (typeof Markdown !== "function") throw new Error("Markdown");
       if (typeof ExternalLink !== "function") throw new Error("ExternalLink");
       for (const name of ["usePaseo", "useRpc", "useSettings", "useAgent", "useWorkspace", "openExternalUrl"]) {
         if (name in shared || typeof client[name] !== "function") throw new Error(name);
