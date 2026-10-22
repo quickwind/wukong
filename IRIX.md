@@ -191,6 +191,31 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   Claude Code. The Providers page and Add provider catalog are hidden. Claude starts disabled when
   its command is not found at daemon start (`detectIrixProviders` in `irix/providers.ts`); an
   explicit enabled setting wins, and installing Claude later takes effect at the next start.
+- **Idle release** (`irix/idle-release*.ts`, setting UI in `app/src/irix/idle-release-setting.tsx`):
+  upstream keeps an idle agent's provider process for as long as the daemon runs
+  (`docs/agent-lifecycle.md`, "Runtime residency"). On Windows each idle `devin acp` grew past 170 MB,
+  and 31 of them used up a 32 GB machine and crashed the daemon. A sweep every minute calls upstream
+  `AgentManager.closeAgent` on a Claude or Devin agent that has been idle for the configured time. The
+  agent stays, closed, with its timeline; the next open or prompt resumes it through `ensureAgentLoaded`.
+  Nothing happens when the Irix policy is off. It does not release an agent that has a turn running or a
+  pending permission, an internal agent, one a client is viewing (visible and focused on it, with a
+  heartbeat inside the idle window), a Devin with a terminal still running, or a Claude with a running
+  background shell or provider subagent. The setting is `idleRelease: { enabled, minutes }` in
+  `<home>/daemon.json`, beside `requireSubagentApproval`: on and 15 by default, minutes an integer from 1 to
+  1440, edited under Settings → host → Agents, read on every sweep so a change needs no restart.
+  Nothing upstream is edited. It hangs off the hooks Irix already had (`attachIrixAgentManager`,
+  `attachIrixWsServer`, the Claude session factory wrapper) and reads four upstream private members:
+  `terminalEntries` (`acp-agent.ts`), `translateMessageToEvents` (`claude/agent.ts`), and `sessions` and
+  `getClientActivity` (the ws server and `Session`). A test pins each, so an upstream sync that renames one
+  fails a test instead of quietly turning a probe off.
+  **Known gap:** `closeAgent` does not check again, inside the agent's lifecycle lane, that the agent is
+  still idle, and `startAgentRun` does not wait for a close in flight. A prompt from the CLI, a schedule or
+  MCP to an agent that is loaded, unfocused and idle for the whole window can land between load and run on
+  the tick of the sweep; it is recorded and never answered. A prompt from a focused client is safe, since
+  a focused agent counts as viewed. Irix cannot close the gap without patching private `AgentManager`
+  methods. The fix belongs upstream: an only-if-idle `closeAgent`, or `startAgentRun` waiting on
+  `inFlightAgentCloses`. A `test.fails` in `idle-release.test.ts` pins it; when it starts failing, upstream
+  fixed it, and the test becomes a normal one.
 - **Plugins:** local folders only. npm, Git and registry sources are switched off because they run
   child processes the guard cannot see. A friendly error says so. Plugins written for Paseo still
   work: `irix/plugin-sdk-alias.ts` maps `@getpaseo/plugin` to the local SDK name. The upstream
