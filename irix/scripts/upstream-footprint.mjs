@@ -3,10 +3,12 @@
 //   - an upstream file was deleted or renamed
 //   - a modified upstream file has no `Irix` marker in the lines it added
 //   - the totals go over the budget
+// `package-lock.json` is generated and not counted. A `package.json` cannot hold a comment, so it
+// needs no marker (its lines still count): IRIX.md says why each one is touched.
 // Files Irix adds (irix/, plugins/irix-*, packages/*/src/irix/, workflows) are not counted:
 // they cannot conflict with upstream.
 //
-//   node irix/scripts/upstream-footprint.mjs [--base <ref>] [--max-files 55] [--max-lines 516]
+//   node irix/scripts/upstream-footprint.mjs [--base <ref>] [--max-files 55] [--max-lines 517]
 //
 // The base defaults to the merge base with upstream/main (run `git fetch upstream` first).
 import { execFileSync } from "node:child_process";
@@ -30,7 +32,7 @@ export function resolveBase(cwd, base) {
   }
 }
 
-export function footprint({ cwd = process.cwd(), base, to, maxFiles = 55, maxLines = 516 } = {}) {
+export function footprint({ cwd = process.cwd(), base, to, maxFiles = 55, maxLines = 517 } = {}) {
   const from = resolveBase(cwd, base);
   const diffTarget = to ? [from, to] : [from];
   const status = git(cwd, "diff", "--name-status", "-M", ...diffTarget)
@@ -48,11 +50,12 @@ export function footprint({ cwd = process.cwd(), base, to, maxFiles = 55, maxLin
       continue;
     }
     const file = paths[0];
+    if (file === "package-lock.json") continue;
     const patch = git(cwd, "diff", "-U0", ...diffTarget, "--", file).split("\n");
     const added = patch.filter((line) => line.startsWith("+") && !line.startsWith("+++"));
     const removed = patch.filter((line) => line.startsWith("-") && !line.startsWith("---"));
     modified.push({ file, added: added.length, removed: removed.length });
-    if (!added.some((line) => MARKER.test(line))) {
+    if (!file.endsWith("package.json") && !added.some((line) => MARKER.test(line))) {
       problems.push(
         `${file}: no "Irix" marker in the lines added (say why the upstream file is touched)`,
       );
@@ -75,7 +78,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     base: arg("base"),
     to: arg("to"),
     maxFiles: Number(arg("max-files") ?? 55),
-    maxLines: Number(arg("max-lines") ?? 516),
+    maxLines: Number(arg("max-lines") ?? 517),
   });
   console.log(
     `base ${report.base.slice(0, 9)}: ${report.modified.length} upstream files modified, ${report.lines} lines`,

@@ -152,7 +152,6 @@ export const openInFileManagerRpc = defineRpc({
 export const SETUP_OVERRIDE_VARIABLES = [
   "IRIX_GITLAB_URL",
   "IRIX_GITLAB_SECTION",
-  "IRIX_GITLAB_COMMAND",
   "IRIX_CLONE_ROOT",
 ] as const;
 
@@ -160,10 +159,6 @@ export const setupStatusRpc = defineRpc({
   name: "irix.gitlab.setup.status",
   input: z.object({}),
   output: z.object({
-    tools: z.object({
-      gitlab: z.object({ found: z.boolean(), version: z.string().nullable() }),
-      uv: z.object({ found: z.boolean() }),
-    }),
     cfgPath: z.string(),
     /** Sections of the python-gitlab config; `usable` is false unless the url is https. */
     sections: z.array(

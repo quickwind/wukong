@@ -10,7 +10,6 @@ export interface GitLabSettings {
   url: string;
   sshHost: string | null;
   configSection: string | null;
-  command: string[];
   cloneRoot: string;
 }
 
@@ -58,15 +57,10 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): GitLabSettin
   if (new URL(url).protocol !== "https:") {
     throw new Error("The GitLab URL must use https");
   }
-  const command = text(env.IRIX_GITLAB_COMMAND)?.split(/\s+/u);
-  const fileCommand = Array.isArray(file.command)
-    ? file.command.filter((part): part is string => typeof part === "string" && part.length > 0)
-    : [];
   return {
     url: url.replace(/\/+$/u, ""),
     sshHost: text(env.IRIX_GITLAB_SSH_HOST) ?? text(file.sshHost),
     configSection: text(env.IRIX_GITLAB_SECTION) ?? text(file.configSection),
-    command: command ?? (fileCommand.length > 0 ? fileCommand : ["gitlab"]),
     cloneRoot: resolve(
       expandHome(text(env.IRIX_CLONE_ROOT) ?? text(file.cloneRoot) ?? defaultCloneRoot()),
     ),

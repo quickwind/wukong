@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createGitLabService } from "../../services/gitlab-service.js";
 import { createGlabCompatRunner } from "./glab-runner.js";
-import type { GitLabClient } from "./python-client.js";
+import type { GitLabClient } from "./client.js";
 
 const PROJECT = "group/sub/app";
 

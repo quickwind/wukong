@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { z } from "zod";
+import { request, type ApiTarget, type GitLabRequestError } from "./api.js";
 import type { GitLabProject } from "../shared/rpc.js";
 import type { GitLabSettings } from "./config.js";
 
@@ -26,15 +27,6 @@ function namespaceKind(row: z.infer<typeof ProjectRowSchema>): "group" | "user" 
   return kind === "group" || kind === "user" ? kind : null;
 }
 
-/** A leading `@` makes python-gitlab read the value from a file; doubling it escapes that. */
-function cliValue(value: string): string {
-  return value.startsWith("@") ? `@${value}` : value;
-}
-
-function option(name: string, value: string | number | boolean): string {
-  return `--${name}=${cliValue(String(value))}`;
-}
-
 export function run(file: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
@@ -47,11 +39,7 @@ export function run(file: string, args: string[], env?: NodeJS.ProcessEnv): Prom
           return;
         }
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          reject(
-            new Error(
-              `\`${file}\` not found; install python-gitlab: uv tool install python-gitlab`,
-            ),
-          );
+          reject(new Error(`\`${file}\` not found; is it installed and on the PATH?`));
           return;
         }
         reject(new Error(stderr.trim() || error.message));
@@ -60,19 +48,8 @@ export function run(file: string, args: string[], env?: NodeJS.ProcessEnv): Prom
   });
 }
 
-function globalArgs(settings: GitLabSettings): string[] {
-  return [
-    "--output=json",
-    "--skip-login",
-    `--server-url=${settings.url}`,
-    ...(settings.configSection ? [`--gitlab=${settings.configSection}`] : []),
-  ];
-}
-
-/** Runs one python-gitlab command and returns its stdout. */
-function gitlab(settings: GitLabSettings, args: string[]): Promise<string> {
-  const [file = "gitlab", ...prefix] = settings.command;
-  return run(file, [...prefix, ...globalArgs(settings), ...args]);
+function target(settings: GitLabSettings): ApiTarget {
+  return { url: settings.url, section: settings.configSection };
 }
 
 export interface SearchOptions {
@@ -97,30 +74,30 @@ export async function searchProjects(
   options: SearchOptions = {},
 ): Promise<GitLabProject[]> {
   const trimmed = query.trim();
-  // Not `--simple`: the full record says whether a project belongs to a group and what it forks.
-  const stdout = await gitlab(settings, [
-    "project",
-    "list",
-    option("membership", true),
-    option("order-by", "last_activity_at"),
-    option("sort", "desc"),
-    option("per-page", limit),
-    "--no-get-all",
-    ...(trimmed ? [option("search", trimmed)] : []),
-  ]);
-  return z
-    .array(ProjectRowSchema)
-    .parse(JSON.parse(stdout))
-    .map((row) => ({
-      path: row.path_with_namespace,
-      name: row.name ?? row.path_with_namespace.split("/").at(-1) ?? row.path_with_namespace,
-      description: row.description ?? null,
-      webUrl: row.web_url ?? null,
-      lastActivityAt: row.last_activity_at ?? null,
-      namespaceKind: namespaceKind(row),
-      forkedFrom: row.forked_from_project?.path_with_namespace ?? null,
-      canFork: canFork(row.path_with_namespace, namespaceKind(row), options.username),
-    }));
+  // Not `simple`: the full record says whether a project belongs to a group and what it forks.
+  const rows = await request(
+    target(settings),
+    (api) =>
+      api.Projects.all({
+        membership: true,
+        orderBy: "last_activity_at",
+        sort: "desc",
+        perPage: limit,
+        maxPages: 1,
+        ...(trimmed ? { search: trimmed } : {}),
+      }),
+    (value) => z.array(ProjectRowSchema).parse(value),
+  );
+  return rows.map((row) => ({
+    path: row.path_with_namespace,
+    name: row.name ?? row.path_with_namespace.split("/").at(-1) ?? row.path_with_namespace,
+    description: row.description ?? null,
+    webUrl: row.web_url ?? null,
+    lastActivityAt: row.last_activity_at ?? null,
+    namespaceKind: namespaceKind(row),
+    forkedFrom: row.forked_from_project?.path_with_namespace ?? null,
+    canFork: canFork(row.path_with_namespace, namespaceKind(row), options.username),
+  }));
 }
 
 const SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/u;
@@ -183,10 +160,11 @@ function toProjectInfo(raw: unknown): ProjectInfo {
 }
 
 export async function currentUsername(settings: GitLabSettings): Promise<string> {
-  const user = z
-    .object({ username: z.string() })
-    .passthrough()
-    .parse(JSON.parse(await gitlab(settings, ["current-user", "get"])));
+  const user = await request(
+    target(settings),
+    (api) => api.Users.showCurrentUser(),
+    (value) => z.object({ username: z.string() }).passthrough().parse(value),
+  );
   return user.username;
 }
 
@@ -198,10 +176,14 @@ export async function getProject(
   assertProjectPath(path);
   try {
     return toProjectInfo(
-      JSON.parse(await gitlab(settings, ["project", "get", option("id", path)])),
+      await request(
+        target(settings),
+        (api) => api.Projects.show(path),
+        (value) => value,
+      ),
     );
   } catch (error) {
-    if (/\b404\b|not found/iu.test((error as Error).message)) return null;
+    if ((error as GitLabRequestError).status === 404) return null;
     throw error;
   }
 }
@@ -209,8 +191,13 @@ export async function getProject(
 /** Forks `path` into the user's own namespace. GitLab answers before the fork's repository exists. */
 export async function forkProject(settings: GitLabSettings, path: string): Promise<ProjectInfo> {
   assertProjectPath(path);
-  const stdout = await gitlab(settings, ["project-fork", "create", option("project-id", path)]);
-  return toProjectInfo(JSON.parse(stdout));
+  return toProjectInfo(
+    await request(
+      target(settings),
+      (api) => api.Projects.fork(path),
+      (value) => value,
+    ),
+  );
 }
 
 /** Adds `name` -> `url` unless the remote already exists. Returns whether it was added. */

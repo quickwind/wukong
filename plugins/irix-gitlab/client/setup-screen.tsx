@@ -25,8 +25,6 @@ import {
   type TestOutcome,
 } from "./setup-controller.js";
 
-const INSTALL_UV = "https://docs.astral.sh/uv/getting-started/installation/";
-const INSTALL_GITLAB = "uv tool install python-gitlab";
 const TOKEN_STEPS =
   "In the page that opens, pick the longest expiry date it allows, click Generate token, then copy the token back here.";
 
@@ -67,26 +65,6 @@ function useController(): SetupController {
 interface ScreenStyles {
   text: { color: string };
   error: { color: string };
-}
-
-function ToolsMissing({ tools, onReload }: { tools: SetupStatus["tools"]; onReload: () => void }) {
-  return (
-    <SettingsSection title="GitLab">
-      <SettingsCard>
-        <SettingsRow
-          label="python-gitlab is not installed"
-          hint={`Irix reaches GitLab through python-gitlab. Install it, then reload this page: ${INSTALL_GITLAB}`}
-        />
-        {tools.uv.found ? null : (
-          <SettingsRow
-            label="uv is not installed either"
-            hint={`Install uv first, then run the command above: ${INSTALL_UV}`}
-          />
-        )}
-        <SettingsAction label="After installing" actionLabel="Check again" onPress={onReload} />
-      </SettingsCard>
-    </SettingsSection>
-  );
 }
 
 function EnvironmentOverrides({ overrides }: { overrides: string[] }) {
@@ -332,10 +310,6 @@ export function GitLabSetupScreen({ theme }: PluginSurfaceProps) {
     );
   }
   const { status } = state;
-
-  if (!status.tools.gitlab.found) {
-    return <ToolsMissing tools={status.tools} onReload={reload} />;
-  }
 
   const showForm = controller.showNewSectionForm();
   const needsToken = controller.needsNewToken();

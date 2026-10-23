@@ -16,7 +16,7 @@ import {
   upsertSection,
 } from "./cfg-file.js";
 import { readGitLabSaved, writeGitLabSaved } from "./irix-json.js";
-import { checkTools, expiresSoon, testSection, testToken } from "./probe.js";
+import { expiresSoon, testSection, testToken } from "./probe.js";
 
 // The daemon's forge config (packages/server/src/irix/gitlab/config.ts) rejects other urls and
 // section names at startup, which would switch off every merge-request feature.
@@ -42,11 +42,6 @@ function sectionProblem(name: string, url: string | null): string | null {
   return urlProblem(url);
 }
 
-function resolveCommand(env: NodeJS.ProcessEnv): string[] {
-  const fromEnv = env.IRIX_GITLAB_COMMAND?.trim().split(/\s+/u);
-  return fromEnv?.[0] ? fromEnv : (readGitLabSaved(env).command ?? ["gitlab"]);
-}
-
 /** The section's url without a trailing slash, or an error saying why it cannot be used. */
 function usableSection(env: NodeJS.ProcessEnv, name: string): string {
   const section = readCfgSections(cfgPath(env)).find((entry) => entry.name === name);
@@ -68,7 +63,6 @@ export async function setupStatus(
 ): Promise<RpcOutput<typeof setupStatusRpc>> {
   const path = cfgPath(env);
   return {
-    tools: await checkTools(resolveCommand(env)),
     cfgPath: path,
     sections: readCfgSections(path).map(({ name, url }) => ({
       name,
@@ -87,8 +81,8 @@ export async function setupTestSection(
   { section }: RpcInput<typeof setupTestSectionRpc>,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<RpcOutput<typeof setupTestSectionRpc>> {
-  usableSection(env, section);
-  const outcome = await testSection(resolveCommand(env), section, env);
+  const url = usableSection(env, section);
+  const outcome = await testSection(url, section, env);
   if (outcome.result !== "ok") {
     return {
       result: outcome.result,
@@ -120,7 +114,7 @@ export async function setupCreateSection(
     : validateUrl(input.url);
   const name = input.replaceSection ?? freeSectionName(existing);
 
-  const outcome = await testToken(resolveCommand(env), url, token);
+  const outcome = await testToken(url, token);
   if (outcome.result === "token-rejected") {
     throw new Error(
       "GitLab rejected the token. Check that it was copied whole and has not expired.",

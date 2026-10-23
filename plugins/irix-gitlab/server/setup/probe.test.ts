@@ -1,49 +1,36 @@
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { FAKE_GITLAB, fakeCalls, seedFake, type FakeState } from "./fake-gitlab.testing.js";
-import { checkTools, expiresSoon, testSection, testToken } from "./probe.js";
+import { forgetApis } from "../api.js";
+import { installSystemCa } from "../system-ca.js";
+import { startFakeGitLab, writeCfg, type FakeGitLab } from "../test/fake-gitlab.js";
+import { expiresSoon, testSection, testToken } from "./probe.js";
 
-let work: string;
-let statePath: string;
-let command: string[];
-const saved = { ...process.env };
+let fake: FakeGitLab;
+let env: NodeJS.ProcessEnv;
 
-const seed = (partial: Partial<FakeState>) => seedFake(statePath, partial);
-const calls = () => fakeCalls(statePath);
+beforeAll(async () => {
+  fake = await startFakeGitLab();
+  installSystemCa({ extraFiles: [fake.certFile] });
+});
+
+afterAll(() => fake.close());
 
 beforeEach(() => {
-  work = mkdtempSync(join(tmpdir(), "irix-probe-"));
-  statePath = join(work, "state.json");
-  const script = join(work, "fake-gitlab.mjs");
-  writeFileSync(script, FAKE_GITLAB);
-  command = [process.execPath, script];
-  process.env.FAKE_GL_STATE = statePath;
-  seed({});
-});
-
-afterEach(() => {
-  for (const key of Object.keys(process.env)) delete process.env[key];
-  Object.assign(process.env, saved);
-});
-
-describe("checkTools", () => {
-  it("reports the gitlab command and its version", async () => {
-    const tools = await checkTools(command);
-    expect(tools.gitlab).toEqual({ found: true, version: "gitlab 8.6.0" });
-  });
-
-  it("reports a missing gitlab command", async () => {
-    const tools = await checkTools([join(work, "no-such-command")]);
-    expect(tools.gitlab).toEqual({ found: false, version: null });
-  });
+  forgetApis();
+  fake.seed({ requireToken: "good" });
+  const cfg = join(mkdtempSync(join(tmpdir(), "irix-probe-")), "python-gitlab.cfg");
+  writeCfg(cfg, fake);
+  env = { ...process.env, PYTHON_GITLAB_CFG: cfg };
+  delete env.GITLAB_PRIVATE_TOKEN;
 });
 
 describe("testSection", () => {
-  it("is ok with the expiry and no missing scopes", async () => {
-    seed({
+  it("is ok with the expiry and no missing scopes, sending the section's token", async () => {
+    fake.seed({
+      requireToken: "good",
       self: {
         active: true,
         revoked: false,
@@ -51,42 +38,55 @@ describe("testSection", () => {
         scopes: ["api", "read_repository", "write_repository"],
       },
     });
-    expect(await testSection(command, "corp")).toEqual({
+    expect(await testSection(fake.url, "corp", env)).toEqual({
       result: "ok",
       expiresAt: "2026-12-01",
       missingScopes: [],
     });
-    expect(calls()[0]?.args).toContain("--gitlab=corp");
+    expect(fake.state.tokens).toEqual(["good"]);
   });
 
   it("lists the scopes the token lacks", async () => {
-    seed({
+    fake.seed({
+      requireToken: "good",
       self: { active: true, revoked: false, expires_at: null, scopes: ["api", "read_repository"] },
     });
-    expect(await testSection(command, "corp")).toMatchObject({
+    expect(await testSection(fake.url, "corp", env)).toMatchObject({
       result: "ok",
       missingScopes: ["write_repository"],
     });
   });
 
   it("rejects a revoked token", async () => {
-    seed({ self: { active: false, revoked: true, expires_at: null, scopes: ["api"] } });
-    expect(await testSection(command, "corp")).toMatchObject({ result: "token-rejected" });
+    fake.seed({
+      requireToken: "good",
+      self: { active: false, revoked: true, expires_at: null, scopes: ["api"] },
+    });
+    expect(await testSection(fake.url, "corp", env)).toMatchObject({ result: "token-rejected" });
   });
 
   it("maps a 401 to token-rejected", async () => {
-    seed({ self: "Impossible to get (401: 401 Unauthorized)" });
-    expect(await testSection(command, "corp")).toMatchObject({ result: "token-rejected" });
+    fake.seed({ requireToken: "other" });
+    expect(await testSection(fake.url, "corp", env)).toMatchObject({ result: "token-rejected" });
   });
 
-  it("maps a DNS failure to unreachable, not to the token", async () => {
-    seed({ self: "requests.exceptions.ConnectionError: getaddrinfo ENOTFOUND gitlab.test" });
-    expect(await testSection(command, "corp")).toMatchObject({ result: "unreachable" });
+  it("maps a refused connection to unreachable, not to the token", async () => {
+    const closed = await startFakeGitLab();
+    const { url } = closed;
+    await closed.close();
+    expect(await testSection(url, "corp", env)).toMatchObject({ result: "unreachable" });
   });
 
-  it("falls back to current-user when the token is not a personal access token", async () => {
-    seed({ self: "Impossible to get (404: 404 Not Found)" });
-    expect(await testSection(command, "corp")).toEqual({
+  it("says unreachable-or-rejected, never ok, when the section has no token", async () => {
+    const empty = join(mkdtempSync(join(tmpdir(), "irix-probe-")), "empty.cfg");
+    writeCfg(empty, fake, { token: "" });
+    const outcome = await testSection(fake.url, "corp", { ...env, PYTHON_GITLAB_CFG: empty });
+    expect(outcome.result).toBe("token-rejected");
+  });
+
+  it("falls back to the current user when the token is not a personal access token", async () => {
+    fake.seed({ requireToken: "good", self: { status: 404, message: "404 Not Found" } });
+    expect(await testSection(fake.url, "corp", env)).toEqual({
       result: "ok",
       expiresAt: null,
       missingScopes: [],
@@ -95,23 +95,9 @@ describe("testSection", () => {
 });
 
 describe("testToken", () => {
-  it("tests the token through a temporary config and removes it", async () => {
-    seed({ requireToken: "good" });
-    const ok = await testToken(command, "https://gl.example.com", "good");
-    expect(ok.result).toBe("ok");
-    const [call] = calls();
-    expect(call?.args.join(" ")).not.toContain("good");
-    expect(call?.tokenInEnv).toBe(false);
-    expect(call?.cfg).toContain("url = https://gl.example.com");
-    const bad = await testToken(command, "https://gl.example.com", "bad");
-    expect(bad.result).toBe("token-rejected");
-  });
-
-  it("leaves no temporary config behind", async () => {
-    await testToken(command, "https://gl.example.com", "good");
-    const cfgPath = calls()[0]?.cfgPath ?? "";
-    expect(cfgPath).not.toBe("");
-    expect(existsSync(cfgPath)).toBe(false);
+  it("tests a token that is not in any config", async () => {
+    expect((await testToken(fake.url, "good")).result).toBe("ok");
+    expect((await testToken(fake.url, "bad")).result).toBe("token-rejected");
   });
 });
 

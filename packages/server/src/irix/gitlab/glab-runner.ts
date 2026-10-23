@@ -6,7 +6,7 @@
 // Only the invocations upstream makes are translated. Any other command line fails loudly,
 // which is what the contract tests in glab-runner.test.ts watch for after an upstream sync.
 
-import type { GitLabClient } from "./python-client.js";
+import type { GitLabClient } from "./client.js";
 
 interface GlabCommandRunnerOptions {
   cwd: string;

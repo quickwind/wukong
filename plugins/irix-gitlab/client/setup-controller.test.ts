@@ -5,7 +5,6 @@ const CORP = { name: "corp", url: "https://gitlab.corp.example.com", usable: tru
 
 function status(partial: Partial<SetupStatus> = {}): SetupStatus {
   return {
-    tools: { gitlab: { found: true, version: "gitlab 8.6.0" }, uv: { found: true } },
     cfgPath: "/home/me/.python-gitlab.cfg",
     sections: [CORP],
     saved: { url: null, configSection: null, cloneRoot: null },

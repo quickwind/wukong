@@ -3,87 +3,34 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { forgetApis } from "./api.js";
 import { forgetUsernames, runClone, search } from "./projects.js";
+import { installSystemCa } from "./system-ca.js";
+import { startFakeGitLab, writeCfg, type FakeGitLab, type FakeState } from "./test/fake-gitlab.js";
 
-const GITLAB = "https://gitlab.test";
 const noop = () => {};
 const instant = { sleep: async () => {}, pollIntervalMs: 1 };
 
 let work: string;
 let remotes: string;
-let statePath: string;
 const saved = { ...process.env };
 
-interface FakeProject {
-  path_with_namespace: string;
-  namespace?: { kind: string };
-  forked_from_project?: { path_with_namespace: string };
-  /** `get` calls before a new fork reports its import as finished. */
-  import_after?: number;
-  fail?: string;
-  polls?: number;
-}
+let fake: FakeGitLab;
 
-interface FakeState {
-  username: string;
-  list: unknown[];
-  projects: Record<string, FakeProject>;
-  /** `current-user get` fails, as when the token is wrong. */
-  noUser?: boolean;
-  importPolls: number;
-  calls: string[];
-}
-
-// A stand-in for python-gitlab that keeps its state in a file, so a test can seed it and read back
-// which commands were run. It answers the commands the plugin issues, in python-gitlab's JSON.
-const FAKE_GITLAB = `
-import { readFileSync, writeFileSync } from "node:fs";
-const file = process.env.FAKE_GL_STATE;
-const state = JSON.parse(readFileSync(file, "utf8"));
-const args = process.argv.slice(2).filter((a) => !/^--(output|skip-login|server-url|gitlab)/u.test(a));
-const flag = (name) => args.find((a) => a.startsWith("--" + name + "="))?.slice(name.length + 3);
-const command = args.filter((a) => !a.startsWith("--")).join(" ");
-state.calls.push(args.join(" "));
-const save = () => writeFileSync(file, JSON.stringify(state));
-const view = (p) => ({
-  ...p,
-  import_status: p.fail ? "failed" : (p.polls ?? 0) >= (p.import_after ?? 0) ? "finished" : "started",
-  import_error: p.fail ?? null,
+beforeAll(async () => {
+  fake = await startFakeGitLab();
+  installSystemCa({ extraFiles: [fake.certFile] });
 });
-const fail = (message) => { save(); console.error(message); process.exit(1); };
-if (command === "current-user get") { if (state.noUser) fail("401 Unauthorized"); save(); console.log(JSON.stringify({ id: 1, username: state.username })); }
-else if (command === "project list") { save(); console.log(JSON.stringify(state.list)); }
-else if (command === "project get") {
-  const project = state.projects[flag("id")];
-  if (!project) fail("Impossible to get (404: 404 Project Not Found)");
-  project.polls = (project.polls ?? 0) + 1;
-  save();
-  console.log(JSON.stringify(view(project)));
-} else if (command === "project-fork create") {
-  const source = flag("project-id");
-  const path = state.username + "/" + source.split("/").at(-1);
-  if (state.projects[path]) fail("409 Project namespace name has already been taken");
-  state.projects[path] = { path_with_namespace: path, namespace: { kind: "user" }, forked_from_project: { path_with_namespace: source }, import_after: state.importPolls, polls: 0 };
-  save();
-  console.log(JSON.stringify(view(state.projects[path])));
-} else { fail("unexpected command: " + command); }
-`;
+
+afterAll(() => fake.close());
 
 function seed(partial: Partial<FakeState> = {}): void {
-  const state: FakeState = {
-    username: "me",
-    list: [],
-    projects: { "group/app": { path_with_namespace: "group/app", namespace: { kind: "group" } } },
-    importPolls: 2,
-    calls: [],
-    ...partial,
-  };
-  writeFileSync(statePath, JSON.stringify(state));
+  fake.seed(partial);
 }
 
-const readState = (): FakeState => JSON.parse(readFileSync(statePath, "utf8")) as FakeState;
+const readState = (): FakeState => fake.state;
 
 function bareRepoWithCommit(projectPath: string): void {
   const bare = join(remotes, `${projectPath}.git`);
@@ -107,7 +54,6 @@ const git = (directory: string, ...args: string[]) =>
 beforeEach(() => {
   work = mkdtempSync(join(tmpdir(), "irix-gitlab-"));
   remotes = join(work, "remotes");
-  statePath = join(work, "gitlab-state.json");
   // Real repositories served at the projects' clone URLs through git's own URL rewriting: the
   // original and the fork a Fork clone creates.
   bareRepoWithCommit("group/app");
@@ -115,24 +61,20 @@ beforeEach(() => {
 
   const home = join(work, "home");
   mkdirSync(home, { recursive: true });
-  const script = join(work, "fake-gitlab.mjs");
-  writeFileSync(script, FAKE_GITLAB);
-  // The command goes in irix.json as an array: the environment variable splits on spaces, which
-  // breaks on a Windows path such as C:\Program Files\nodejs\node.exe.
-  writeFileSync(
-    join(home, "irix.json"),
-    JSON.stringify({ gitlab: { command: [process.execPath, script] } }),
-  );
+  const cfg = join(work, "python-gitlab.cfg");
+  writeCfg(cfg, fake);
   seed();
   forgetUsernames();
+  forgetApis();
 
   process.env.PASEO_HOME = home;
-  process.env.FAKE_GL_STATE = statePath;
-  process.env.IRIX_GITLAB_URL = GITLAB;
+  process.env.PYTHON_GITLAB_CFG = cfg;
+  delete process.env.GITLAB_PRIVATE_TOKEN;
+  process.env.IRIX_GITLAB_URL = fake.url;
   process.env.IRIX_CLONE_ROOT = join(work, "clones");
   process.env.GIT_CONFIG_COUNT = "1";
   process.env.GIT_CONFIG_KEY_0 = `url.${pathToFileURL(remotes).href}/.insteadOf`;
-  process.env.GIT_CONFIG_VALUE_0 = `${GITLAB}/`;
+  process.env.GIT_CONFIG_VALUE_0 = `${fake.url}/`;
 });
 
 afterEach(() => {
@@ -148,7 +90,7 @@ describe("search", () => {
           path_with_namespace: "group/app",
           name: "app",
           description: "An app",
-          web_url: `${GITLAB}/group/app`,
+          web_url: `${fake.url}/group/app`,
           namespace: { kind: "group" },
         },
         // A colleague's personal project, shared with the user.
@@ -191,15 +133,21 @@ describe("search", () => {
   it("asks who the user is once, not on every search", async () => {
     await search({ query: "a" });
     await search({ query: "b" });
-    expect(readState().calls.filter((c) => c === "current-user get")).toHaveLength(1);
+    expect(readState().calls.filter((c) => c === "GET /user")).toHaveLength(1);
   });
 
-  it("asks python-gitlab for the full record of the user's projects, escaping a query like @file", async () => {
+  it("asks GitLab for the full record of the user's projects, sending the query as it was typed", async () => {
     await search({ query: "@secret" });
-    const call = readState().calls.find((c) => c.startsWith("project list")) ?? "";
-    expect(call).toContain("--search=@@secret");
-    expect(call).toContain("--membership=true");
-    expect(call).not.toContain("--simple");
+    const call = readState().calls.find((c) => c.startsWith("GET /projects?")) ?? "";
+    const query = new URLSearchParams(call.split("?")[1]);
+    expect(query.get("search")).toBe("@secret");
+    expect(query.get("membership")).toBe("true");
+    expect(query.has("simple")).toBe(false);
+  });
+
+  it("sends the token from the python-gitlab config", async () => {
+    await search({ query: "a" });
+    expect(new Set(readState().tokens)).toEqual(new Set(["good"]));
   });
 
   it("explains how to configure GitLab when nothing is set", async () => {
@@ -219,7 +167,7 @@ describe("clone", () => {
       forkedFrom: null,
     });
     expect(existsSync(join(result.directory, "README.md"))).toBe(true);
-    expect(readState().calls.some((c) => c.startsWith("project-fork"))).toBe(false);
+    expect(readState().calls.some((c) => c.endsWith("/fork"))).toBe(false);
   });
 
   it("reuses an existing clone of the same project", async () => {
@@ -266,7 +214,7 @@ describe("fork clone", () => {
       ]),
     );
     const calls = readState().calls;
-    expect(calls).toContain("project-fork create --project-id=group/app");
+    expect(calls).toContain("POST /projects/group%2Fapp/fork");
     // The clone is of the fork; the original is the upstream remote.
     expect(git(result.directory, "remote", "get-url", "origin")).toMatch(/me\/app\.git$/);
     expect(git(result.directory, "remote", "get-url", "upstream")).toMatch(/group\/app\.git$/);
@@ -289,7 +237,7 @@ describe("fork clone", () => {
     const result = await runClone({ path: "group/app", fork: true }, (s) => steps.push(s), instant);
     expect(result.clonedPath).toBe("me/app");
     expect(steps).toContain("Using your existing fork…");
-    expect(readState().calls.some((c) => c.startsWith("project-fork"))).toBe(false);
+    expect(readState().calls.some((c) => c.endsWith("/fork"))).toBe(false);
   });
 
   it("adds the upstream remote to an existing clone of the fork, once", async () => {

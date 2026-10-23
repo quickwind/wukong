@@ -52,7 +52,7 @@ export const GitLabMergeRequestSchema = z
     blocking_discussions_resolved: z.boolean().optional(),
     // GitLab moves toward `auto_merge_enabled`; `merge_when_pipeline_succeeds` is
     // the deprecated spelling. The client folds the former into the latter, see
-    // normalizeMergeRequest in gitlab-python-client.ts.
+    // normalizeMergeRequest in rest-client.ts.
     merge_when_pipeline_succeeds: z.boolean().optional(),
     auto_merge_enabled: z.boolean().optional(),
     squash: z.boolean().optional(),

@@ -7,9 +7,9 @@ Irix is installed from seven npm tarballs (`irix-*.tgz`). They must be installed
 - **Node.js 22 or newer** (`node --version`).
 - **Git for Windows** (`git --version`).
 - **Claude Code** installed and signed in (`claude --version`). Devin CLI is optional.
-- **python-gitlab**, only if you want GitLab search, clone and merge requests:
-  `pip install python-gitlab` (or `uv tool install python-gitlab`), then set up
-  `%USERPROFILE%\.python-gitlab.cfg` as you normally would.
+- For GitLab search, clone and merge requests you need a token in
+  `%USERPROFILE%\.python-gitlab.cfg` (the GitLab settings screen can create it). Python and the
+  python-gitlab program are not needed.
 
 ## Build the tarballs yourself (optional)
 
@@ -81,8 +81,8 @@ The log is `%USERPROFILE%\.irix\daemon.log`.
 
 Two files, both in your user folder.
 
-**1. `%USERPROFILE%\.python-gitlab.cfg`**: python-gitlab's own settings, with your token. Irix
-never sees the token.
+**1. `%USERPROFILE%\.python-gitlab.cfg`**: the file python-gitlab uses, with your token. Irix
+reads the token from it for each GitLab request and never writes it anywhere else.
 
 ```ini
 [global]

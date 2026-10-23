@@ -1,5 +1,5 @@
 // Irix: the forge registry holds one adapter, the company GitLab, served by upstream's
-// GitLab service driving python-gitlab through the glab-compatible runner.
+// GitLab service driving the REST client (gitbeaker) through the glab-compatible runner.
 
 import type { ForgeAdapterRegistration } from "../../services/forge-registry.js";
 import { createGitLabService } from "../../services/gitlab-service.js";
@@ -7,7 +7,7 @@ import { resolvePaseoHome } from "../../server/paseo-home.js";
 import { isIrixActive } from "../policy.js";
 import { loadGitLabForgeConfig, matchesGitLabForgeHost, type GitLabForgeConfig } from "./config.js";
 import { createGlabCompatRunner } from "./glab-runner.js";
-import { createGitLabPythonClient } from "./python-client.js";
+import { createGitLabRestClient } from "./rest-client.js";
 
 // Read once: a changed irix.json takes effect when the daemon restarts.
 let cachedConfig: GitLabForgeConfig | null | undefined;
@@ -29,8 +29,8 @@ export function createIrixGitLabAdapter(
         );
       }
       return createGitLabService({
-        runner: createGlabCompatRunner(createGitLabPythonClient({ config })),
-        resolveGlabPath: async () => "python-gitlab",
+        runner: createGlabCompatRunner(createGitLabRestClient({ config })),
+        resolveGlabPath: async () => "gitlab-rest",
       });
     },
     matchesHost(host) {

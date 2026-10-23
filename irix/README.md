@@ -25,8 +25,8 @@ They are a handful of one-line hooks, not rewrites.
 - **No cloud traffic from the daemon.** One hook on `net.Socket#connect` refuses every
   connection that is not loopback, a local socket or a host in `IRIX_ALLOWED_HOSTS`, and the
   daemon refuses to listen on anything but loopback. That covers relay, Hub, push, registries,
-  update checks and whatever upstream adds later. Child processes (the provider CLIs, `git`,
-  `python-gitlab`) are outside the daemon and unaffected.
+  update checks and whatever upstream adds later. Child processes (the provider CLIs and `git`)
+  are outside the daemon and unaffected.
 - **Providers:** Claude Code and Devin CLI. Devin is a configured ACP provider (`devin acp`).
   Other providers are removed from the registry, not just disabled.
 - **Windows shell:** commands agents run (Devin's `terminal/create`) and new terminals use
@@ -57,28 +57,30 @@ Put the company GitLab in `<Irix home>/irix.json` (default `~/.irix/irix.json`):
 }
 ```
 
-`IRIX_GITLAB_URL`, `IRIX_GITLAB_SECTION`, `IRIX_GITLAB_SSH_HOST`, `IRIX_GITLAB_COMMAND`
-and `IRIX_CLONE_ROOT` take precedence. Without `cloneRoot`, clones go to `~/workspace/gitlab` (on
+`IRIX_GITLAB_URL`, `IRIX_GITLAB_SECTION`, `IRIX_GITLAB_SSH_HOST`
+and `IRIX_CLONE_ROOT` take precedence (`command` and `IRIX_GITLAB_COMMAND` from earlier versions are accepted and ignored). Without `cloneRoot`, clones go to `~/workspace/gitlab` (on
 Windows, `<home>\workspace\gitlab`). The URL must be https.
 
 You normally do not edit these by hand. Open the Command Center and run **GitLab settings**, or press **GitLab settings** on the Add project from GitLab page (a built-in plugin has no row under Settings → Plugins). It checks that
-[python-gitlab](https://python-gitlab.readthedocs.io/) is installed (if not, it shows
-`uv tool install python-gitlab` and where to get uv; Irix never runs the installer), lists the
+lists the
 sections of `~/.python-gitlab.cfg` and tests one when you press **Test**, or, with no config, takes
 your GitLab URL, opens GitLab's new-token page with the name and permissions (`api`,
 `read_repository`, `write_repository`) filled in, and writes the pasted token to
 `~/.python-gitlab.cfg` (mode 0600, only after the token works). **Save** then writes `url`,
 `configSection` and `cloneRoot` to `irix.json`. The URL always comes from the chosen section.
-Paseo does not keep the token: it passes through one request and ends up only in python-gitlab's
-config, or in its credential helper if you configure one yourself.
+Irix does not keep the token: it passes through one request and ends up only in the
+python-gitlab config, or in its credential helper if you configure one yourself.
 
 The daemon's merge-request features read `irix.json` once at startup, so a changed section or URL
 reaches them after the daemon restarts. Project search and clone read it on every call.
 
 Merge request status, checks, merge, auto-merge and issues run through upstream's GitLab service.
 A glab-compatible runner (`packages/server/src/irix/gitlab/glab-runner.ts`) answers the `glab`
-command lines that service issues with python-gitlab calls; no `glab` executable is involved. Not
-supported: rebase merges. The daemon's clone request clones only from this GitLab.
+command lines that service issues with calls to GitLab's REST API (gitbeaker, inside the daemon;
+no `glab` executable and no python-gitlab process). The token is still read from the python-gitlab
+config, and the system's CA store is trusted, so a company CA installed on the machine works; a
+CA file can also be named by `ssl_verify` in the config section or `NODE_EXTRA_CA_CERTS`.
+`ssl_verify = false` is ignored. Not supported: rebase merges. The daemon's clone request clones only from this GitLab.
 
 ## Plugins: `ui.AgentView`
 
@@ -195,4 +197,4 @@ half-adapted:
   accept a pasted link, which is a deliberate user action.
 - Links to `paseo.sh/docs` remain; they open only when clicked.
 - The GitLab integration has not been run against a live GitLab (version 19.0 in particular):
-  start with auto-merge, which python-gitlab exposes only through the older parameter.
+  start with auto-merge (the client sends both the old and the new parameter).
