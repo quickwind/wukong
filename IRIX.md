@@ -254,6 +254,21 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   `NODE_EXTRA_CA_CERTS` still works, and `ssl_verify = /path/ca.pem` in the python-gitlab section
   adds that file. `ssl_verify = false` is ignored on purpose. It needs Node 22.15 or newer; on
   older Node only the bundled CAs and `NODE_EXTRA_CA_CERTS` apply.
+  **Create merge request** (`gitlab/upstream-merge-request.ts`, wrapped around the service's
+  `createPullRequest` in `adapter.ts`): upstream's button pushes the branch and then asks the forge
+  service to create the request, with the title and description the daemon drafts. When the checkout
+  has an `upstream` remote on the configured GitLab that is a different project from `origin` (the
+  layout Fork clone makes), nothing is created over the API. The daemon looks up both projects, then
+  opens GitLab's "new merge request" page in the default browser of the machine it runs on
+  (`rundll32 url.dll,FileProtocolHandler` / `open` / `xdg-open`, no shell), from the current branch of
+  `origin` to the default branch of `upstream`, with the drafted title and description in the address
+  (a long description is cut to keep it under 6000 characters). The request exists once the person
+  submits that page. Because upstream's client treats any answer as "created", the page-opened case is
+  returned as an error, so the toast is red and reads "Opened the new merge request page in your
+  browser (...)"; a client edit (two upstream files) would turn it into a plain notice. This works
+  because Irix's daemon listens on loopback only, so the browser is on the same machine. Without an
+  `upstream` remote, or when it is on another server or is the same project as `origin`, the request is
+  created over the API as before.
   Configuration is `<home>/irix.json` or `IRIX_GITLAB_*`; the URL must be https. The `command` field
   no longer applies to the daemon; the plugin below still runs it. The GitLab settings screen
   (Command Center item, or the button on the GitLab page; built-in plugins have no Settings →

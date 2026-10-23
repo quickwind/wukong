@@ -95,4 +95,6 @@ export interface GitLabClient {
   setSquash(input: ProjectScope & { iid: number; squash: boolean }): Promise<void>;
   cancelAutoMerge(input: ProjectScope & { iid: number }): Promise<void>;
   searchProjects(input: SearchProjectsInput): Promise<GitLabProject[]>;
+  /** The project at `project` (a path or id): its id and default branch. */
+  getProject(input: { cwd: string; project: string }): Promise<GitLabProject>;
 }

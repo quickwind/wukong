@@ -301,6 +301,10 @@ export function createGitLabRestClient(options: GitLabRestClientOptions): GitLab
       await call((gitlab) => gitlab.MergeRequests.cancelOnPipelineSuccess(project, iid), Anything);
     },
 
+    getProject({ project }) {
+      return call((gitlab) => gitlab.Projects.show(project), GitLabProjectSchema);
+    },
+
     searchProjects(input) {
       return call(
         (gitlab) =>

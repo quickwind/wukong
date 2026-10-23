@@ -72,6 +72,7 @@ function fakeClient(): { client: GitLabClient; calls: Record<string, unknown[]> 
     setSquash: record("setSquash", undefined),
     cancelAutoMerge: record("cancelAutoMerge", undefined),
     searchProjects: record("searchProjects", []),
+    getProject: record("getProject", { id: 1, path_with_namespace: PROJECT }),
   } as unknown as GitLabClient;
   return { client, calls };
 }
