@@ -1,8 +1,12 @@
 name: Publish Irix to npm
 
-# Every push to `irix` verifies the edition, builds the seven packages under the company's
-# npm scope and publishes a new `-irix.N` version. It publishes nothing until the repository
-# variable NPM_SCOPE is set. Setup: irix/README.md ("Publishing").
+# Every push to `irix` verifies the edition: brand and release script tests, dependency
+# licenses, build, typecheck, lint, formatting and the Irix tests, on Linux and on Windows.
+#
+# The `publish` job is switched off (`if: ${{ false }}`): CI here runs the checks and publishes
+# nothing, whatever the repository variables say. Packages are built locally with
+# `node irix/scripts/pack-local.mjs`. To publish from CI again, set that condition back to
+# `${{ vars.NPM_SCOPE != '' }}` and follow irix/README.md ("Publishing").
 #
 # This workflow never creates a `v*` tag. Upstream's release workflows trigger on `v*` tags,
 # so tag this branch with another prefix (for example `irix-20261010`).
@@ -142,8 +146,9 @@ jobs:
   publish:
     name: publish
     needs: [verify, verify-windows]
-    # Inert until NPM_SCOPE is configured; see irix/README.md.
-    if: ${{ vars.NPM_SCOPE != '' }}
+    # Switched off on purpose: CI runs the checks only and never publishes. To turn publishing
+    # back on, use `${{ vars.NPM_SCOPE != '' }}` here; see irix/README.md ("Publishing").
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     # Create this environment to hold NPM_TOKEN and, if you want, require a reviewer.

@@ -14,7 +14,7 @@ minimal), the design decisions, the checks to run, and the known gaps. This file
 | `plugins/irix-devin-usage/`    | Bundled plugin: Devin usage queries and status                                        |
 | `packages/app/src/irix/`       | Web UI switches and the Add Project redirect                                          |
 | `irix/`                        | Brand assets, brand/publish scripts (this directory)                                  |
-| `.github/workflows/irix-*.yml` | Publish to npm, sync with upstream                                                    |
+| `.github/workflows/irix-*.yml` | CI checks (the publish job is off), sync with upstream                                |
 
 Upstream files Irix touches are marked `// Irix:`: `rg "// Irix"` lists every one of them.
 They are a handful of one-line hooks, not rewrites.
@@ -142,6 +142,11 @@ installs, builds (including the web UI) and writes seven `irix-*.tgz` files to `
 - `git config core.autocrlf` may be `true` on Windows; the build copes with CRLF.
 
 ## Publishing
+
+**The publish job is switched off.** `irix-publish.yml` runs its checks on every push to `irix`
+and publishes nothing: the `publish` job has `if: ${{ false }}`. Build packages locally with
+`node irix/scripts/pack-local.mjs` (see above). The rest of this section describes what the job
+does once it is switched back on, by changing that condition to `${{ vars.NPM_SCOPE != '' }}`.
 
 `irix-publish.yml` runs on every push to `irix`. It verifies, then (once `NPM_SCOPE` is set)
 rewrites the npm scope and the brand in a throwaway checkout, builds with `EXPO_PUBLIC_IRIX=1`,

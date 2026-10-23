@@ -74,7 +74,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                                                              |
 | `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin                 |
 | `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                                   |
-| `.github/workflows/irix-*.yml` | Publish to npm; weekly sync with upstream                                                                                   |
+| `.github/workflows/irix-*.yml` | CI checks on every push to `irix` (the publish job is switched off); weekly sync with upstream                              |
 
 ## Upstream files we touch (the whole list)
 
