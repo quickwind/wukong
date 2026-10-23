@@ -18,6 +18,7 @@
 // same first-prompt block, to use the `irix` command line from its shell instead.
 
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import type { Logger } from "pino";
 
 import type {
@@ -377,6 +378,76 @@ export function attachDevinSubagentApprovalGate(
   };
 }
 
+// How long a new message waits for Devin to end a turn that was already canceled. Devin ends the
+// turn with its answer to the original `session/prompt`, which can come after the daemon's own
+// short wait for a canceled turn (2 s) has run out.
+export const DEVIN_TURN_END_WAIT_MS = 30_000;
+const TURN_END_POLL_MS = 25;
+
+// Shown in the chat when Devin has not ended a canceled turn within the wait, so the message was not
+// sent. The menu item is "Reload agent" in the tab menu.
+export const DEVIN_TURN_STILL_ENDING_MESSAGE =
+  "Devin has not finished the previous task yet, so this message was not sent. " +
+  "Wait a few seconds and send it again. If this keeps happening, use Reload agent from the tab menu.";
+
+/**
+ * Makes a message sent right after an interrupt wait for Devin to end the canceled turn. The daemon
+ * waits only a moment for a canceled turn to end, then treats it as over and starts the next one;
+ * upstream's ACP session still holds the turn until Devin answers its `session/prompt`, so the new
+ * turn failed with "A foreground turn is already active". Only a turn this session was asked to
+ * cancel is waited for; any other overlap still fails at once. If Devin does not end the turn
+ * within the wait, the message fails with a message that says what to do next.
+ */
+export function attachDevinTurnEndWait(
+  sessionInput: AgentSession,
+  logger?: Logger,
+  waitMs = DEVIN_TURN_END_WAIT_MS,
+): void {
+  const session = sessionInput as MutableACPSession;
+  const originalStartTurn = session.startTurn?.bind(session);
+  if (typeof originalStartTurn !== "function") {
+    return;
+  }
+  let canceledTurnId: string | null = null;
+  const lifecycle = { closed: false };
+
+  const originalInterrupt = session.interrupt.bind(session);
+  session.interrupt = async () => {
+    canceledTurnId = session.activeForegroundTurnId ?? canceledTurnId;
+    return originalInterrupt();
+  };
+
+  const originalClose = session.close.bind(session);
+  session.close = async () => {
+    lifecycle.closed = true;
+    return originalClose();
+  };
+
+  const waitForTurnEnd = async (turnId: string) => {
+    const deadline = Date.now() + waitMs;
+    while (
+      session.activeForegroundTurnId === turnId &&
+      !lifecycle.closed &&
+      Date.now() < deadline
+    ) {
+      await delay(TURN_END_POLL_MS);
+    }
+  };
+
+  session.startTurn = async (prompt, options) => {
+    const turnId = session.activeForegroundTurnId;
+    if (turnId && turnId === canceledTurnId) {
+      logger?.info({ turnId }, "Waiting for Devin to end the canceled turn before the next one");
+      await waitForTurnEnd(turnId);
+      if (session.activeForegroundTurnId === turnId && !lifecycle.closed) {
+        logger?.warn({ turnId, waitMs }, "Devin did not end the canceled turn in time");
+        throw new Error(DEVIN_TURN_STILL_ENDING_MESSAGE);
+      }
+    }
+    return originalStartTurn(prompt, options);
+  };
+}
+
 type DevinClientOptions = ConstructorParameters<typeof GenericACPAgentClient>[0];
 
 // Devin sends the "/" command list in a notification after the session opens: about a second
@@ -440,6 +511,7 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     attachDevinSubagentApprovalGate(session, launchContext?.agentId);
     attachDevinBypassOptionFilter(session);
     attachDevinSubagentCards(session);
+    attachDevinTurnEndWait(session, this.clientLogger);
     return session;
   }
 
@@ -455,6 +527,7 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     attachDevinSubagentApprovalGate(session, launchContext?.agentId);
     attachDevinBypassOptionFilter(session);
     attachDevinSubagentCards(session);
+    attachDevinTurnEndWait(session, this.clientLogger);
     return session;
   }
 }

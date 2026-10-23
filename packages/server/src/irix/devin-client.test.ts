@@ -5,6 +5,8 @@ import type { AgentSession } from "../server/agent/agent-sdk-types.js";
 import { activateIrixPolicy } from "./policy.js";
 import {
   attachDevinBypassOptionFilter,
+  attachDevinTurnEndWait,
+  DEVIN_TURN_STILL_ENDING_MESSAGE,
   attachDevinSubagentCards,
   createIrixAcpClient,
   DEVIN_COMMANDS_WAIT_MS,
@@ -311,5 +313,88 @@ describe("Devin system prompt delivery", () => {
         { callId: "abc12345", detail: { type: "sub_agent" } },
       ]);
     });
+  });
+});
+
+describe("Devin turn end wait", () => {
+  function fakeAcpSession() {
+    const subscribers = new Set<(event: unknown) => void>();
+    const upstreamStartTurn = vi.fn(async () => {
+      if (fake.activeForegroundTurnId) {
+        throw new Error("A foreground turn is already active");
+      }
+      return { turnId: "next" };
+    });
+    const fake = {
+      activeForegroundTurnId: null as string | null,
+      upstreamStartTurn,
+      startTurn: upstreamStartTurn,
+      interrupt: vi.fn(async () => {}),
+      close: vi.fn(async () => {}),
+      subscribe: (callback: (event: unknown) => void) => {
+        subscribers.add(callback);
+        return () => subscribers.delete(callback);
+      },
+      endTurn() {
+        fake.activeForegroundTurnId = null;
+        for (const callback of subscribers) {
+          callback({ type: "turn_canceled" });
+        }
+      },
+    };
+    return fake;
+  }
+
+  it("starts the next turn once Devin ends the turn that was canceled", async () => {
+    const fake = fakeAcpSession();
+    attachDevinTurnEndWait(fake as unknown as AgentSession);
+    fake.activeForegroundTurnId = "old";
+    const session = fake as unknown as AgentSession;
+    await session.interrupt();
+
+    const started = session.startTurn("hi");
+    await Promise.resolve();
+    expect(fake.upstreamStartTurn).not.toHaveBeenCalled();
+
+    fake.endTurn();
+    await expect(started).resolves.toEqual({ turnId: "next" });
+    expect(fake.upstreamStartTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not wait for a turn nobody canceled", async () => {
+    const fake = fakeAcpSession();
+    attachDevinTurnEndWait(fake as unknown as AgentSession);
+    fake.activeForegroundTurnId = "running";
+
+    await expect((fake as unknown as AgentSession).startTurn("hi")).rejects.toThrow(
+      "A foreground turn is already active",
+    );
+  });
+
+  it("fails with a hint on what to do when Devin does not end the turn in time", async () => {
+    const fake = fakeAcpSession();
+    attachDevinTurnEndWait(fake as unknown as AgentSession, undefined, 20);
+    fake.activeForegroundTurnId = "stuck";
+    const session = fake as unknown as AgentSession;
+    await session.interrupt();
+
+    await expect(session.startTurn("hi")).rejects.toThrow(DEVIN_TURN_STILL_ENDING_MESSAGE);
+    expect(fake.upstreamStartTurn).not.toHaveBeenCalled();
+  });
+
+  it("stops waiting when the session is closed", async () => {
+    const fake = fakeAcpSession();
+    attachDevinTurnEndWait(fake as unknown as AgentSession, undefined, 60_000);
+    fake.activeForegroundTurnId = "old";
+    const session = fake as unknown as AgentSession;
+    await session.interrupt();
+
+    const started = session.startTurn("hi");
+    const settled = started.then(
+      () => "started",
+      (error: Error) => error.message,
+    );
+    await session.close();
+    expect(await settled).toBe("A foreground turn is already active");
   });
 });
