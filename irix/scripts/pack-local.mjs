@@ -50,6 +50,15 @@ export function coreVersion(version) {
   return version.split("-")[0];
 }
 
+/**
+ * `0.12.0-irix.202610220146.g08fc0f11`, plus `.dirty` when the build took in uncommitted changes.
+ * The `g` keeps a SHA made only of digits from reading as a number: semver rejects a numeric
+ * identifier with a leading zero.
+ */
+export function buildVersion({ core, stamp, revision, dirty }) {
+  return `${core}-irix.${stamp}.g${revision}${dirty ? ".dirty" : ""}`;
+}
+
 /** A build stamp that sorts in time order: 202610101530 (UTC). */
 export function buildStamp(date = new Date()) {
   const pad = (value) => String(value).padStart(2, "0");
@@ -222,7 +231,8 @@ export function main(argv) {
         capture(node, ["-p", "JSON.stringify(require('./package.json').version)"], inWork),
       ),
     );
-    const version = `${core}-irix.${stamp}`;
+    const revision = capture("git", ["rev-parse", "--short=8", "HEAD"], { cwd: repo });
+    const version = buildVersion({ core, stamp, revision, dirty: hasChanges });
     // The web UI is built later, while packing the server; its About page shows this version.
     env.EXPO_PUBLIC_IRIX_VERSION = version;
     run("npm", ["pkg", "set", `version=${version}`], inWork);

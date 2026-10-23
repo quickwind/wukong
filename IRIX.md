@@ -223,7 +223,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   shows as fully used. Forecast weather is projected month-end use against the limit.
 - **Packaging:** `node irix/scripts/pack-local.mjs --out <dir>` builds seven tarballs from the
   last commit in a throwaway folder (scope `@irix`, brand applied, web UI built with
-  `EXPO_PUBLIC_IRIX=1`). Version is `<upstream core>-irix.<timestamp>`; the app package keeps
+  `EXPO_PUBLIC_IRIX=1`). Version is `<upstream core>-irix.<timestamp>.g<short commit>`, with `.dirty` added when the working tree had uncommitted changes; the app package keeps
   upstream's version because Expo rejects other forms. All seven must be installed together or npm
   fetches upstream packages and the guard's promise is gone.
 - **Isolation from Paseo:** only an `irix` binary (no `paseo`), home `~/.irix` or

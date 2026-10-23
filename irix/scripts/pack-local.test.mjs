@@ -7,6 +7,7 @@ import test from "node:test";
 
 import {
   buildStamp,
+  buildVersion,
   coreVersion,
   makeZip,
   parseArgs,
@@ -45,6 +46,25 @@ test("strips the prerelease and stamps the build in UTC", () => {
   assert.equal(coreVersion("0.11.2-beta.4"), "0.11.2");
   assert.equal(coreVersion("0.11.2"), "0.11.2");
   assert.equal(buildStamp(new Date(Date.UTC(2026, 9, 10, 3, 5))), "202610100305");
+});
+
+test("the build version carries the short commit, and .dirty when the tree had changes", () => {
+  const parts = { core: "0.12.0", stamp: "202610220146", revision: "08fc0f11" };
+  assert.equal(buildVersion({ ...parts, dirty: false }), "0.12.0-irix.202610220146.g08fc0f11");
+  assert.equal(buildVersion({ ...parts, dirty: true }), "0.12.0-irix.202610220146.g08fc0f11.dirty");
+});
+
+test("a commit made only of digits still gives a valid semver version", () => {
+  const version = buildVersion({
+    core: "0.12.0",
+    stamp: "202610220146",
+    revision: "01234567",
+    dirty: true,
+  });
+  const prerelease = version.split("-").slice(1).join("-").split(".");
+  for (const identifier of prerelease) {
+    assert.match(identifier, /^(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)$/u);
+  }
 });
 
 test("only tarballs of the same scope count as leftovers from an earlier build", () => {
