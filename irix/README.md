@@ -14,6 +14,7 @@ minimal), the design decisions, the checks to run, and the known gaps. This file
 | `plugins/irix-devin-usage/`    | Bundled plugin: Devin usage queries and status                                        |
 | `packages/app/src/irix/`       | Web UI switches and the Add Project redirect                                          |
 | `irix/`                        | Brand assets, brand/publish scripts (this directory)                                  |
+| `irix/scripts/diagnostics/`    | Read-only Windows scripts that collect process and crash evidence                     |
 | `.github/workflows/irix-*.yml` | CI checks (the publish job is off), sync with upstream                                |
 
 Upstream files Irix touches are marked `// Irix:`: `rg "// Irix"` lists every one of them.
