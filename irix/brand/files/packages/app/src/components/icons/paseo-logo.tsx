@@ -24,6 +24,7 @@ export function PaseoLogo({ size = 64, color }: PaseoLogoProps) {
         <Path
           key={d}
           d={d}
+          fill={stroke}
           stroke={stroke}
           strokeWidth={IRIX_LOGO_STROKE_WIDTH}
           strokeLinecap="round"

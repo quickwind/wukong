@@ -1,6 +1,9 @@
 <svg width="48" height="48" viewBox="0 0 700 700" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="700" height="700" rx="156" fill="black"/>
-  <path d="M 220 220 C 220 330, 250 400, 320 450 C 430 530, 560 470, 560 350 C 560 240, 460 180, 360 260 C 280 325, 210 410, 170 510 C 150 560, 230 580, 290 540 C 390 480, 470 350, 530 230" stroke="white" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="220" cy="150" r="24" fill="white"/>
+  <path d="M 408 266 C 448 200, 504 156, 558 146 C 516 182, 472 225, 434 292 Q 402 298 408 266 Z" fill="white" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 434 408 C 500 448, 544 504, 554 558 C 518 516, 475 472, 408 434 Q 402 402 434 408 Z" fill="white" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 292 434 C 252 500, 196 544, 142 554 C 184 518, 228 475, 266 408 Q 298 402 292 434 Z" fill="white" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 266 292 C 200 252, 156 196, 146 142 C 182 184, 225 228, 292 266 Q 298 298 266 292 Z" fill="white" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="350" cy="350" r="36" fill="white"/>
   <circle cx="570" cy="570" r="130" fill="#22c55e"/>
 </svg>
