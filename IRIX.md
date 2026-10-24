@@ -342,7 +342,13 @@ config`), and the id and default branch of the two projects for a day, in memory
   first of the calendar month (UTC); `planEnd` is the contract end, not a cycle. A limit of 0
   with nothing used (zeros, or left out as proto3 JSON does) is "No ACU quota on this Devin plan";
   a limit of 0 with ACU already used shows as fully used. Forecast weather is projected month-end
-  use against the limit.
+  use against the limit. Both usage plugins ship an `icon.svg` and register it (`icon: "icon.svg"`);
+  without one the usage list and the sidebar footer show the same generic gauge for every source.
+  Devin's is the app's own provider icon (`acp-provider-icons.ts`) and Claude's is upstream's
+  Claude icon; a test in each plugin's test file keeps them equal to the provider's. A Devin agent's
+  context window hover card shows the plan usage like Claude's does because `DevinACPAgentClient`
+  passes `usageProvider: "devin"` (`devin-client.ts`): upstream's ACP session reports no usage
+  account without it.
 - **Claude usage** (`plugins/irix-claude-usage`): upstream's `claude-usage-source` stays off. It
   reads only the 5 hour and weekly windows, and an enterprise seat (`enterprise_usage_based`,
   checked 2026-10-24 on a Dell account) has neither: `/api/oauth/usage` returns them as `null`

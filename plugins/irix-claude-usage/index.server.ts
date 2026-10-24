@@ -6,6 +6,7 @@ export default function contribute(server: PluginServerContext) {
   server.registerUsageSource({
     id: "claude",
     label: "Claude",
+    icon: "icon.svg",
     input: inputSchema,
     discover: (scope) => discover(scope),
     fetch: (input) => fetchUsage(inputSchema.parse(input)),

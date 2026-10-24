@@ -482,6 +482,8 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     super({
       waitForInitialCommands: true,
       initialCommandsWaitTimeoutMs: DEVIN_COMMANDS_WAIT_MS,
+      // Lets usage sources match a Devin session, so its context window card shows the plan usage.
+      usageProvider: DEVIN_PROVIDER_ID,
       ...options,
       command: withSubagentGate(options.command),
     });

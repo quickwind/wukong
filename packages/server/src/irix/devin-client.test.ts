@@ -108,6 +108,9 @@ describe("Devin system prompt delivery", () => {
       expect(
         (client as unknown as { waitForInitialCommands: boolean }).waitForInitialCommands,
       ).toBe(true);
+      // Without a usage provider the session reports no account, and the context window's hover
+      // card shows no plan usage for the agent.
+      expect((client as unknown as { usageProvider: string }).usageProvider).toBe("devin");
       expect(createIrixAcpClient("cursor", options)).toBeUndefined();
     } finally {
       deactivate();
