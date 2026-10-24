@@ -33,6 +33,7 @@ describe("Irix plugins", () => {
       expect([...(irixBuiltinPlugins(loader)?.ids ?? [])]).toEqual([
         "irix-gitlab",
         "irix-devin-usage",
+        "irix-claude-usage",
       ]);
     });
   });

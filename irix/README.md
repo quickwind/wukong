@@ -12,6 +12,7 @@ minimal), the design decisions, the checks to run, and the known gaps. This file
 | `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy         |
 | `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, "Add project from GitLab", "Open a local folder" |
 | `plugins/irix-devin-usage/`    | Bundled plugin: Devin usage queries and status                                        |
+| `plugins/irix-claude-usage/`   | Bundled plugin: Claude monthly spend cap and usage windows                            |
 | `packages/app/src/irix/`       | Web UI switches and the Add Project redirect                                          |
 | `irix/`                        | Brand assets, brand/publish scripts (this directory)                                  |
 | `irix/scripts/diagnostics/`    | Read-only Windows scripts that collect process and crash evidence                     |
@@ -32,7 +33,7 @@ They are a handful of one-line hooks, not rewrites.
 - **Windows shell:** commands agents run (Devin's `terminal/create`) and new terminals use
   PowerShell, not `cmd.exe`. Set `IRIX_WINDOWS_SHELL=cmd` in the daemon's environment to switch
   back. This is the one place to configure it (`packages/server/src/irix/windows-shell.ts`).
-- **Plugins:** local directories only, plus the bundled `irix-gitlab` and `irix-devin-usage`. npm, Git and registry
+- **Plugins:** local directories only, plus the bundled `irix-gitlab`, `irix-devin-usage` and `irix-claude-usage`. npm, Git and registry
   installs and the other bundled plugins are off.
 - **Plugins can embed Paseo's chat.** `@getpaseo/plugin/client/ui` exports `AgentView` and
   `capabilities` in Irix builds only (they are `undefined` elsewhere); see

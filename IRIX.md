@@ -74,6 +74,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                                                              |
 | `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin                 |
 | `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                                   |
+| `plugins/irix-claude-usage/`   | Bundled plugin: Claude monthly spend cap (and session/weekly windows where a plan has them)                                 |
 | `.github/workflows/irix-*.yml` | CI checks on every push to `irix` (the publish job is switched off); weekly sync with upstream                              |
 
 ## Upstream files we touch (the whole list)
@@ -339,6 +340,17 @@ config`), and the id and default branch of the two projects for a day, in memory
   two places that must agree: the plugin and `irix/devin-hosts.ts` (a test checks). Reset is the
   first of the calendar month (UTC); `planEnd` is the contract end, not a cycle. A limit of 0
   shows as fully used. Forecast weather is projected month-end use against the limit.
+- **Claude usage** (`plugins/irix-claude-usage`): upstream's `claude-usage-source` stays off. It
+  reads only the 5 hour and weekly windows, and an enterprise seat (`enterprise_usage_based`,
+  checked 2026-10-24 on a Dell account) has neither: `/api/oauth/usage` returns them as `null`
+  and puts the monthly spend cap in `spend`, so upstream's plugin would show one "Extra usage:
+  Enabled" line. Ours reads the CLI's token from `~/.claude/.credentials.json` (or
+  `CLAUDE_CONFIG_DIR`), never refreshes or rewrites it, and sends it only to `api.anthropic.com`.
+  That host is open in the egress guard for this plugin (`irix/claude-hosts.ts`; the list exists
+  in the plugin too and a test checks they agree), the one exception to "no daemon traffic to the
+  internet" beyond Devin's and the GitLab host. It is an unofficial endpoint and may change. A
+  session on Bedrock, Vertex or a custom `ANTHROPIC_BASE_URL` is not offered an account. No
+  reset time is shown: the cycle is not in the response. The Mac keychain store is not read.
 - **Packaging:** `node irix/scripts/pack-local.mjs --out <dir>` builds seven tarballs from the
   last commit in a throwaway folder (scope `@irix`, brand applied, web UI built with
   `EXPO_PUBLIC_IRIX=1`). Version is `<upstream core>-irix.<timestamp>.g<short commit>`, with `.dirty` added when the working tree had uncommitted changes; the app package keeps
@@ -637,7 +649,8 @@ Not verified, so do not claim otherwise:
   system-CA trust there was not seen working; Windows and Linux were not run either. Check with
   `node -e "console.log(require('tls').getCACertificates('system').length)"` on a team machine.
   `ssl_verify = false` in a team member's python-gitlab config no longer disables verification.
-- Claude usage is off (upstream's `claude-usage-source` is not enabled).
+- Claude usage comes from `irix-claude-usage` (spend cap only, see above); it was run against one
+  real enterprise account, not a Pro or Max one. Upstream's `claude-usage-source` is not enabled.
 - Settings has "Enable terminal agent hooks", which edits the user's agent config files. It is
   upstream's and installs hooks only when switched on (unset means off). Keep it off while Paseo
   is installed beside Irix, or both write hooks into the same Claude config.

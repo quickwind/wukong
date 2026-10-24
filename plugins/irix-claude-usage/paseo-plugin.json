@@ -1,0 +1,6 @@
+{
+  "id": "irix-claude-usage",
+  "name": "Claude usage",
+  "description": "Shows the signed-in Claude account's monthly spend cap and, where the plan has them, session and weekly limits.",
+  "requirements": { "paseo": ">=0.11.2" }
+}

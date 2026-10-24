@@ -3,6 +3,7 @@
 // daemon start lives here, which keeps upstream files to a one-line import.
 
 import { activateIrixPolicy, isIrixActive } from "./policy.js";
+import { CLAUDE_USAGE_HOSTS } from "./claude-hosts.js";
 import { devinUsageHosts } from "./devin-hosts.js";
 import { allowEgressHost, installEgressGuard } from "./egress-guard.js";
 import { IRIX_HOST_CAPS_ENV, irixHostCapsEnvValue } from "./host-caps.js";
@@ -30,6 +31,11 @@ export function applyIrixEdition(): void {
 
   // The Devin usage plugin runs inside this guard and must reach Devin's own servers.
   for (const host of devinUsageHosts()) {
+    allowEgressHost(host);
+  }
+
+  // The Claude usage plugin likewise reaches api.anthropic.com for the account's spend cap.
+  for (const host of CLAUDE_USAGE_HOSTS) {
     allowEgressHost(host);
   }
 

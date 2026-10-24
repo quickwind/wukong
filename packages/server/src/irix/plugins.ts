@@ -13,7 +13,11 @@ export function irixManagedSources(
   return isIrixActive() ? undefined : sources;
 }
 
-export const IRIX_BUILTIN_PLUGINS: readonly string[] = ["irix-gitlab", "irix-devin-usage"];
+export const IRIX_BUILTIN_PLUGINS: readonly string[] = [
+  "irix-gitlab",
+  "irix-devin-usage",
+  "irix-claude-usage",
+];
 
 export function irixBuiltinPlugins(
   loader: BuiltinPluginLoader | undefined,
