@@ -8,7 +8,7 @@
 // Files Irix adds (irix/, plugins/irix-*, packages/*/src/irix/, workflows) are not counted:
 // they cannot conflict with upstream.
 //
-//   node irix/scripts/upstream-footprint.mjs [--base <ref>] [--max-files 55] [--max-lines 520]
+//   node irix/scripts/upstream-footprint.mjs [--base <ref>] [--max-files 48] [--max-lines 470]
 //
 // The base defaults to the merge base with upstream/main (run `git fetch upstream` first).
 import { execFileSync } from "node:child_process";
@@ -32,7 +32,7 @@ export function resolveBase(cwd, base) {
   }
 }
 
-export function footprint({ cwd = process.cwd(), base, to, maxFiles = 55, maxLines = 520 } = {}) {
+export function footprint({ cwd = process.cwd(), base, to, maxFiles = 48, maxLines = 470 } = {}) {
   const from = resolveBase(cwd, base);
   const diffTarget = to ? [from, to] : [from];
   const status = git(cwd, "diff", "--name-status", "-M", ...diffTarget)
@@ -77,8 +77,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const report = footprint({
     base: arg("base"),
     to: arg("to"),
-    maxFiles: Number(arg("max-files") ?? 55),
-    maxLines: Number(arg("max-lines") ?? 520),
+    maxFiles: Number(arg("max-files") ?? 48),
+    maxLines: Number(arg("max-lines") ?? 470),
   });
   console.log(
     `base ${report.base.slice(0, 9)}: ${report.modified.length} upstream files modified, ${report.lines} lines`,

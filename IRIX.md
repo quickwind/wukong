@@ -21,12 +21,12 @@ Paseo on company Windows machines, where nothing may be sent to cloud services:
 
 We want to merge upstream often and cheaply. Every line changed in an upstream file is a future
 merge conflict. An earlier attempt (the `internal-edition` branch, kept only for reference) edited
-126 upstream files and was abandoned for exactly that reason. This branch edits **51 upstream files, 520 lines** (`upstream-footprint.mjs`, 2026-10-22). The
-budget is 55 files and 520 lines. It was 40 and 400. Four things used the room, and nothing else
+126 upstream files and was abandoned for exactly that reason. This branch edits **46 upstream files, 462 lines** (`upstream-footprint.mjs`, against v0.13.0). The
+budget is 48 files and 470 lines. It was 40 and 400. Four things used the room, and nothing else
 may: the Name + Create bar (the New workspace screen and the new chat tab are upstream code, so no
 Irix-owned file can replace them) took it to 45 files and 420 lines, hiding a plugin-managed
 project from the sidebar (same reason) took the lines to 440, and Devin's skills in the ACP command
-list (one line in `acp-agent.ts`) took them to 447, which moved the budget to 450. The plugin `Markdown` component (upstream 995ad2f87, #7579, applied by hand because a cherry-pick conflicts) added 6 files and 69 lines (with their Irix marker comments), which moved the budget to 55 files and 516 lines; those lines match upstream verbatim and stop counting once this branch merges upstream. The two lists of
+list (one line in `acp-agent.ts`) took them to 447, which moved the budget to 450. The plugin `Markdown` component was carried by hand for a while (upstream 995ad2f87, #7579); v0.13.0 ships it and the copy is gone. Later work (schedules and agent messaging switched off, subagent approval, bypass modes, the CLI and daemon hooks) took it to 462. The two lists of
 changes were merged, so the numbers above are measured on the merge, not the sum of the two
 branches. The next upstream edit has to pay for itself by removing another; everything else is new
 files.
@@ -57,7 +57,7 @@ node irix/scripts/upstream-footprint.mjs     # lists every upstream file we modi
 ```
 
 It fails if an upstream file is deleted or renamed, if a modified upstream file has no `Irix`
-marker in the lines added, or if the totals pass the budget (55 files, 520 lines; change with
+marker in the lines added, or if the totals pass the budget (48 files, 470 lines; change with
 `--max-files`/`--max-lines`). **Run it before every commit that touches upstream files** and when
 you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
@@ -89,6 +89,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | `server/daemon-worker.ts`                                                                                                  | Imports the edition entry first (egress guard, policy)                                                                                                                                                                                                                                 |
 | `server/agent/providers/acp-agent.ts`, `terminal/terminal.ts`                                                              | One line each: Windows shell comes from `irixWindowsShell()` (PowerShell by default); `acp-agent.ts` also spreads `additionalDirectoriesParams(...)` into `session/new`, `session/load` and `session/resume`, and reads a provider's skills from `irix/command-kind.ts`                |
 | `server/config.ts`                                                                                                         | Terminal profiles fixed to Claude Code                                                                                                                                                                                                                                                 |
+| `server/websocket-server.ts`                                                                                               | Builds the connected-hosts registry through `createIrixConnectedHosts` (always empty in Irix)                                                                                                                                                                                          |
 | `server/session.ts`                                                                                                        | Clone requests only from the company GitLab; pull request text without the LLM (`irix/pr-text.ts`, two lines)                                                                                                                                                                          |
 | `server/agent/provider-registry.ts`                                                                                        | Restrict to Claude and Devin; Devin as configured ACP, with Irix's Devin client                                                                                                                                                                                                        |
 | `server/plugins/index.ts`                                                                                                  | No managed sources; only Irix's bundled plugins                                                                                                                                                                                                                                        |
