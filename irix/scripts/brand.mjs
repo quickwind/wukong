@@ -29,6 +29,27 @@ const GUARDED_OVERLAYS = {
     "daf84f1ce2598b60b57ea80bbaf0d208e6466da5d6c5d5fd9e142ffa7300680b",
 };
 
+// Overlay files that upstream does not have; every other overlay replaces a file upstream ships.
+const ADDED_OVERLAYS = new Set([
+  "packages/app/src/components/icons/irix-logo-geometry.ts",
+  "packages/app/public/pwa-icon-16.png",
+  "packages/app/public/pwa-icon-24.png",
+  "packages/app/public/pwa-icon-32.png",
+  "packages/app/public/pwa-icon-48.png",
+  "packages/app/public/pwa-icon-256.png",
+]);
+
+// An installed Chrome app takes its window, taskbar and desktop icons from the manifest's icon
+// list, picking the entry that fits each size. The small ones carry the mark alone (the text is
+// unreadable at 16 to 32 px); the larger ones, upstream's 192 and 512 replaced by Irix's, carry
+// the mark with the name.
+const MANIFEST_ICONS = [16, 24, 32, 48, 256]
+  .map(
+    (size) =>
+      `\n    { "src": "/pwa-icon-${size}.png", "sizes": "${size}x${size}", "type": "image/png", "purpose": "any" },`,
+  )
+  .join("");
+
 // Files with no user-visible product name.
 const I18N_WITHOUT_NAME = new Set(["plugin-settings.ts"]);
 
@@ -84,6 +105,12 @@ function textRules(root) {
       replacement: `"$1": "${BRAND}"`,
     },
     {
+      file: "packages/app/public/manifest.json",
+      pattern: /("icons": \[)/gu,
+      replacement: `$1${MANIFEST_ICONS}`,
+      applied: "/pwa-icon-16.png",
+    },
+    {
       file: "packages/app/public/index.html",
       pattern: /(apple-mobile-web-app-title" content=")Paseo"/gu,
       replacement: `$1${BRAND}"`,
@@ -136,7 +163,7 @@ function applyOverlay(root, relative, dryRun, log) {
   const target = path.join(root, relative);
   const replacement = readFileSync(source);
   const guard = GUARDED_OVERLAYS[relative.split(path.sep).join("/")];
-  const isNewFile = relative.endsWith("irix-logo-geometry.ts");
+  const isNewFile = ADDED_OVERLAYS.has(relative.split(path.sep).join("/"));
   if (!isNewFile && !existsSync(target)) {
     throw new Error(`Brand overlay target is missing (renamed or removed upstream?): ${relative}`);
   }

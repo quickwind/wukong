@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -64,6 +64,20 @@ test("brands the name, metadata, logo and CLI alias", () => {
   assert.deepEqual(JSON.parse(read(root, "packages/cli/package.json")).bin, {
     irix: "bin/irix",
   });
+});
+
+test("the web app manifest lists small icons without the name and large ones with it, once", () => {
+  const root = copyTree();
+  applyBrand({ root });
+  applyBrand({ root });
+  const { icons } = JSON.parse(read(root, "packages/app/public/manifest.json"));
+  assert.deepEqual(
+    icons.map((icon) => icon.sizes),
+    ["16x16", "24x24", "32x32", "48x48", "256x256", "192x192", "512x512"],
+  );
+  for (const icon of icons) {
+    assert.ok(existsSync(path.join(root, "packages/app/public", icon.src)), `${icon.src} exists`);
+  }
 });
 
 test("the About page says whose work this is, once, even if the brand runs twice", () => {
