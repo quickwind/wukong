@@ -53,6 +53,27 @@ export function allowEgressHost(host: string): () => void {
   };
 }
 
+/**
+ * A bundled plugin cannot import this module, but it is evaluated in this process and shares
+ * `globalThis`. While the guard is installed, this key holds a function that allows one host name
+ * (a plain DNS name or an IP: no scheme, port or path). Plugins call it for the GitLab they are
+ * about to reach; without the guard (stock Paseo) nothing is there and calling it is skipped.
+ */
+export const ALLOW_EGRESS_HOST_KEY = Symbol.for("irix.allowEgressHost");
+
+const HOST_NAME = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/u;
+
+function allowHostFromPlugin(host: unknown): void {
+  if (typeof host !== "string") {
+    throw new TypeError("allowEgressHost takes a host name");
+  }
+  const normalized = normalizeHost(host);
+  if (!HOST_NAME.test(normalized) && !net.isIP(normalized)) {
+    throw new TypeError(`Not a host name: ${host}`);
+  }
+  allowedHosts.add(normalized);
+}
+
 function isAllowed(host: string): boolean {
   const normalized = normalizeHost(host);
   return isLoopbackHost(normalized) || allowedHosts.has(normalized);
@@ -149,7 +170,10 @@ export function installEgressGuard(options: EgressGuardOptions = {}): () => void
     return (originalListen as (...rest: unknown[]) => net.Server).apply(this, args);
   } as typeof net.Server.prototype.listen;
 
+  (globalThis as Record<symbol, unknown>)[ALLOW_EGRESS_HOST_KEY] = allowHostFromPlugin;
+
   uninstallActive = () => {
+    delete (globalThis as Record<symbol, unknown>)[ALLOW_EGRESS_HOST_KEY];
     net.Socket.prototype.connect = originalConnect;
     net.Server.prototype.listen = originalListen;
     uninstallActive = null;

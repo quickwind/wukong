@@ -279,6 +279,7 @@ import { runGitCommand } from "../utils/run-git-command.js";
 import { CreateAgentLifecycleDispatch } from "./agent/create-agent-lifecycle-dispatch.js";
 import { resolveWorktreeSourceCwd } from "./workspace-source.js";
 import { assertIrixAgentMessagingAllowed } from "../irix/restrictions.js";
+import { createIrixGitMetadataGenerator } from "../irix/pr-text.js"; // Irix: pull request text without the LLM
 
 type ProviderSubagentManagerEvent = Extract<
   AgentManagerEvent,
@@ -943,7 +944,7 @@ export class Session {
       workspaceGitService: this.workspaceGitService,
       github: this.github,
       checkoutDiffManager,
-      gitMetadataGenerator: createGitMetadataGenerator({
+      gitMetadataGenerator: createIrixGitMetadataGenerator(createGitMetadataGenerator, {
         workspaceGitService: this.workspaceGitService,
         generation: createAgentStructuredTextGeneration({
           agentManager: this.agentManager,

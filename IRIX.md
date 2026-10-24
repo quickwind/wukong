@@ -21,8 +21,8 @@ Paseo on company Windows machines, where nothing may be sent to cloud services:
 
 We want to merge upstream often and cheaply. Every line changed in an upstream file is a future
 merge conflict. An earlier attempt (the `internal-edition` branch, kept only for reference) edited
-126 upstream files and was abandoned for exactly that reason. This branch edits **51 upstream files, 517 lines** (`upstream-footprint.mjs`, 2026-10-22). The
-budget is 55 files and 517 lines. It was 40 and 400. Four things used the room, and nothing else
+126 upstream files and was abandoned for exactly that reason. This branch edits **51 upstream files, 520 lines** (`upstream-footprint.mjs`, 2026-10-22). The
+budget is 55 files and 520 lines. It was 40 and 400. Four things used the room, and nothing else
 may: the Name + Create bar (the New workspace screen and the new chat tab are upstream code, so no
 Irix-owned file can replace them) took it to 45 files and 420 lines, hiding a plugin-managed
 project from the sidebar (same reason) took the lines to 440, and Devin's skills in the ACP command
@@ -57,7 +57,7 @@ node irix/scripts/upstream-footprint.mjs     # lists every upstream file we modi
 ```
 
 It fails if an upstream file is deleted or renamed, if a modified upstream file has no `Irix`
-marker in the lines added, or if the totals pass the budget (55 files, 517 lines; change with
+marker in the lines added, or if the totals pass the budget (55 files, 520 lines; change with
 `--max-files`/`--max-lines`). **Run it before every commit that touches upstream files** and when
 you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
@@ -87,7 +87,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | `server/daemon-worker.ts`                                                                                                  | Imports the edition entry first (egress guard, policy)                                                                                                                                                                                                                                 |
 | `server/agent/providers/acp-agent.ts`, `terminal/terminal.ts`                                                              | One line each: Windows shell comes from `irixWindowsShell()` (PowerShell by default); `acp-agent.ts` also spreads `additionalDirectoriesParams(...)` into `session/new`, `session/load` and `session/resume`, and reads a provider's skills from `irix/command-kind.ts`                |
 | `server/config.ts`                                                                                                         | Terminal profiles fixed to Claude Code                                                                                                                                                                                                                                                 |
-| `server/session.ts`                                                                                                        | Clone requests only from the company GitLab                                                                                                                                                                                                                                            |
+| `server/session.ts`                                                                                                        | Clone requests only from the company GitLab; pull request text without the LLM (`irix/pr-text.ts`, two lines)                                                                                                                                                                          |
 | `server/agent/provider-registry.ts`                                                                                        | Restrict to Claude and Devin; Devin as configured ACP, with Irix's Devin client                                                                                                                                                                                                        |
 | `server/plugins/index.ts`                                                                                                  | No managed sources; only Irix's bundled plugins                                                                                                                                                                                                                                        |
 | `server/plugins/compiler.ts`                                                                                               | Lets plugins written for `@getpaseo/plugin` build here                                                                                                                                                                                                                                 |
@@ -116,6 +116,13 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   adds later. It **does not cover** child processes (provider CLIs, `git`,
   `npm`) or **third-party plugins**, which run in their own forked process (verified: one reached
   the internet). The bundled plugins run inside the daemon and are covered.
+  **The GitLab host is allowed by the code that is about to use it**, not at startup: the REST client
+  (`gitlab/rest-client.ts`) allows the host of `gitlab.url`, and the bundled `irix-gitlab` plugin allows
+  the host of whatever URL it is about to call (the setup form's URL included). The plugin runs in this
+  process and cannot import the guard, so `installEgressGuard` leaves a function under
+  `Symbol.for("irix.allowEgressHost")` on `globalThis`; it accepts a bare host name only. Python-gitlab
+  ran as a child process and was never blocked, so this was missing when the REST client replaced it,
+  and every GitLab call failed with "Irix blocked a connection". `IRIX_ALLOWED_HOSTS` still works.
 - **Devin client** (`irix/devin-client.ts`, chosen from `provider-registry.ts` the way upstream picks
   its Cursor and Kimi clients): ACP has no system prompt and upstream's ACP session never reads
   `config.systemPrompt`, so Bots' identity and soul never reached Devin. The client puts the
@@ -254,21 +261,54 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   `NODE_EXTRA_CA_CERTS` still works, and `ssl_verify = /path/ca.pem` in the python-gitlab section
   adds that file. `ssl_verify = false` is ignored on purpose. It needs Node 22.15 or newer; on
   older Node only the bundled CAs and `NODE_EXTRA_CA_CERTS` apply.
+  **Pull request text without a model** (`irix/pr-text.ts`, two lines in `session.ts`): upstream's
+  button asks an agent to write the title and description, which starts a provider session on every
+  click (many seconds on a Devin-only machine). With the Irix policy on, the metadata generator
+  answers at once with an empty title and description. GitLab's new merge request page fills those in
+  itself, and the API path (no `upstream` remote) drafts them just before it creates the request, the
+  way GitLab does: one commit gives its subject and body; several give the tidied branch name as the
+  title and the subjects, oldest first, as the description. Commit messages are still written by the
+  model. The seam is the factory call in `session.ts`, which takes upstream's creator as an argument
+  so the import block stays as it was.
   **Create merge request** (`gitlab/upstream-merge-request.ts`, wrapped around the service's
   `createPullRequest` in `adapter.ts`): upstream's button pushes the branch and then asks the forge
-  service to create the request, with the title and description the daemon drafts. When the checkout
-  has an `upstream` remote on the configured GitLab that is a different project from `origin` (the
-  layout Fork clone makes), nothing is created over the API. The daemon looks up both projects, then
-  opens GitLab's "new merge request" page in the default browser of the machine it runs on
-  (`rundll32 url.dll,FileProtocolHandler` / `open` / `xdg-open`, no shell), from the current branch of
-  `origin` to the default branch of `upstream`, with the drafted title and description in the address
-  (a long description is cut to keep it under 6000 characters). The request exists once the person
-  submits that page. Because upstream's client treats any answer as "created", the page-opened case is
-  returned as an error, so the toast is red and reads "Opened the new merge request page in your
-  browser (...)"; a client edit (two upstream files) would turn it into a plain notice. This works
-  because Irix's daemon listens on loopback only, so the browser is on the same machine. Without an
-  `upstream` remote, or when it is on another server or is the same project as `origin`, the request is
-  created over the API as before.
+  service to create the request. When the checkout has an `upstream` remote on the configured GitLab
+  that is a different project from `origin` (the layout Fork clone makes), nothing is created over the
+  API. The daemon opens GitLab's "new merge request" page in the default browser of the machine it
+  runs on (`rundll32 url.dll,FileProtocolHandler` / `open` / `xdg-open`, no shell), from the current
+  branch of `origin` to the default branch of `upstream`, and gives only those two ends (the page is the fork's own, `<origin project>/-/merge_requests/new`, with `target_project_id` naming the upstream project; under the upstream project's path GitLab looks for the branch in the wrong project and reports it missing): GitLab fills
+  the title and description itself from the commits and the project's template. The request exists
+  once the person submits that page. Because upstream's client treats any answer as "created", the
+  page-opened case is returned as an error, so the toast is red and reads "Opened the new merge
+  request page in your browser (...)"; a client edit (two upstream files) would turn it into a plain
+  notice. This works because Irix's daemon listens on loopback only, so the browser is on the same
+  machine. Without an `upstream` remote, or when it is on another server or is the same project as
+  `origin`, the request is created over the API as before.
+  **A closed merge request does not hide the button.** Upstream treats a merge request that is closed
+  but whose head commit is the branch's current commit as the branch's current one, so the button
+  stayed "View merge request" until the branch got a new commit. `withoutAbandonedMergeRequest`
+  (`gitlab/adapter.ts`, around `getCurrentPullRequestStatus`) reports none for a request that was
+  closed without merging, so the button offers to create a new one; a merged request still shows,
+  as merged.
+  **Where a fork's merge requests are looked for** (`gitlab/fork-scope.ts`, `resolveMergeRequestScope`
+  in `client.ts` / `rest-client.ts`): GitLab keeps a merge request in its target project, so for a
+  checkout with an `upstream` remote on the same GitLab (a different project from `origin`) the
+  requests are in the upstream project. Viewing, listing, merging, cancelling auto-merge and reading
+  pipelines (`glab-runner.ts`) therefore ask the upstream project, and `mr list --source-branch` keeps
+  only requests whose `source_project_id` is the fork's, because other people's forks may have a
+  branch of the same name. Creating a request over the API and listing issues still use
+  `resolveProject`, the project of `origin`. Approvals and discussions use the project the request
+  names for itself. Without an `upstream` remote nothing changes. Not checked against a real GitLab:
+  where a fork request's pipelines run and the permissions needed on the upstream project.
+  **The lookups behind the click are cached** (`gitlab/upstream-cache.ts`), because on a busy
+  Windows daemon every git process waits in a queue (a `checkout_status_request` took 26 s in one
+  log): the `origin` and `upstream` URLs are kept until the repository's config file changes (a `stat`
+  of `<git common dir>/config`, no process; the first look costs one `git rev-parse` and two `git
+config`), and the id and default branch of the two projects for a day, in memory (a restart asks
+  again). A failed lookup is not kept. Adding an `upstream` remote changes the config file, so the next
+  click sees it. The branch name needs no lookup: upstream computes it and passes it in. The same
+  cached remotes serve `resolveProject` and the merge request lookups, which used to run `git config`
+  once per command (about 100 of them in a 30 s window on one team machine).
   Configuration is `<home>/irix.json` or `IRIX_GITLAB_*`; the URL must be https. The `command` field
   no longer applies to the daemon; the plugin below still runs it. The GitLab settings screen
   (Command Center item, or the button on the GitLab page; built-in plugins have no Settings →
@@ -304,6 +344,14 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   `EXPO_PUBLIC_IRIX=1`). Version is `<upstream core>-irix.<timestamp>.g<short commit>`, with `.dirty` added when the working tree had uncommitted changes; the app package keeps
   upstream's version because Expo rejects other forms. All seven must be installed together or npm
   fetches upstream packages and the guard's promise is gone.
+- **Installed-app icons** (`irix/brand/files/packages/app/public/pwa-icon-*.png`, rule in `brand.mjs`):
+  an app installed from Chrome takes its window, taskbar and desktop icons from the manifest's icon
+  list, choosing the entry that fits each size. Irix lists the mark alone at 16, 24 and 32 px and the
+  mark with the name at 48, 192, 256 and 512 px, so the name shows only where it can be read. This is
+  an experiment: the manifest has no per-surface setting, so which size each surface uses depends on
+  Chrome and on the display scaling (at 150% the Windows taskbar asks for 48 px and gets the version
+  with the name). `favicon.ico` and the browser-tab icons never carry the name. Redraw the small ones
+  from `favicon-dark.svg` and the large ones from `icon.png` when the mark changes.
 - **Isolation from Paseo:** only an `irix` binary (no `paseo`), home `~/.irix` or
   `IRIX_HOME`, port 6890, and the CLI ignores `PASEO_HOME`/`PASEO_HOST` inherited from a
   terminal opened inside Paseo.

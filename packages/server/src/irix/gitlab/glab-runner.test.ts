@@ -25,7 +25,10 @@ const mergeRequest = {
   head_pipeline: { id: 99, status: "running" },
 };
 
-function fakeClient(): { client: GitLabClient; calls: Record<string, unknown[]> } {
+function fakeClient(fork?: { origin: string; project: string; sourceProjectId: number }): {
+  client: GitLabClient;
+  calls: Record<string, unknown[]>;
+} {
   const calls: Record<string, unknown[]> = {};
   const record =
     <T>(name: string, result: T) =>
@@ -35,7 +38,11 @@ function fakeClient(): { client: GitLabClient; calls: Record<string, unknown[]> 
     };
   const pipeline = { id: 99, status: "running", jobs: [] };
   const client = {
-    resolveProject: record("resolveProject", PROJECT),
+    resolveProject: record("resolveProject", fork?.origin ?? PROJECT),
+    resolveMergeRequestScope: record("resolveMergeRequestScope", {
+      project: fork?.project ?? PROJECT,
+      sourceProjectId: fork?.sourceProjectId ?? null,
+    }),
     currentUser: record("currentUser", { id: 1, username: "me" }),
     getMergeRequest: record("getMergeRequest", mergeRequest),
     listMergeRequests: record("listMergeRequests", [mergeRequest]),
@@ -77,8 +84,8 @@ function fakeClient(): { client: GitLabClient; calls: Record<string, unknown[]> 
   return { client, calls };
 }
 
-function setup() {
-  const { client, calls } = fakeClient();
+function setup(fork?: Parameters<typeof fakeClient>[0]) {
+  const { client, calls } = fakeClient(fork);
   const service = createGitLabService({
     runner: createGlabCompatRunner(client),
     resolveGlabPath: async () => "python-gitlab",
@@ -240,5 +247,52 @@ describe("glab-compatible runner behind upstream's GitLab service", () => {
       resolveRemoteUrl: async () => `git@gitlab.example.com:${PROJECT}.git`,
     });
     expect(await service.isAuthenticated({ cwd })).toBe(false);
+  });
+});
+
+describe("a fork with an upstream project", () => {
+  // The checkout's origin is the fork; its merge requests are kept in the upstream project.
+  const fork = { origin: "me/app", project: "group/app", sourceProjectId: 11 };
+
+  it("looks the branch's merge request up in the upstream project, keeping the fork's own", async () => {
+    const { service, calls } = setup(fork);
+    await service.getCurrentPullRequestStatus({ cwd, headRef: "feature", headSha: "abc123" });
+    expect(calls.listMergeRequests?.[0]).toMatchObject({
+      project: "group/app",
+      sourceBranch: "feature",
+      sourceProjectId: 11,
+    });
+    expect(calls.getMergeRequest?.[0]).toMatchObject({ project: "group/app", iid: 7 });
+    // Approvals and discussions use the project the request itself names, so they follow it.
+  });
+
+  it("does not narrow a free-text search to the fork's own requests", async () => {
+    const { service, calls } = setup(fork);
+    await service.listPullRequests({ cwd, query: "thing", limit: 5 });
+    expect(calls.listMergeRequests?.[0]).toMatchObject({ project: "group/app", search: "thing" });
+    expect(calls.listMergeRequests?.[0]).not.toHaveProperty("sourceProjectId");
+  });
+
+  it("merges and cancels auto-merge in the project that holds the request", async () => {
+    const { service, calls } = setup(fork);
+    const status = await service.getCurrentPullRequestStatus({ cwd, headRef: "feature" });
+    await service.mergePullRequest({ cwd, prNumber: 7, mergeMethod: "merge", status } as never);
+    expect(calls.merge?.[0]).toMatchObject({ project: "group/app", iid: 7 });
+    await service.disablePullRequestAutoMerge({ cwd, prNumber: 7 } as never);
+    expect(calls.cancelAutoMerge?.[0]).toMatchObject({ project: "group/app", iid: 7 });
+  });
+
+  it("still creates a request, and lists issues, in the checkout's own project", async () => {
+    const { service, calls } = setup(fork);
+    await service.createPullRequest({
+      cwd,
+      title: "t",
+      body: "b",
+      head: "feature",
+      base: "main",
+    });
+    expect(calls.createMergeRequest?.[0]).toMatchObject({ project: "me/app" });
+    await service.listIssues({ cwd, query: "bug", limit: 4 });
+    expect(calls.listIssues?.[0]).toMatchObject({ project: "me/app" });
   });
 });

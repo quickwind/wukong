@@ -11,6 +11,18 @@ import { installSystemCa } from "./system-ca.js";
 const REQUEST_TIMEOUT_MS = 30_000;
 const CREDENTIALS_CACHE_MS = 5 * 60_000;
 
+// Irix's egress guard refuses connections to hosts it has not been told about. It leaves a function
+// under this key on `globalThis` (the plugin runs in the daemon process) for exactly this.
+const ALLOW_EGRESS_HOST_KEY = Symbol.for("irix.allowEgressHost");
+
+/** Tells the egress guard (when there is one) that the GitLab at `url` is about to be contacted. */
+function allowGitLabHost(url: string): void {
+  const allow = (globalThis as Record<symbol, unknown>)[ALLOW_EGRESS_HOST_KEY];
+  if (typeof allow === "function") {
+    allow(new URL(url).hostname);
+  }
+}
+
 export type GitLabApi = InstanceType<typeof Gitlab>;
 
 /** A failed request: the HTTP status when GitLab answered, null when it did not. */
@@ -87,6 +99,7 @@ export function forgetApis(): void {
 }
 
 export async function gitlabApi(target: ApiTarget): Promise<GitLabApi> {
+  allowGitLabHost(target.url);
   const env = target.env ?? process.env;
   const key = `${target.url}#${target.section ?? ""}#${env.PYTHON_GITLAB_CFG ?? ""}`;
   const hit = cache.get(key);
@@ -105,6 +118,7 @@ export async function gitlabApi(target: ApiTarget): Promise<GitLabApi> {
 
 /** A token that is not in the config yet (the setup form), tried once. */
 export function gitlabApiWithToken(url: string, token: string): GitLabApi {
+  allowGitLabHost(url);
   installSystemCa();
   return new Gitlab({ host: url, queryTimeout: REQUEST_TIMEOUT_MS, token });
 }

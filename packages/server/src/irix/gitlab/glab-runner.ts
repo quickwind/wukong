@@ -159,7 +159,12 @@ export function createGlabCompatRunner(client: GitLabClient): GlabCommandRunner 
     const { positionals, flags } = parseArgs(args.slice(1));
     const target = positionals[0] ?? "";
     const method = (flags.get("--method") ?? "GET").toUpperCase();
-    const projectEncoded = encodeURIComponent(await client.resolveProject(cwd));
+    // `:fullpath` stands for the project of the thing asked for: issues are looked up where the
+    // checkout is, merge requests where they are kept (see resolveMergeRequestScope).
+    const project = /\/issues(\?|$)/u.test(target)
+      ? await client.resolveProject(cwd)
+      : (await client.resolveMergeRequestScope(cwd)).project;
+    const projectEncoded = encodeURIComponent(project);
     const resolved = target.replace(":fullpath", projectEncoded).replace(":id", projectEncoded);
 
     const listMatch = API_LIST_PATH.exec(resolved);
@@ -176,7 +181,7 @@ export function createGlabCompatRunner(client: GitLabClient): GlabCommandRunner 
   }
 
   async function ciGet(flags: Map<string, string>, cwd: string) {
-    const project = await client.resolveProject(cwd);
+    const { project } = await client.resolveMergeRequestScope(cwd);
     const mergeRequest = flags.get("--merge-request");
     if (mergeRequest !== undefined) {
       const pipeline = await client.getLatestMrPipelineWithJobs({
@@ -208,7 +213,7 @@ export function createGlabCompatRunner(client: GitLabClient): GlabCommandRunner 
       return { stdout: `${created.webUrl}\n`, stderr: "" };
     }
     if (action === "view") {
-      const project = await client.resolveProject(cwd);
+      const { project } = await client.resolveMergeRequestScope(cwd);
       return json(
         await client.getMergeRequest({
           cwd,
@@ -218,7 +223,7 @@ export function createGlabCompatRunner(client: GitLabClient): GlabCommandRunner 
       );
     }
     if (action === "list") {
-      const project = await client.resolveProject(cwd);
+      const { project, sourceProjectId } = await client.resolveMergeRequestScope(cwd);
       const sourceBranch = flags.get("--source-branch");
       const search = flags.get("--search");
       const limit = optionalLimit(flags);
@@ -227,7 +232,9 @@ export function createGlabCompatRunner(client: GitLabClient): GlabCommandRunner 
           cwd,
           project,
           ...(flags.has("--all") ? {} : { state: "opened" as const }),
-          ...(sourceBranch !== undefined ? { sourceBranch } : {}),
+          // Several people may have a branch of this name in their forks: ours is the one whose
+          // source is this checkout's project. A free-text search is not about the checkout.
+          ...(sourceBranch !== undefined ? { sourceBranch, sourceProjectId } : {}),
           ...(search ? { search } : {}),
           ...(limit !== undefined ? { limit } : {}),
         }),
@@ -237,7 +244,7 @@ export function createGlabCompatRunner(client: GitLabClient): GlabCommandRunner 
       if (flags.has("--rebase")) {
         fail("Rebase merge is not supported by the Irix GitLab adapter; use merge or squash");
       }
-      const project = await client.resolveProject(cwd);
+      const { project } = await client.resolveMergeRequestScope(cwd);
       const iid = positiveInt(positionals[0], "merge request number");
       if (flags.has("--squash")) {
         await client.setSquash({ cwd, project, iid, squash: true });

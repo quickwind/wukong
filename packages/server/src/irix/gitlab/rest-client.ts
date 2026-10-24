@@ -9,9 +9,11 @@
 
 import { Gitlab } from "@gitbeaker/rest";
 import { z } from "zod";
-import { defaultResolveRemoteUrl } from "../../services/forge-cli-command.js";
-import { GitLabApiError, type GitLabClient } from "./client.js";
+import { allowEgressHost } from "../egress-guard.js";
+import { GitLabApiError, type GitLabClient, type MergeRequestScope } from "./client.js";
 import { parseGitLabProjectPath, type GitLabForgeConfig } from "./config.js";
+import { forkPairOf, readRemoteUrls, type RemoteReader } from "./fork-scope.js";
+import { defaultUpstreamCaches, type UpstreamCaches } from "./upstream-cache.js";
 import {
   GitLabCredentialsError,
   resolveGitLabCredentials,
@@ -28,6 +30,7 @@ import {
   GitLabPipelineJobSchema,
   GitLabProjectSchema,
   type GitLabMergeRequest,
+  type GitLabProject,
   type GitLabPipelineDetails,
   type GitLabPipelineJob,
 } from "./schemas.js";
@@ -47,7 +50,14 @@ const CERTIFICATE_CODES = new Set([
 
 export interface GitLabRestClientOptions {
   config: GitLabForgeConfig;
+  /** Test seam: the URL of `origin`, in place of reading it from git (no `upstream` is then seen). */
   resolveRemoteUrl?: (cwd: string) => Promise<string | null>;
+  /** Test seam: replaces reading a remote's URL from git. */
+  readRemote?: RemoteReader;
+  /** Test seam: what tells the cached remotes of a checkout are out of date (null: never cache). */
+  fingerprint?: (cwd: string) => Promise<string | null>;
+  /** Test seam: fresh caches instead of the daemon-wide ones. */
+  caches?: UpstreamCaches;
   /** Test seam: replaces the lookup of the python-gitlab config and environment. */
   resolveCredentials?: () => Promise<GitLabCredentials>;
 }
@@ -114,7 +124,15 @@ function normalizeMergeRequest(mr: GitLabMergeRequest): GitLabMergeRequest {
 
 export function createGitLabRestClient(options: GitLabRestClientOptions): GitLabClient {
   const { config } = options;
-  const resolveRemoteUrl = options.resolveRemoteUrl ?? defaultResolveRemoteUrl;
+  const caches = options.caches ?? defaultUpstreamCaches;
+  const readOrigin = options.resolveRemoteUrl;
+  const readRemote: RemoteReader | undefined =
+    options.readRemote ??
+    (readOrigin
+      ? (cwd, remote) => (remote === "origin" ? readOrigin(cwd) : Promise.resolve(null))
+      : undefined);
+  const remoteUrls = (cwd: string) =>
+    readRemoteUrls({ cwd, read: readRemote, fingerprint: options.fingerprint, caches });
   const loadCredentials =
     options.resolveCredentials ??
     (() => resolveGitLabCredentials({ section: config.configSection }));
@@ -123,6 +141,8 @@ export function createGitLabRestClient(options: GitLabRestClientOptions): GitLab
 
   async function api(): Promise<InstanceType<typeof Gitlab>> {
     if (cached && Date.now() - cached.at < TOKEN_CACHE_MS) return cached.api;
+    // The configured GitLab is the one server this edition talks to; the egress guard needs to know.
+    allowEgressHost(new URL(config.url).hostname);
     const credentials = await loadCredentials();
     installSystemCa({ extraFiles: credentials.caFile ? [credentials.caFile] : [] });
     const common = { host: config.url, queryTimeout: REQUEST_TIMEOUT_MS };
@@ -162,14 +182,27 @@ export function createGitLabRestClient(options: GitLabRestClientOptions): GitLab
 
   return {
     async resolveProject(cwd) {
-      const remoteUrl = await resolveRemoteUrl(cwd);
-      const project = remoteUrl ? parseGitLabProjectPath(config, remoteUrl) : null;
+      const { origin } = await remoteUrls(cwd);
+      const project = origin ? parseGitLabProjectPath(config, origin) : null;
       if (!project) {
         throw new GitLabApiError(
           `The origin remote of ${cwd} does not belong to the configured GitLab (${config.url})`,
         );
       }
       return project;
+    },
+
+    async resolveMergeRequestScope(cwd): Promise<MergeRequestScope> {
+      const urls = await remoteUrls(cwd);
+      const pair = forkPairOf(config, urls);
+      if (!pair) {
+        return { project: await this.resolveProject(cwd), sourceProjectId: null };
+      }
+      // The same cached lookup the Create button uses (upstream-merge-request.ts).
+      const source = (await caches.projects.get(`${config.url}|${pair.originPath}`, "project", () =>
+        call((gitlab) => gitlab.Projects.show(pair.originPath), GitLabProjectSchema),
+      )) as GitLabProject;
+      return { project: pair.upstreamPath, sourceProjectId: source.id };
     },
 
     currentUser() {
@@ -197,7 +230,11 @@ export function createGitLabRestClient(options: GitLabRestClientOptions): GitLab
           }),
         z.array(GitLabMergeRequestSchema),
       );
-      return mergeRequests.map(normalizeMergeRequest);
+      const own =
+        input.sourceProjectId == null
+          ? mergeRequests
+          : mergeRequests.filter((mr) => mr.source_project_id === input.sourceProjectId);
+      return own.map(normalizeMergeRequest);
     },
 
     listDiscussions(input) {

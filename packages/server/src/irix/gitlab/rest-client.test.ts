@@ -14,6 +14,7 @@ import { GitLabApiError } from "./client.js";
 import { LOCALHOST_CERT, LOCALHOST_KEY } from "./fixtures/localhost-tls.js";
 import { parseCfg, resolveGitLabCredentials } from "./credentials.js";
 import { createGitLabRestClient } from "./rest-client.js";
+import { installEgressGuard } from "../egress-guard.js";
 import { installSystemCa } from "./system-ca.js";
 
 const CERT_FILE = join(mkdtempSync(join(tmpdir(), "irix-rest-cert-")), "localhost.pem");
@@ -35,6 +36,8 @@ const mergeRequest = {
   sha: "abc",
   references: { full: "g/app!7" },
 };
+
+const asApiError = (error: unknown) => error as GitLabApiError;
 
 describe("GitLab REST client", () => {
   let server: https.Server;
@@ -203,6 +206,37 @@ describe("GitLab REST client", () => {
 
     it("does not treat ssl_verify booleans as a CA file", () => {
       expect(parseCfg("[a]\nssl_verify = false\n").get("a")?.get("ssl_verify")).toBe("false");
+    });
+  });
+
+  describe("with the egress guard installed", () => {
+    it("allows the configured GitLab host and no other", async () => {
+      const uninstall = installEgressGuard();
+      try {
+        const make = (host: string) =>
+          createGitLabRestClient({
+            config: { url: `https://${host}` },
+            resolveRemoteUrl: async () => null,
+            resolveCredentials: async () => ({ kind: "private", token: "t", caFile: null }),
+          });
+        // The configured host gets past the guard (and then fails to resolve, as .invalid never does).
+        const reached = await make("gitlab.company.invalid").currentUser("/x").catch(asApiError);
+        expect(reached.stderr).toMatch(/Cannot reach GitLab/u);
+        expect(reached.stderr).not.toMatch(/Irix blocked/u);
+        // A host nobody configured stays blocked, whatever else has been allowed.
+        const other = await createGitLabRestClient({
+          config: { url: "https://other.invalid" },
+          resolveRemoteUrl: async () => null,
+          resolveCredentials: async () => {
+            throw new GitLabApiError("no credentials");
+          },
+        })
+          .currentUser("/x")
+          .catch(asApiError);
+        expect(other.stderr).toBe("no credentials");
+      } finally {
+        uninstall();
+      }
     });
   });
 });

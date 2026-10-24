@@ -34,6 +34,8 @@ export interface ProjectScope {
 }
 
 export interface ListMergeRequestsInput extends ProjectScope {
+  /** Keep only requests whose source is this project (a fork's requests, listed in its upstream). */
+  sourceProjectId?: number | null;
   sourceBranch?: string;
   search?: string;
   /** Omit for every state. */
@@ -72,9 +74,22 @@ export interface SearchProjectsInput {
   limit?: number;
 }
 
+/** Where a checkout's merge requests are, and which of them are the checkout's own. */
+export interface MergeRequestScope {
+  project: string;
+  /** Set when the requests are in an upstream project: only those from this fork are ours. */
+  sourceProjectId: number | null;
+}
+
 export interface GitLabClient {
   /** Project path of the checkout's `origin`, resolved against the configured GitLab. */
   resolveProject(cwd: string): Promise<string>;
+  /**
+   * The project that holds the checkout's merge requests: `origin`'s, or, for a fork with an
+   * `upstream` remote on the same GitLab, the upstream project (GitLab keeps a request in its
+   * target project).
+   */
+  resolveMergeRequestScope(cwd: string): Promise<MergeRequestScope>;
   currentUser(cwd: string): Promise<GitLabCurrentUser>;
   getMergeRequest(input: ProjectScope & { iid: number }): Promise<GitLabMergeRequest>;
   listMergeRequests(input: ListMergeRequestsInput): Promise<GitLabMergeRequest[]>;

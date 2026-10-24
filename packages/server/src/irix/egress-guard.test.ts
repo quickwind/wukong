@@ -3,6 +3,7 @@ import net from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  ALLOW_EGRESS_HOST_KEY,
   allowEgressHost,
   EgressBlockedError,
   installEgressGuard,
@@ -79,6 +80,29 @@ describe("egress guard", () => {
     revoke();
     expect(errors.some((error) => error instanceof EgressBlockedError)).toBe(false);
     expect(blocked).toEqual([]);
+  });
+
+  it("lets a bundled plugin allow a host through a function on globalThis, while installed", async () => {
+    const allow = (globalThis as Record<symbol, unknown>)[ALLOW_EGRESS_HOST_KEY] as (
+      host: unknown,
+    ) => void;
+    expect(typeof allow).toBe("function");
+    expect(await connectError({ host: "gitlab.corp.invalid", port: 443 })).toBeInstanceOf(
+      EgressBlockedError,
+    );
+    allow("GitLab.Corp.Invalid");
+    expect(await connectError({ host: "gitlab.corp.invalid", port: 443 })).not.toBeInstanceOf(
+      EgressBlockedError,
+    );
+    for (const bad of ["https://gitlab.corp.invalid", "gitlab.corp.invalid:443", "a b", "", 5]) {
+      expect(() => allow(bad)).toThrow(TypeError);
+    }
+  });
+
+  it("removes that function when uninstalled", () => {
+    uninstall();
+    expect((globalThis as Record<symbol, unknown>)[ALLOW_EGRESS_HOST_KEY]).toBeUndefined();
+    uninstall = installEgressGuard();
   });
 
   it("refuses to listen on a non-loopback address, even an allowlisted one", () => {

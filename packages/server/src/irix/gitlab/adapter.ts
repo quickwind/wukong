@@ -8,6 +8,7 @@ import { isIrixActive } from "../policy.js";
 import { loadGitLabForgeConfig, matchesGitLabForgeHost, type GitLabForgeConfig } from "./config.js";
 import { createGlabCompatRunner } from "./glab-runner.js";
 import { createGitLabRestClient } from "./rest-client.js";
+import { draftPullRequestTextForCheckout } from "../pr-text.js";
 import { openUpstreamMergeRequestPage, type LaunchBrowser } from "./upstream-merge-request.js";
 
 // Read once: a changed irix.json takes effect when the daemon restarts.
@@ -36,15 +37,23 @@ export function createIrixGitLabAdapter(
         runner: createGlabCompatRunner(client),
         resolveGlabPath: async () => "gitlab-rest",
       });
-      // A checkout with an `upstream` remote proposes its branch there, on GitLab's own page.
+      // A checkout with an `upstream` remote proposes its branch there, on GitLab's own page, which
+      // fills in the title and description. Without one the API needs a title, so draft it now.
       const createPullRequest = service.createPullRequest.bind(service);
       service.createPullRequest = async (input) => {
         await openUpstreamMergeRequestPage(
           { config, client, launch },
           { cwd: input.cwd, head: input.head, title: input.title, body: input.body },
         );
-        return createPullRequest(input);
+        if (input.title) {
+          return createPullRequest(input);
+        }
+        const draft = await draftPullRequestTextForCheckout(input.cwd);
+        return createPullRequest({ ...input, title: draft.title, body: input.body || draft.body });
       };
+      const getCurrentPullRequestStatus = service.getCurrentPullRequestStatus.bind(service);
+      service.getCurrentPullRequestStatus = async (input) =>
+        withoutAbandonedMergeRequest(await getCurrentPullRequestStatus(input));
       return service;
     },
     matchesHost(host) {
@@ -55,6 +64,18 @@ export function createIrixGitLabAdapter(
 }
 
 type ForgeEntry = readonly [string, ForgeAdapterRegistration];
+
+/**
+ * Upstream keeps showing a closed merge request as the branch's current one for as long as the
+ * branch is at the commit it had (the button stays "View merge request"). A merge request that was
+ * closed without merging is over, so Irix reports none and the button offers to create a new one.
+ * A merged request still shows, as merged.
+ */
+export function withoutAbandonedMergeRequest<T extends { state: string; isMerged: boolean }>(
+  status: T | null,
+): T | null {
+  return status && status.state === "closed" && !status.isMerged ? null : status;
+}
 
 /** Upstream's adapters unless Irix is active, in which case GitLab is the only forge. */
 export function irixForgeEntries(

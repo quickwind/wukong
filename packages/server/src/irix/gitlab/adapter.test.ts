@@ -5,7 +5,11 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { ForgeRegistry } from "../../services/forge-registry.js";
 import { activateIrixPolicy } from "../policy.js";
-import { createIrixGitLabAdapter, irixForgeEntries } from "./adapter.js";
+import {
+  createIrixGitLabAdapter,
+  irixForgeEntries,
+  withoutAbandonedMergeRequest,
+} from "./adapter.js";
 import { loadGitLabForgeConfig, parseGitLabProjectPath } from "./config.js";
 
 const config = { url: "https://gitlab.corp.example/", sshHost: "git.corp.example:2222" };
@@ -73,5 +77,24 @@ describe("Irix GitLab forge", () => {
     // Windows PowerShell and older Notepad write UTF-8 with a byte order mark.
     writeFileSync(join(home, "irix.json"), `\uFEFF${JSON.stringify(documented)}`);
     expect(loadGitLabForgeConfig(home, {})?.url).toBe("https://gitlab.corp.example");
+  });
+});
+
+describe("withoutAbandonedMergeRequest", () => {
+  it("hides a merge request that was closed without merging", () => {
+    expect(withoutAbandonedMergeRequest({ state: "closed", isMerged: false })).toBeNull();
+  });
+
+  it.each([
+    [{ state: "open", isMerged: false }],
+    [{ state: "merged", isMerged: true }],
+    // A merged request is reported as merged, not closed; if both were ever true it still shows.
+    [{ state: "closed", isMerged: true }],
+  ])("keeps %j", (status) => {
+    expect(withoutAbandonedMergeRequest(status)).toBe(status);
+  });
+
+  it("passes through no merge request", () => {
+    expect(withoutAbandonedMergeRequest(null)).toBeNull();
   });
 });
