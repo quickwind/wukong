@@ -29,6 +29,11 @@ function isOn(value: string | undefined): boolean {
   return value === "1" || value?.toLowerCase() === "true";
 }
 
+/** Connected hosts are off in Irix. Only this variable turns them on; IRIX_UNRESTRICTED does not. */
+export function isIrixConnectedHostsDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return isIrixActive() && !isOn(env.IRIX_ENABLE_CONNECTED_HOSTS);
+}
+
 export function isIrixRestricted(
   restriction: IrixRestriction,
   env: NodeJS.ProcessEnv = process.env,
@@ -64,6 +69,9 @@ export function isIrixToolBlocked(
   }
   if (SCHEDULE_TOOLS.has(toolName)) {
     return isIrixRestricted("schedules");
+  }
+  if (toolName === "list_hosts") {
+    return isIrixConnectedHostsDisabled();
   }
   return toolName === "send_agent_prompt" && isIrixRestricted("agentMessaging");
 }
@@ -165,6 +173,8 @@ export function irixServerFeatures(wsServer?: unknown): {
   schedulesDisabled?: boolean;
   subagentApprovalLocked?: boolean;
   requireSubagentApproval?: boolean;
+  connectedHosts?: boolean;
+  hostMultiplexing?: boolean;
 } {
   if (wsServer) {
     attachIrixWsServer(wsServer);
@@ -173,6 +183,7 @@ export function irixServerFeatures(wsServer?: unknown): {
     return {};
   }
   return {
+    ...(isIrixConnectedHostsDisabled() ? { connectedHosts: false, hostMultiplexing: false } : {}),
     ...(isIrixRestricted("schedules") ? { schedulesDisabled: true } : {}),
     subagentApprovalLocked: isSubagentApprovalLocked(),
     requireSubagentApproval: isSubagentApprovalRequired(),

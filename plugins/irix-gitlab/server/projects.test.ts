@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { forgetApis } from "./api.js";
 import { forgetUsernames, runClone, search } from "./projects.js";
@@ -156,6 +156,9 @@ describe("search", () => {
     await expect(search({ query: "" })).rejects.toThrow(/not configured/);
   });
 });
+
+// These tests run real git processes, which take several seconds each on Windows.
+vi.setConfig({ testTimeout: 60_000 });
 
 describe("clone", () => {
   it("clones into the clone root", async () => {

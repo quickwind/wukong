@@ -236,6 +236,13 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   upstream: an only-if-idle `closeAgent`, or `startAgentRun` waiting on `inFlightAgentCloses`. The
   "residual hazard" test in `idle-release.test.ts` asserts the current outcome; when upstream fixes it,
   that test fails and becomes one that expects a reply.
+- **No connected hosts** (upstream 0.13.0, #7370; `irix/connected-hosts-policy.ts`): the daemon never dials
+  or accepts another daemon. `websocket-server.ts` builds its registry through
+  `createIrixConnectedHosts`, which returns an always-empty one that refuses `add`, `update`,
+  `remove` and `openRoute` (`HOSTS_DISABLED`) and never reads `hosts.json`. `irixServerFeatures`
+  advertises `connectedHosts` and `hostMultiplexing` as false, so the app, CLI client and SDK report
+  the feature as unsupported. `irix host` is removed (`cli/src/irix/surface.ts`) and the `list_hosts`
+  agent tool is blocked. Neither `IRIX_UNRESTRICTED` nor an `IRIX_ALLOW_*` variable lifts this; only\n `IRIX_ENABLE_CONNECTED_HOSTS=1` in the daemon's (and CLI's) environment does. The egress guard\n still applies, so list each target in `IRIX_ALLOWED_HOSTS` (comma separated host names). SSH\n targets start a child `ssh` process, which the guard does not cover.
 - **Plugins:** local folders only. npm, Git and registry sources are switched off because they run
   child processes the guard cannot see. A friendly error says so. Plugins written for Paseo still
   work: `irix/plugin-sdk-alias.ts` maps `@getpaseo/plugin` to the local SDK name. The upstream

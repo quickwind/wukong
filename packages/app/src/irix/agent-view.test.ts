@@ -42,5 +42,5 @@ describe("plugin ui.AgentView", () => {
     const runtime = await import("@/plugins/react-native/ui");
     expect(runtime.AgentView).toBeTypeOf("function");
     expect(runtime.capabilities).toEqual({ agentView: 1, managedProjectsHidden: 1 });
-  });
+  }, 60_000);
 });

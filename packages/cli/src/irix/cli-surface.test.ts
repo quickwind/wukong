@@ -1,15 +1,19 @@
+import { tmpdir } from "node:os";
 import { PassThrough } from "node:stream";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCli } from "../cli.js";
 import { createCliParseArgv } from "../run.js";
 import { markIrixCli } from "./defaults.js";
 import { isCliSubagentApprovalRequired, promptCliSubagentApproval } from "./surface.js";
 
 describe("Irix CLI surface", () => {
-  const unused = ["clone", "onboard", "pair", "hub", "speech"];
+  const unused = ["clone", "onboard", "pair", "hub", "speech", "host"];
   const names = (command: ReturnType<typeof createCli>) => command.commands.map((c) => c.name());
 
-  afterEach(() => markIrixCli(false));
+  afterEach(() => {
+    markIrixCli(false);
+    vi.unstubAllEnvs();
+  });
 
   it("keeps the upstream commands outside the Irix edition", () => {
     markIrixCli(false);
@@ -19,12 +23,20 @@ describe("Irix CLI surface", () => {
     expect(daemon && names(daemon)).toContain("pair");
   });
 
-  it("leaves out clone, onboard, pair, hub and speech in the Irix edition", () => {
+  it("leaves out clone, onboard, pair, hub, speech and host in the Irix edition", () => {
     markIrixCli(true);
     const cli = createCli();
     for (const name of unused) expect(names(cli)).not.toContain(name);
     const daemon = cli.commands.find((command) => command.name() === "daemon");
     expect(daemon && names(daemon)).not.toContain("pair");
+  });
+
+  it("keeps the host command only when IRIX_ENABLE_CONNECTED_HOSTS is set", () => {
+    markIrixCli(true);
+    vi.stubEnv("IRIX_UNRESTRICTED", "1");
+    expect(names(createCli())).not.toContain("host");
+    vi.stubEnv("IRIX_ENABLE_CONNECTED_HOSTS", "1");
+    expect(names(createCli())).toContain("host");
   });
 
   it("keeps the commands Irix does use", () => {
@@ -73,11 +85,11 @@ describe("Irix CLI surface", () => {
   it("does not turn a directory argument into an open-in-desktop request", () => {
     const nodeArgv: [string, string] = ["node", "irix"];
     markIrixCli(false);
-    expect(createCliParseArgv({ argv: ["."], cwd: "/tmp", nodeArgv })).toMatchObject({
+    expect(createCliParseArgv({ argv: ["."], cwd: tmpdir(), nodeArgv })).toMatchObject({
       kind: "open-project",
     });
     markIrixCli(true);
-    expect(createCliParseArgv({ argv: ["."], cwd: "/tmp", nodeArgv })).toEqual([
+    expect(createCliParseArgv({ argv: ["."], cwd: tmpdir(), nodeArgv })).toEqual([
       "node",
       "irix",
       ".",

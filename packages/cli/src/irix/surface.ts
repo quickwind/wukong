@@ -185,6 +185,9 @@ export function applyIrixSurface(program: Command): Command {
   for (const name of UNUSED_COMMANDS) {
     removeCommand(program, name);
   }
+  if (!isEnvOn(process.env.IRIX_ENABLE_CONNECTED_HOSTS)) {
+    removeCommand(program, "host");
+  }
   const daemon = program.commands.find((command) => command.name() === "daemon");
   if (daemon) {
     removeCommand(daemon, "pair");

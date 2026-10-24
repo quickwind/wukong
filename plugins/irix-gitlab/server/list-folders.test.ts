@@ -12,7 +12,7 @@ import {
 } from "./list-folders.js";
 
 function envFor(home: string, overrides: Partial<ListFoldersEnv> = {}): ListFoldersEnv {
-  return { platform: "linux", home, env: {}, exists: () => true, ...overrides };
+  return { platform: process.platform, home, env: {}, exists: () => true, ...overrides };
 }
 
 describe("listFolders", () => {
@@ -39,7 +39,10 @@ describe("listFolders", () => {
   });
 
   it("has no parent at the top of the disk", async () => {
-    expect((await listFolders("/", envFor("/"))).parent).toBeNull();
+    const top = path.parse(process.cwd()).root;
+    expect((await listFolders(top, envFor(top))).parent).toBe(
+      process.platform === "win32" ? "" : null,
+    );
   });
 
   it("rejects a missing path and a file", async () => {

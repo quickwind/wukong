@@ -1,16 +1,17 @@
+import { useHostFeatureMap } from "@/runtime/host-features";
 import { useCallback, useEffect, useMemo } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceDirectoryServerIds } from "@/stores/session-store-hooks";
 import { workspaceEqualityFns } from "@/stores/session-store-hooks/selectors";
-import { useHostProjects } from "@/projects/host-projects";
+import { useWorkspaceStructure } from "@/stores/session-store-hooks";
 import { getHostRuntimeStore, useHostRegistryLoaded, useHosts } from "@/runtime/host-runtime";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { withoutManagedProjects } from "@/irix/managed-projects"; // Irix
 import {
-  buildSidebarWorkspacePlacementModel,
+  createSidebarWorkspacePlacementSelector,
   computeSidebarOrderUpdates,
   createSidebarWorkspaceEntry,
   deriveProjectStatusBucket,
@@ -86,6 +87,7 @@ const EMPTY_WORKSPACES: SidebarWorkspacePlacement[] = [];
 const EMPTY_PROJECT_NAMES = new Map<string, string>();
 
 export interface SidebarWorkspacesListResult {
+  workspaceSortSupported: boolean;
   workspacePlacements: SidebarWorkspacePlacement[];
   projects: SidebarProjectEntry[];
   projectNamesByViewKey: Map<string, string>;
@@ -139,14 +141,20 @@ export function useSidebarWorkspacesList(options?: {
 
   const directoryServerIds = useWorkspaceDirectoryServerIds(serverIds);
 
-  const hostProjects = useHostProjects(directoryServerIds);
+  const workspaceSort = useSidebarViewStore((state) => state.workspaceSort);
+  const groupMode = useSidebarViewStore((state) => state.groupMode);
+  const sortSupport = useHostFeatureMap(directoryServerIds, "workspaceSortTimes");
+  const workspaceSortSupported = [...sortSupport.values()].every(Boolean);
+  const sort =
+    groupMode === "project" && (workspaceSort === "manual" || workspaceSortSupported)
+      ? workspaceSort
+      : undefined;
+  const { projects: hostProjects } = useWorkspaceStructure(directoryServerIds, sort);
 
+  const selectPlacements = useMemo(createSidebarWorkspacePlacementSelector, []);
   const sidebarModel = useMemo(
-    () =>
-      buildSidebarWorkspacePlacementModel({
-        projects: withoutManagedProjects(hostProjects), // Irix: no plugin-managed project
-      }),
-    [hostProjects],
+    () => selectPlacements(withoutManagedProjects(hostProjects)), // Irix: no plugin-managed project
+    [hostProjects, selectPlacements],
   );
 
   const projects = sidebarModel.projects.length > 0 ? sidebarModel.projects : EMPTY_PROJECTS;
@@ -162,17 +170,16 @@ export function useSidebarWorkspacesList(options?: {
     const updates = computeSidebarOrderUpdates({
       projects,
       persistedProjectOrder,
-      getWorkspaceOrder: (projectViewKey) =>
-        orderStore.workspaceOrderByProject[projectViewKey] ?? EMPTY_ORDER,
+      getWorkspaceOrder: sort === "manual" ? orderStore.getWorkspaceOrder : undefined,
     });
 
     if (updates.projectOrder) {
       orderStore.setProjectOrder(updates.projectOrder);
     }
-    for (const { projectViewKey, order } of updates.workspaceOrders) {
-      orderStore.setWorkspaceOrder(projectViewKey, order);
+    for (const update of updates.workspaceOrders) {
+      orderStore.setWorkspaceOrder(update.projectViewKey, update.order);
     }
-  }, [persistedProjectOrder, projects]);
+  }, [persistedProjectOrder, projects, sort]);
 
   const refreshAll = useCallback(() => {
     if (!isActive) return;
@@ -194,6 +201,7 @@ export function useSidebarWorkspacesList(options?: {
   });
 
   return {
+    workspaceSortSupported,
     workspacePlacements,
     projects,
     projectNamesByViewKey,
