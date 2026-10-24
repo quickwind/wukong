@@ -2,12 +2,14 @@ import type { CreatePaseoWorktreeInput } from "@getpaseo/client/internal/daemon-
 import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
 import type { ComboboxOptionModel } from "@/components/ui/combobox-options";
 import { getForgePresentation } from "@/git/forge";
+import { otherRemoteBranchItem } from "@/irix/remote-branch"; // Irix
 
 export interface BranchPickerDetail {
   name: string;
   committerDate: number;
   hasLocal?: boolean;
   hasRemote?: boolean;
+  remote?: string; // Irix
   localAhead?: number;
   localBehind?: number;
 }
@@ -67,6 +69,11 @@ export function buildBranchPickerItems(details: readonly BranchPickerDetail[]): 
   const items: PickerItem[] = [];
 
   for (const detail of details) {
+    const remoteItem = otherRemoteBranchItem(detail); // Irix
+    if (remoteItem) {
+      items.push(remoteItem);
+      continue;
+    }
     const hasKnownProvenance = detail.hasLocal !== undefined || detail.hasRemote !== undefined;
     if (!hasKnownProvenance) {
       items.push({

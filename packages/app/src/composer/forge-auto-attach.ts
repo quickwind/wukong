@@ -12,6 +12,7 @@ import {
 import type { ComposerAttachment, UserComposerAttachment } from "@/attachments/types";
 import { buildForgeSearchQueryOptions, type ForgeSearchClient } from "@/git/use-forge-search-query";
 import { extractForgeRefs, type ForgeRef } from "@/git/forge-refs";
+import { isInReferencedProject } from "@/irix/forge-reference"; // Irix
 import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
 import { isAttachmentSelectedForForgeItem, toggleForgeAttachment } from "./actions";
 
@@ -509,6 +510,7 @@ function hasForgeAttachment(attachments: UserComposerAttachment[], ref: ForgeRef
 }
 
 function forgeItemMatchesRef(item: ForgeSearchItem, ref: ForgeRef): boolean {
+  if (!isInReferencedProject(item, ref)) return false; // Irix
   return item.kind === forgeItemKind(ref) && item.number === ref.number;
 }
 

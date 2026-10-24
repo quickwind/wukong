@@ -1,3 +1,4 @@
+import { fetchUpstreamRemote } from "../irix/upstream-remote.js"; // Irix
 import { runGitCommand, type RunGitCommand } from "../utils/run-git-command.js";
 
 export interface WorkspaceGitFetchResult {
@@ -39,6 +40,7 @@ export async function fetchWorkspaceGitRemote(
   } catch (caught) {
     error ??= caught;
   }
+  await fetchUpstreamRemote(cwd, run); // Irix
   try {
     after = await readWorkspaceGitRefs(cwd, run);
   } catch (caught) {

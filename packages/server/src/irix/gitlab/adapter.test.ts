@@ -7,6 +7,7 @@ import { ForgeRegistry } from "../../services/forge-registry.js";
 import { activateIrixPolicy } from "../policy.js";
 import {
   createIrixGitLabAdapter,
+  forkMergeRequestCheckoutRefs,
   irixForgeEntries,
   withoutAbandonedMergeRequest,
 } from "./adapter.js";
@@ -96,5 +97,14 @@ describe("withoutAbandonedMergeRequest", () => {
 
   it("passes through no merge request", () => {
     expect(withoutAbandonedMergeRequest(null)).toBeNull();
+  });
+});
+
+describe("forkMergeRequestCheckoutRefs", () => {
+  it("fetches a merge request head from upstream first, where a fork's requests live", () => {
+    expect(forkMergeRequestCheckoutRefs(7)).toEqual([
+      { remoteName: "upstream", remoteRef: "refs/merge-requests/7/head" },
+      { remoteName: "origin", remoteRef: "refs/merge-requests/7/head" },
+    ]);
   });
 });

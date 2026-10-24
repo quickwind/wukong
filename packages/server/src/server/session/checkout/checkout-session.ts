@@ -22,6 +22,7 @@ import type {
   CheckoutDiffSubscription,
   CheckoutDiffSubscriptionRequest,
 } from "../../checkout-diff-manager.js";
+import { listUpstreamBranchDetails } from "../../../irix/upstream-remote.js"; // Irix
 import { toCheckoutError } from "../../checkout-git-utils.js";
 import {
   buildCheckoutPrStatusPayloadFromSnapshot,
@@ -384,11 +385,12 @@ export class CheckoutSession {
         query,
         limit,
       });
+      const upstreamDetails = await listUpstreamBranchDetails(resolvedCwd, { query, limit }); // Irix
       this.host.emit({
         type: "branch_suggestions_response",
         payload: {
           branches: branchDetails.map((branch) => branch.name),
-          branchDetails,
+          branchDetails: [...branchDetails, ...upstreamDetails], // Irix
           error: null,
           requestId,
         },

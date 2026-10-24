@@ -2,10 +2,12 @@ import { FORGE_DEFINITIONS } from "@getpaseo/protocol/forge-manifest";
 import { normalizeHost, parseGitRemoteLocation } from "@getpaseo/protocol/git-remote";
 import type { ForgeReferencePath } from "@/git/client-forge-module";
 import { CLIENT_FORGE_LOGIC_MODULES } from "@/git/forges";
+import { anyProjectReference } from "@/irix/forge-reference"; // Irix
 
 export interface ForgeRef {
   kind: ForgeReferencePath["kind"];
   number: number;
+  projectPath?: string; // Irix
 }
 
 const WEB_URL_PATTERN = /https?:\/\/[^\s<>"'`)\]]+/giu;
@@ -46,7 +48,9 @@ export function extractForgeRefs(
       continue;
     }
     for (const referencePath of registeredReferencePaths(target.forgeIds)) {
-      const ref = parseReferencePath(pathname, target.repoPath, referencePath);
+      const ref =
+        parseReferencePath(pathname, target.repoPath, referencePath) ??
+        anyProjectReference(pathname, referencePath); // Irix
       if (!ref) {
         continue;
       }

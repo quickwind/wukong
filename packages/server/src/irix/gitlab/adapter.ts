@@ -2,10 +2,12 @@
 // GitLab service driving the REST client (gitbeaker) through the glab-compatible runner.
 
 import type { ForgeAdapterRegistration } from "../../services/forge-registry.js";
+import type { PullRequestCheckoutRef } from "../../services/forge-service.js";
 import { createGitLabService } from "../../services/gitlab-service.js";
 import { resolvePaseoHome } from "../../server/paseo-home.js";
 import { isIrixActive } from "../policy.js";
 import { loadGitLabForgeConfig, matchesGitLabForgeHost, type GitLabForgeConfig } from "./config.js";
+import { forkPairOf, readRemoteUrls } from "./fork-scope.js";
 import { createGlabCompatRunner } from "./glab-runner.js";
 import { createGitLabRestClient } from "./rest-client.js";
 import { draftPullRequestTextForCheckout } from "../pr-text.js";
@@ -51,6 +53,15 @@ export function createIrixGitLabAdapter(
         const draft = await draftPullRequestTextForCheckout(input.cwd);
         return createPullRequest({ ...input, title: draft.title, body: input.body || draft.body });
       };
+      // A fork checkout keeps its merge requests in `upstream`, so that is where their heads are.
+      const getPullRequestCheckoutTarget = service.getPullRequestCheckoutTarget.bind(service);
+      service.getPullRequestCheckoutTarget = async (input) => {
+        const target = await getPullRequestCheckoutTarget(input);
+        const isFork = forkPairOf(config, await readRemoteUrls({ cwd: input.cwd })) !== null;
+        return isFork
+          ? { ...target, checkoutRefs: forkMergeRequestCheckoutRefs(target.number) }
+          : target;
+      };
       const getCurrentPullRequestStatus = service.getCurrentPullRequestStatus.bind(service);
       service.getCurrentPullRequestStatus = async (input) =>
         withoutAbandonedMergeRequest(await getCurrentPullRequestStatus(input));
@@ -61,6 +72,14 @@ export function createIrixGitLabAdapter(
       return config ? matchesGitLabForgeHost(config, host) : false;
     },
   };
+}
+
+/** Where a merge request's head can be fetched when `origin` is the user's fork. */
+export function forkMergeRequestCheckoutRefs(iid: number): PullRequestCheckoutRef[] {
+  return [
+    { remoteName: "upstream", remoteRef: `refs/merge-requests/${iid}/head` },
+    { remoteName: "origin", remoteRef: `refs/merge-requests/${iid}/head` },
+  ];
 }
 
 type ForgeEntry = readonly [string, ForgeAdapterRegistration];
