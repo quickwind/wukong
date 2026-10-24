@@ -21,6 +21,9 @@ const login: ClaudeLogin = {
   rateLimitTier: "default_claude_zero",
 };
 const NOW = Date.parse("2026-10-24T02:15:00Z");
+// Oct 10 noon UTC: 9.5 days into a 31-day month. Oct 2 noon: 1.5 days in, too early to forecast.
+const MID_MONTH = new Date("2026-10-10T12:00:00Z");
+const EARLY_MONTH = new Date("2026-10-02T12:00:00Z");
 
 // The shape the real enterprise account returned (windows null, a monthly spend cap set).
 const realUsage = {
@@ -50,19 +53,18 @@ function available(report: ReturnType<typeof reportFromUsage>) {
   return report;
 }
 
-const spendOf = (used: number, limit: number, percent: number) => ({
+const spendOf = (used: number, limit: number) => ({
   ...realUsage,
   spend: {
     ...realUsage.spend,
     used: { amount_minor: used, currency: "USD", exponent: 2 },
     limit: { amount_minor: limit, currency: "USD", exponent: 2 },
-    percent,
   },
 });
 
 describe("reportFromUsage", () => {
   it("turns the monthly spend cap into a window, a balance and a detail", () => {
-    const report = available(reportFromUsage(spendOf(2550, 10000, 25.5), login));
+    const report = available(reportFromUsage(spendOf(2550, 10000), login, EARLY_MONTH));
     expect(report.planLabel).toBe("Enterprise zero");
     expect(report.windows).toEqual([
       expect.objectContaining({
@@ -71,6 +73,7 @@ describe("reportFromUsage", () => {
         summary: true,
         usedPct: 25.5,
         remainingPct: 74.5,
+        resetsAt: "2026-11-01T00:00:00.000Z",
       }),
     ]);
     expect(report.balances).toEqual([
@@ -87,22 +90,18 @@ describe("reportFromUsage", () => {
     );
   });
 
-  it("shows $0 of a $100 cap as an empty bar, not as missing data", () => {
-    const report = available(reportFromUsage(realUsage, login));
+  it("shows $0 of a $100 cap as an empty bar", () => {
+    const report = available(reportFromUsage(realUsage, login, EARLY_MONTH));
     expect(report.windows[0]).toMatchObject({ usedPct: 0, remainingPct: 100 });
     expect(report.details).toContainEqual(expect.objectContaining({ value: "$0.00 / $100.00" }));
   });
 
   it("warns at 80 percent and flags danger at 95 percent", () => {
-    expect(available(reportFromUsage(spendOf(8000, 10000, 80), login)).windows[0]?.tone).toBe(
-      "warning",
-    );
-    expect(available(reportFromUsage(spendOf(9500, 10000, 95), login)).windows[0]?.tone).toBe(
-      "danger",
-    );
-    expect(available(reportFromUsage(spendOf(7999, 10000, 79.99), login)).windows[0]?.tone).toBe(
-      undefined,
-    );
+    const tone = (used: number) =>
+      available(reportFromUsage(spendOf(used, 10000), login, EARLY_MONTH)).windows[0]?.tone;
+    expect(tone(8000)).toBe("warning");
+    expect(tone(9500)).toBe("danger");
+    expect(tone(7999)).toBeUndefined();
   });
 
   it("keeps the 5 hour and weekly windows when an account has them", () => {
@@ -114,6 +113,7 @@ describe("reportFromUsage", () => {
           seven_day: { utilization: 40.5, resets_at: "2026-10-30T00:00:00Z" },
         },
         login,
+        EARLY_MONTH,
       ),
     );
     expect(report.windows.map((window) => window.id)).toEqual(["five_hour", "weekly", "spend"]);
@@ -128,10 +128,9 @@ describe("reportFromUsage", () => {
   });
 
   it("reports an account with no windows and no spend cap as having no quota", () => {
-    const report = reportFromUsage({ five_hour: null, seven_day: null, limits: [] }, login);
-    expect(report).toEqual({
+    expect(reportFromUsage({ five_hour: null, seven_day: null, limits: [] }, login)).toEqual({
       status: "unavailable",
-      problem: { kind: "no_quota", detail: expect.stringContaining("no usage limit") },
+      problem: { kind: "no_quota", detail: "No usage quota on this Claude account" },
     });
   });
 
@@ -143,8 +142,21 @@ describe("reportFromUsage", () => {
     expect(report.status).toBe("unavailable");
   });
 
-  it("treats a zero cap as fully used, not as unlimited", () => {
-    const report = available(reportFromUsage(spendOf(0, 0, 0), login));
+  it("says there is no quota when both the spend and the cap are zero", () => {
+    for (const body of [
+      spendOf(0, 0),
+      { ...realUsage, spend: { ...realUsage.spend, limit: null, used: realUsage.spend.used } },
+    ]) {
+      expect(reportFromUsage(body, login, MID_MONTH)).toEqual({
+        status: "unavailable",
+        problem: { kind: "no_quota", detail: "No usage quota on this Claude account" },
+      });
+    }
+  });
+
+  it("treats a zero cap with money already spent as fully used, with no forecast", () => {
+    const report = available(reportFromUsage(spendOf(500, 0), login, MID_MONTH));
+    expect(report.windows).toHaveLength(1);
     expect(report.windows[0]).toMatchObject({ usedPct: 100, remainingPct: 0, tone: "danger" });
   });
 
@@ -155,10 +167,9 @@ describe("reportFromUsage", () => {
         ...realUsage.spend,
         used: { amount_minor: 5, currency: "JPY", exponent: 0 },
         limit: { amount_minor: 100, currency: "JPY", exponent: 0 },
-        percent: 5,
       },
     };
-    const report = available(reportFromUsage(body, login));
+    const report = available(reportFromUsage(body, login, EARLY_MONTH));
     expect(report.details).toContainEqual(expect.objectContaining({ value: "5 JPY / 100 JPY" }));
   });
 
@@ -167,8 +178,65 @@ describe("reportFromUsage", () => {
   });
 
   it("leaves the plan label out when the login does not say", () => {
-    const report = available(reportFromUsage(realUsage, { accessToken: "t" }));
+    const report = available(reportFromUsage(realUsage, { accessToken: "t" }, EARLY_MONTH));
     expect(report.planLabel).toBeUndefined();
+  });
+});
+
+describe("month-end forecast", () => {
+  it("projects this month's pace to month end and names the weather", () => {
+    const report = available(reportFromUsage(spendOf(3000, 10000), login, MID_MONTH));
+    expect(report.windows.map((window) => window.id)).toEqual(["spend", "spend-forecast"]);
+    expect(report.windows[1]).toMatchObject({
+      label: "Month-end forecast: tight",
+      shortLabel: "⛅",
+      summary: true,
+      tone: "warning",
+    });
+    expect(report.windows[1]?.usedPct).toBeCloseTo(97.89, 1);
+    expect(report.details).toContainEqual({
+      id: "spend-forecast",
+      label: "Forecast",
+      value: "⛅ ~$97.89 / $100.00 by month end, tight",
+      tone: "warning",
+    });
+    expect(report.windows[0]?.runsOutAt).toBeUndefined();
+  });
+
+  it("says plenty of room when nothing has been spent", () => {
+    const report = available(reportFromUsage(realUsage, login, MID_MONTH));
+    expect(report.windows[1]).toMatchObject({
+      label: "Month-end forecast: plenty of room",
+      shortLabel: "☀️",
+      usedPct: 0,
+    });
+    expect(report.windows[1]?.tone).toBeUndefined();
+  });
+
+  it("marks when the cap runs out, and by how much, if the pace goes over", () => {
+    const report = available(reportFromUsage(spendOf(5000, 10000), login, MID_MONTH));
+    expect(report.windows[0]?.runsOutAt).toBe("2026-10-20T00:00:00.000Z");
+    expect(report.windows[0]?.shortfallPct).toBeCloseTo(63.2, 0);
+    expect(report.windows[1]).toMatchObject({
+      label: "Month-end forecast: well over",
+      tone: "danger",
+      usedPct: 100,
+    });
+  });
+
+  it("says the cap is already reached when it is all spent", () => {
+    const report = available(reportFromUsage(spendOf(10000, 10000), login, MID_MONTH));
+    expect(report.windows[0]?.runsOutAt).toBe(MID_MONTH.toISOString());
+  });
+
+  it("waits for three days of data before forecasting", () => {
+    const report = available(reportFromUsage(spendOf(3000, 10000), login, EARLY_MONTH));
+    expect(report.windows.map((window) => window.id)).toEqual(["spend"]);
+    expect(report.details).toContainEqual({
+      id: "spend-forecast",
+      label: "Forecast",
+      value: "after 3 days of data this month",
+    });
   });
 });
 

@@ -18,11 +18,11 @@ Instead of receiving the files, build them from the repository:
 ```powershell
 git clone -b irix https://github.com/quickwind/Paseo.git irix
 cd irix
-node irix/scripts/pack-local.mjs --out ..\irix-dist
+node irix/scripts/pack-local.mjs
 ```
 
 This takes about ten minutes the first time and leaves the seven `irix-*.tgz` files in
-`..\irix-dist`. Commit first if you changed anything: only committed work is built.
+`%USERPROFILE%\irix-dist` (a different folder with `--out`). Commit first if you changed anything: only committed work is built.
 
 ## Install
 

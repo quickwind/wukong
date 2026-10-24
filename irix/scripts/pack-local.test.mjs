@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
@@ -15,6 +15,12 @@ import {
   staleTarball,
   zipAttempts,
 } from "./pack-local.mjs";
+
+test("puts the output in ~/irix-dist unless --out says otherwise", () => {
+  assert.equal(parseArgs([]).out, path.join(homedir(), "irix-dist"));
+  assert.equal(parseArgs(["--scope", "acme"]).out, path.join(homedir(), "irix-dist"));
+  assert.equal(parseArgs(["--out", "elsewhere"]).out, "elsewhere");
+});
 
 test("parses the options and defaults the scope to irix", () => {
   assert.deepEqual(parseArgs(["--out", "dist"]), {
@@ -34,8 +40,7 @@ test("parses the options and defaults the scope to irix", () => {
   );
 });
 
-test("rejects a missing output, a bad scope, the upstream scope and unknown options", () => {
-  assert.throws(() => parseArgs([]), /--out is required/);
+test("rejects a bad scope, the upstream scope and unknown options", () => {
   assert.throws(() => parseArgs(["--out", "d", "--scope", "Acme Corp"]), /lowercase npm scope/);
   assert.throws(() => parseArgs(["--out", "d", "--scope", "getpaseo"]), /upstream/);
   assert.throws(() => parseArgs(["--out", "d", "--nope"]), /Unknown argument/);

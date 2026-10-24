@@ -131,7 +131,7 @@ Needs Node.js 22+ and Git. Works the same on Windows (PowerShell or cmd), macOS 
 ```sh
 git clone -b irix https://github.com/quickwind/Paseo.git irix
 cd irix
-node irix/scripts/pack-local.mjs --out ../irix-dist
+node irix/scripts/pack-local.mjs            # writes to ~/irix-dist; --out <dir> to change it
 ```
 
 It checks out the last commit into a throwaway folder, applies the npm scope and the brand,

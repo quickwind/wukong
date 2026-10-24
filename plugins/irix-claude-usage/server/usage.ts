@@ -143,17 +143,61 @@ function formatMoney(money: z.infer<typeof MoneySchema>): string {
   return money.currency === "USD" ? `$${text}` : `${text} ${money.currency}`;
 }
 
-function spendReport(spend: NonNullable<UsageResponse["spend"]>): {
-  window: UsageWindow;
+const DAY_MS = 86_400_000;
+// Too early in the month, one busy day swings the average too far to call.
+const MIN_FORECAST_DAYS = 3;
+
+/** The spend cap is read as a calendar month (UTC), as the Devin plugin does; the API gives no cycle. */
+function monthBounds(now: Date): { start: number; end: number } {
+  return {
+    start: Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    end: Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+  };
+}
+
+interface Weather {
+  icon: string;
+  word: string;
+  tone: Tone;
+}
+
+// Projected month-end spend against the cap.
+function weatherFor(ratio: number): Weather {
+  if (ratio < 0.6) return { icon: "☀️", word: "plenty of room", tone: undefined };
+  if (ratio < 0.85) return { icon: "🌤️", word: "on track", tone: undefined };
+  if (ratio <= 1) return { icon: "⛅", word: "tight", tone: "warning" };
+  if (ratio <= 1.25) return { icon: "🌧️", word: "likely over", tone: "danger" };
+  return { icon: "⛈️", word: "well over", tone: "danger" };
+}
+
+function spendReport(
+  spend: NonNullable<UsageResponse["spend"]>,
+  now: Date,
+): {
+  windows: UsageWindow[];
   balances: UsageBalance[];
-  detail: UsageDetail;
-} {
+  details: UsageDetail[];
+} | null {
   const limit = spend.limit ?? { ...spend.used, amount_minor: 0 };
   const used = major(spend.used);
   const cap = major(limit);
-  // A cap of zero leaves no allowance: fully used, not "no limit".
+  // No cap and nothing spent is no quota. A cap of zero with money already spent is fully used.
+  if (cap === 0 && used === 0) return null;
   const usedPct = cap > 0 ? (used / cap) * 100 : 100;
-  const window = windowFor("spend", "Monthly spend", "$", usedPct);
+  const bounds = monthBounds(now);
+  const window = windowFor(
+    "spend",
+    "Monthly spend",
+    "$",
+    usedPct,
+    new Date(bounds.end).toISOString(),
+  );
+  const forecast = cap > 0 ? forecastSpend({ used, cap, now, bounds }) : null;
+  if (forecast?.runsOutAt) {
+    window.runsOutAt = forecast.runsOutAt;
+    window.shortfallPct = Math.max(0, (forecast.ratio - 1) * 100);
+  }
+  const windows = [window];
   const balances: UsageBalance[] =
     spend.used.currency === "USD"
       ? [
@@ -168,16 +212,76 @@ function spendReport(spend: NonNullable<UsageResponse["spend"]>): {
           },
         ]
       : [];
-  const detail: UsageDetail = {
-    id: "spend",
-    label: "Spend",
-    value: `${formatMoney(spend.used)} / ${formatMoney(limit)}`,
-    ...(window.tone ? { tone: window.tone } : {}),
-  };
-  return { window, balances, detail };
+  const details: UsageDetail[] = [
+    {
+      id: "spend",
+      label: "Spend",
+      value: `${formatMoney(spend.used)} / ${formatMoney(limit)}`,
+      ...(window.tone ? { tone: window.tone } : {}),
+    },
+  ];
+  if (forecast) {
+    const { weather } = forecast;
+    windows.push({
+      id: "spend-forecast",
+      label: `Month-end forecast: ${weather.word}`,
+      shortLabel: weather.icon,
+      summary: true,
+      usedPct: Math.min(100, forecast.ratio * 100),
+      ...(weather.tone ? { tone: weather.tone } : {}),
+    });
+    const projected = formatMoney({
+      ...limit,
+      amount_minor: forecast.projected * 10 ** limit.exponent,
+    });
+    details.push({
+      id: "spend-forecast",
+      label: "Forecast",
+      value: `${weather.icon} ~${projected} / ${formatMoney(limit)} by month end, ${weather.word}`,
+      ...(weather.tone ? { tone: weather.tone } : {}),
+    });
+  } else if (cap > 0) {
+    details.push({
+      id: "spend-forecast",
+      label: "Forecast",
+      value: `after ${MIN_FORECAST_DAYS} days of data this month`,
+    });
+  }
+  return { windows, balances, details };
 }
 
-export function reportFromUsage(body: unknown, login: ClaudeLogin): UsageReport {
+interface Forecast {
+  projected: number;
+  ratio: number;
+  weather: Weather;
+  /** When the cap is reached at this month's pace; null if it is not. */
+  runsOutAt: string | null;
+}
+
+/** This month's pace carried to month end. Null until there are a few days of data. */
+function forecastSpend(input: {
+  used: number;
+  cap: number;
+  now: Date;
+  bounds: { start: number; end: number };
+}): Forecast | null {
+  const { used, cap, now, bounds } = input;
+  const elapsed = now.getTime() - bounds.start;
+  if (elapsed < MIN_FORECAST_DAYS * DAY_MS) return null;
+  const rate = used / elapsed;
+  const projected = rate * (bounds.end - bounds.start);
+  const ratio = projected / cap;
+  let runsOutAt: string | null = null;
+  if (used >= cap) runsOutAt = now.toISOString();
+  else if (projected > cap) runsOutAt = new Date(now.getTime() + (cap - used) / rate).toISOString();
+  return { projected, ratio, weather: weatherFor(ratio), runsOutAt };
+}
+
+export function reportFromUsage(
+  body: unknown,
+  login: ClaudeLogin,
+  now: Date = new Date(),
+): UsageReport {
   const parsed = UsageResponseSchema.safeParse(body);
   if (!parsed.success) {
     throw new Error("Claude usage response was not understood; the API may have changed");
@@ -194,21 +298,17 @@ export function reportFromUsage(body: unknown, login: ClaudeLogin): UsageReport 
   if (seven_day) {
     windows.push(windowFor("weekly", "Weekly", "wk", seven_day.utilization, seven_day.resets_at));
   }
-  if (spend && spend.enabled !== false) {
-    const report = spendReport(spend);
-    windows.push(report.window);
-    balances.push(...report.balances);
-    details.push(report.detail);
+  const spendShown = spend && spend.enabled !== false ? spendReport(spend, now) : null;
+  if (spendShown) {
+    windows.push(...spendShown.windows);
+    balances.push(...spendShown.balances);
+    details.push(...spendShown.details);
   }
   if (windows.length === 0) {
-    return unavailable({
-      kind: "no_quota",
-      detail: "This Claude account reports no usage limit to show",
-    });
+    return unavailable({ kind: "no_quota", detail: "No usage quota on this Claude account" });
   }
   return { status: "available", planLabel: planLabel(login), windows, balances, details };
 }
-
 // A 429 carries Retry-After, in the tens of minutes. Until it passes, a fetch (a forced Refresh
 // included) answers from here instead of calling again. Keyed by the token's tail, never stored whole.
 const rateLimitedUntil = new Map<string, number>();
@@ -284,7 +384,7 @@ export async function fetchUsage(_input: UsageInput, deps: UsageDeps = {}): Prom
     throw rateLimitedError(waitMs);
   }
   if (!response.ok) throw new Error(`Claude usage API returned ${response.status}`);
-  return reportFromUsage(await response.json(), login);
+  return reportFromUsage(await response.json(), login, new Date(now()));
 }
 
 function enabled(value: string | undefined): boolean {

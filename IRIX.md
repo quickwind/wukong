@@ -67,6 +67,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | `IRIX.md`                      | This guide                                                                                                                  |
 | `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide                                           |
+| `irix/AGENTS.md`               | Windows build recipe and the traps that cost time when packaging                                                            |
 | `irix/README.md`               | Configuration, GitLab setup, building, publishing                                                                           |
 | `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins                                                   |
 | `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                                               |
@@ -339,7 +340,9 @@ config`), and the id and default branch of the two projects for a day, in memory
   `credentials.toml`) and sends the key only to an allowlisted https host. The allowlist exists in
   two places that must agree: the plugin and `irix/devin-hosts.ts` (a test checks). Reset is the
   first of the calendar month (UTC); `planEnd` is the contract end, not a cycle. A limit of 0
-  shows as fully used. Forecast weather is projected month-end use against the limit.
+  with nothing used (zeros, or left out as proto3 JSON does) is "No ACU quota on this Devin plan";
+  a limit of 0 with ACU already used shows as fully used. Forecast weather is projected month-end
+  use against the limit.
 - **Claude usage** (`plugins/irix-claude-usage`): upstream's `claude-usage-source` stays off. It
   reads only the 5 hour and weekly windows, and an enterprise seat (`enterprise_usage_based`,
   checked 2026-10-24 on a Dell account) has neither: `/api/oauth/usage` returns them as `null`
@@ -349,9 +352,14 @@ config`), and the id and default branch of the two projects for a day, in memory
   That host is open in the egress guard for this plugin (`irix/claude-hosts.ts`; the list exists
   in the plugin too and a test checks they agree), the one exception to "no daemon traffic to the
   internet" beyond Devin's and the GitLab host. It is an unofficial endpoint and may change. A
-  session on Bedrock, Vertex or a custom `ANTHROPIC_BASE_URL` is not offered an account. No
-  reset time is shown: the cycle is not in the response. The Mac keychain store is not read.
-- **Packaging:** `node irix/scripts/pack-local.mjs --out <dir>` builds seven tarballs from the
+  session on Bedrock, Vertex or a custom `ANTHROPIC_BASE_URL` is not offered an account. Like
+  Devin it shows month-end forecast weather, **assuming the spend cap resets on the first of the
+  calendar month (UTC)**: the response carries no cycle, so that is unverified and the reset time
+  and forecast are wrong if the contract bills on another day. Spend and cap both zero is "No
+  usage quota on this Claude account"; a cap of zero with money already spent shows as fully used.
+  The Mac keychain store is not read.
+- **Packaging:** `node irix/scripts/pack-local.mjs` (output in `~/irix-dist` unless `--out <dir>`
+  says otherwise; Windows build recipe and traps in [irix/AGENTS.md](irix/AGENTS.md)) builds seven tarballs from the
   last commit in a throwaway folder (scope `@irix`, brand applied, web UI built with
   `EXPO_PUBLIC_IRIX=1`). Version is `<upstream core>-irix.<timestamp>.g<short commit>`, with `.dirty` added when the working tree had uncommitted changes; the app package keeps
   upstream's version because Expo rejects other forms. All seven must be installed together or npm
@@ -528,7 +536,7 @@ files you changed**, never the whole suite, use the npm scripts for lint and for
 3. `node irix/scripts/upstream-footprint.mjs` if you touched an upstream file.
 4. For anything user-visible, run it for real: temp home, own port, never `6767` (the main Paseo
    daemon; do not restart it) and not `6890` if someone is using it.
-5. Packaging: `node irix/scripts/pack-local.mjs --out ~/irix-dist` (one batch only; it clears
+5. Packaging: `node irix/scripts/pack-local.mjs` (writes to `~/irix-dist`; one batch only; it clears
    earlier tarballs there), then install them into a temp `--prefix` and run `irix --version`.
 6. If you added a dependency, a copied snippet, a file from elsewhere or an asset: apply "Rules for
    every change" under License and attribution, and run
@@ -598,7 +606,7 @@ workflow cannot judge the things in step 4; a person or agent must.
    `npm run lint`, `npm run format:check`, `node --test "irix/scripts/*.test.mjs"`, the Irix
    tests (`packages/server`: `src/irix`; `plugins`: `irix-gitlab irix-devin-usage`;
    `packages/app`: `src/irix src/usage`), and the footprint script. Do not run the whole suite.
-6. **Package and smoke test.** `node irix/scripts/pack-local.mjs --out <dir>`, install the
+6. **Package and smoke test.** `node irix/scripts/pack-local.mjs`, install the
    tarballs into a temp `--prefix`, then start that daemon on a temp home and port. Check:
    `irix --version`; only `claude` and `devin` providers; `irix-gitlab` and
    `irix-devin-usage` loaded; no `Irix blocked` line in `daemon.log` at startup; the page
@@ -649,8 +657,9 @@ Not verified, so do not claim otherwise:
   system-CA trust there was not seen working; Windows and Linux were not run either. Check with
   `node -e "console.log(require('tls').getCACertificates('system').length)"` on a team machine.
   `ssl_verify = false` in a team member's python-gitlab config no longer disables verification.
-- Claude usage comes from `irix-claude-usage` (spend cap only, see above); it was run against one
-  real enterprise account, not a Pro or Max one. Upstream's `claude-usage-source` is not enabled.
+- Claude usage comes from `irix-claude-usage` (spend cap and a month-end forecast, see above); it
+  was run against one real enterprise account, not a Pro or Max one, and its calendar-month reset
+  is an assumption. Upstream's `claude-usage-source` is not enabled.
 - Settings has "Enable terminal agent hooks", which edits the user's agent config files. It is
   upstream's and installs hooks only when switched on (unset means off). Keep it off while Paseo
   is installed beside Irix, or both write hooks into the same Claude config.

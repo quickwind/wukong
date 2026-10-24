@@ -107,15 +107,26 @@ describe("reportFromStatus", () => {
   it("says so when the plan has no ACU figures at all, rather than showing zero", () => {
     expect(reportFromStatus({ userStatus: { planStatus: { planInfo: {} } } }, NOW)).toEqual({
       status: "unavailable",
-      problem: { kind: "no_quota", detail: "This Devin plan reports no ACU limit" },
+      problem: { kind: "no_quota", detail: "No ACU quota on this Devin plan" },
     });
   });
 
-  it("shows a limit of zero as fully used, with no forecast", () => {
+  it("says there is no quota when both the limit and the consumption are zero", () => {
     for (const planStatus of [
       { acuLimit: 0, acuConsumed: 0 },
-      { acuLimit: 0 },
+      { acuLimit: 0 }, // proto3 JSON leaves zeros out
+    ]) {
+      expect(reportFromStatus({ userStatus: { planStatus } }, NOW)).toEqual({
+        status: "unavailable",
+        problem: { kind: "no_quota", detail: "No ACU quota on this Devin plan" },
+      });
+    }
+  });
+
+  it("shows a limit of zero with ACU already used as fully used, with no forecast", () => {
+    for (const planStatus of [
       { acuConsumed: 9.31 }, // proto3 JSON leaves a zero limit out
+      { acuLimit: 0, acuConsumed: 9.31 },
     ]) {
       const report = available(reportFromStatus({ userStatus: { planStatus } }, NOW));
       const [window] = report.windows;

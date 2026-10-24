@@ -4,9 +4,9 @@
 // It works in a throwaway checkout of the last commit, so your working tree is left alone
 // (commit first: uncommitted changes are not included).
 //
-// Usage: node irix/scripts/pack-local.mjs --out <dir> [--scope irix] [--work-dir <dir>] [--keep]
-//   --out       where the .tgz files and the .zip bundle go (required); the files of an earlier
-//               build there are removed. The bundle holds the seven tarballs, windows-update.ps1
+// Usage: node irix/scripts/pack-local.mjs [--out <dir>] [--scope irix] [--work-dir <dir>] [--keep]
+//   --out       where the .tgz files and the .zip bundle go (default: ~/irix-dist); the files of
+//               an earlier build there are removed. The bundle holds the seven tarballs, windows-update.ps1
 //               and INSTALL-WINDOWS.md: one file to hand out, unzip and run the script
 //   --scope     npm scope, giving @<scope>/cli, @<scope>/server, ... (default: irix)
 //   --work-dir  where the throwaway checkout lives. Keep it short on Windows (default: a
@@ -15,7 +15,7 @@
 
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,7 +23,7 @@ const PACKAGES = ["highlight", "relay", "protocol", "client", "plugin", "server"
 const SCOPE_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 
 export function parseArgs(argv) {
-  const args = { out: "", scope: "irix", workDir: "", keep: false };
+  const args = { out: path.join(homedir(), "irix-dist"), scope: "irix", workDir: "", keep: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     const next = () => {
@@ -37,7 +37,6 @@ export function parseArgs(argv) {
     else if (arg === "--keep") args.keep = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
-  if (!args.out) throw new Error("--out is required");
   if (!SCOPE_PATTERN.test(args.scope)) {
     throw new Error("--scope must be a lowercase npm scope such as `irix`");
   }
