@@ -24,6 +24,7 @@ import {
   writePaseoWorktreeFirstAgentBranchAutoNameMetadata,
 } from "../utils/worktree-metadata.js";
 import type { WorktreeCreationIntent } from "./resolve-worktree-creation-intent.js";
+import { hasWorkspaceAutomation } from "../irix/workspace-automation.js"; // Irix
 import { resolveFirstAgentPromptTitle } from "./agent/create-agent-title.js";
 import { buildAgentBranchNameSeed } from "./agent/prompt-attachments.js";
 import type { FirstAgentContext } from "@getpaseo/protocol/messages";
@@ -106,7 +107,8 @@ async function createPaseoWorktreeWithPriority(
       background: input.background,
       callerWorkspaceId: input.callerWorkspaceId,
       ...(createdWorktree.intent.kind === "checkout-change-request" &&
-      createdWorktree.intent.headRepository
+      createdWorktree.intent.headRepository &&
+      hasWorkspaceAutomation(workspaceCwd) // Irix
         ? {
             untrustedSource: {
               kind: "change_request" as const,

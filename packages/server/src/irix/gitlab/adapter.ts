@@ -58,9 +58,23 @@ export function createIrixGitLabAdapter(
       service.getPullRequestCheckoutTarget = async (input) => {
         const target = await getPullRequestCheckoutTarget(input);
         const isFork = forkPairOf(config, await readRemoteUrls({ cwd: input.cwd })) !== null;
-        return isFork
+        const refsTarget = isFork
           ? { ...target, checkoutRefs: forkMergeRequestCheckoutRefs(target.number) }
           : target;
+        return withSourceProjectName(refsTarget, async () => {
+          const { project } = await client.resolveMergeRequestScope(input.cwd);
+          const mergeRequest = await client.getMergeRequest({
+            cwd: input.cwd,
+            project,
+            iid: input.number,
+          });
+          if (mergeRequest.source_project_id == null) return null;
+          const source = await client.getProject({
+            cwd: input.cwd,
+            project: String(mergeRequest.source_project_id),
+          });
+          return source.path_with_namespace;
+        });
       };
       const getCurrentPullRequestStatus = service.getCurrentPullRequestStatus.bind(service);
       service.getCurrentPullRequestStatus = async (input) =>
@@ -80,6 +94,25 @@ export function forkMergeRequestCheckoutRefs(iid: number): PullRequestCheckoutRe
     { remoteName: "upstream", remoteRef: `refs/merge-requests/${iid}/head` },
     { remoteName: "origin", remoteRef: `refs/merge-requests/${iid}/head` },
   ];
+}
+
+/**
+ * Upstream's GitLab service leaves the merge request's source project unnamed, so the warning for
+ * a merge request from another project read "unknown repository". The name goes in the owner field
+ * (a path such as `me/app`), which is what that warning prints when there is no URL. A lookup that
+ * fails leaves the target as it was.
+ */
+export async function withSourceProjectName<T extends { isCrossRepository: boolean }>(
+  target: T,
+  lookupSourceProjectPath: () => Promise<string | null>,
+): Promise<T & { headOwnerLogin?: string | null }> {
+  if (!target.isCrossRepository) return target;
+  try {
+    const path = await lookupSourceProjectPath();
+    return path ? { ...target, headOwnerLogin: path } : target;
+  } catch {
+    return target;
+  }
 }
 
 type ForgeEntry = readonly [string, ForgeAdapterRegistration];

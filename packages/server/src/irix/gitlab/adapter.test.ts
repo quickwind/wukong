@@ -9,6 +9,7 @@ import {
   createIrixGitLabAdapter,
   forkMergeRequestCheckoutRefs,
   irixForgeEntries,
+  withSourceProjectName,
   withoutAbandonedMergeRequest,
 } from "./adapter.js";
 import { loadGitLabForgeConfig, parseGitLabProjectPath } from "./config.js";
@@ -106,5 +107,27 @@ describe("forkMergeRequestCheckoutRefs", () => {
       { remoteName: "upstream", remoteRef: "refs/merge-requests/7/head" },
       { remoteName: "origin", remoteRef: "refs/merge-requests/7/head" },
     ]);
+  });
+});
+
+describe("withSourceProjectName", () => {
+  const fork = { isCrossRepository: true, headOwnerLogin: null };
+
+  it("names the project a merge request comes from", async () => {
+    expect(await withSourceProjectName(fork, async () => "me/app")).toEqual({
+      isCrossRepository: true,
+      headOwnerLogin: "me/app",
+    });
+  });
+
+  it("leaves a merge request of the same project, and a failed lookup, as they were", async () => {
+    const same = { isCrossRepository: false, headOwnerLogin: null };
+    expect(await withSourceProjectName(same, async () => "me/app")).toBe(same);
+    expect(
+      await withSourceProjectName(fork, async () => {
+        throw new Error("404");
+      }),
+    ).toBe(fork);
+    expect(await withSourceProjectName(fork, async () => null)).toBe(fork);
   });
 });
