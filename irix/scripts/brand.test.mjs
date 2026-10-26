@@ -16,6 +16,7 @@ const TOUCHED = [
   "packages/app/public/index.html",
   "packages/app/app.config.js",
   "packages/app/src/components/icons/paseo-logo.tsx",
+  "packages/app/src/utils/os-notifications.ts",
   "packages/app/src/screens/settings-screen.tsx",
   "packages/app/assets/images",
   "packages/app/public",
@@ -66,7 +67,7 @@ test("brands the name, metadata, logo and CLI alias", () => {
   });
 });
 
-test("the web app manifest lists small icons without the name and large ones with it, once", () => {
+test("the web app manifest lists all mark-only PWA icons once", () => {
   const root = copyTree();
   applyBrand({ root });
   applyBrand({ root });

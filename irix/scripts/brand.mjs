@@ -32,6 +32,7 @@ const GUARDED_OVERLAYS = {
 // Overlay files that upstream does not have; every other overlay replaces a file upstream ships.
 const ADDED_OVERLAYS = new Set([
   "packages/app/src/components/icons/irix-logo-geometry.ts",
+  "packages/app/assets/images/web-notification-icon.png",
   "packages/app/public/pwa-icon-16.png",
   "packages/app/public/pwa-icon-24.png",
   "packages/app/public/pwa-icon-32.png",
@@ -109,6 +110,12 @@ function textRules(root) {
       pattern: /("icons": \[)/gu,
       replacement: `$1${MANIFEST_ICONS}`,
       applied: "/pwa-icon-16.png",
+    },
+    {
+      file: "packages/app/src/utils/os-notifications.ts",
+      pattern: /require\("\.\.\/\.\.\/assets\/images\/notification-icon\.png"\)/gu,
+      replacement: 'require("../../assets/images/web-notification-icon.png")',
+      applied: "web-notification-icon.png",
     },
     {
       file: "packages/app/public/index.html",
