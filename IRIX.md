@@ -389,7 +389,7 @@ config`), and the id and default branch of the two projects for a day, in memory
   passes `usageProvider: "devin"` (`devin-client.ts`): upstream's ACP session reports no usage
   account without it.
 - **Context hint** (`plugins/irix-context-hint`): a composer pill that appears when an agent's context window
-  passes the warning (75% by default) or critical (90%) threshold. Its menu offers `/compact`, a new agent in
+  passes the warning (50% by default) or critical (75%) threshold. Its menu offers `/compact`, a new agent in
   the same workspace with the same provider, model and mode (and switches to it, through a blank
   `open-agent` screen, since menu callbacks have no navigation), or "don't remind me" (hidden until the level gets
   worse or usage drops below the warning threshold). The client entry reads `lastUsage` from the agent list

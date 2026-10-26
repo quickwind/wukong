@@ -1,11 +1,12 @@
 import { defineRpc, defineSettings } from "@getpaseo/plugin";
 import { z } from "zod";
+import { DEFAULT_PREFERENCES } from "./level.js";
 
 export const preferencesSchema = z
   .object({
-    enabled: z.boolean().default(true),
-    warnPercent: z.number().int().min(1).max(99).default(75),
-    criticalPercent: z.number().int().min(2).max(100).default(90),
+    enabled: z.boolean().default(DEFAULT_PREFERENCES.enabled),
+    warnPercent: z.number().int().min(1).max(99).default(DEFAULT_PREFERENCES.warnPercent),
+    criticalPercent: z.number().int().min(2).max(100).default(DEFAULT_PREFERENCES.criticalPercent),
   })
   .refine((value) => value.warnPercent < value.criticalPercent, {
     message: "The warning threshold must be below the critical one",

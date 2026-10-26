@@ -6,8 +6,8 @@ export interface HintPreferences {
 
 export const DEFAULT_PREFERENCES: HintPreferences = {
   enabled: true,
-  warnPercent: 75,
-  criticalPercent: 90,
+  warnPercent: 50,
+  criticalPercent: 75,
 };
 
 export type ContextLevel = "none" | "warn" | "critical";
