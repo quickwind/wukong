@@ -1,106 +1,56 @@
-# Cross-Provider Agent Fork Mechanism
+# Agent fork
 
-Paseo allows users to fork an active or completed agent session into a new session, with the option to choose a completely different agent provider (such as switching from Claude Code to Codex, OpenCode, Pi, or custom ACP agents).
+Forking starts a new agent from an existing agent's conversation. The new agent can use a different provider and model, so you can continue a Claude Code chat in Devin or the other way round.
 
-This document covers the architecture, timeline curation, and cross-provider context injection pipeline.
+A fork does not branch the provider's session. The daemon turns the source agent's timeline into a text summary and attaches it to the new agent's first message. The source agent keeps running untouched. Providers store their sessions in incompatible formats, so text is the only thing every provider accepts.
 
----
+## What the new agent receives
 
-## Architecture Principles
+One text attachment (`type: "text"`, `contextKind: "chat_history"`, title "Chat history"), built by `buildAgentForkContextAttachment` in `packages/server/src/server/agent/activity-curator.ts`:
 
-Agent providers (Claude Code, Codex, OpenCode, Pi, ACP) maintain incompatible internal session state, proprietary SQLite databases, and diverging process lifecycles. Trying to deserialize or reconstruct native session states across providers is unviable.
+```
+<chat-history-summary>
+Chat history from a previous Paseo agent.
+Source agent: <title>
+Source directory: <cwd>
 
-Paseo treats forking as context distillation rather than native session resumption:
-
-- **No native session branching**: Forking does not branch or resume the provider's native session state. The source session continues running untouched.
-- **Projected timeline curation**: The daemon curates the source agent's projected timeline into a standardized, character-budgeted summary attachment (`chat_history`).
-- **Provider decoupling**: The new agent receives the curated history as a prompt attachment at turn start. Any provider that supports text prompt blocks can consume it without custom migration logic.
-
----
-
-## Data Flow
-
-```mermaid
-sequenceDiagram
-    participant UI as Client (App)
-    participant Server as Daemon
-    participant Curator as Activity Curator
-    participant NewAgent as Target Agent (Any Provider)
-
-    UI->>Server: agent.fork_context.request (agentId, boundary?)
-    Server->>Curator: buildAgentForkContextAttachment()
-    Note over Curator: Curate timeline rows, extract thoughts,<br/>assistant messages, and tool invocations
-    Curator-->>Server: Formatted chat-history-summary attachment
-    Server-->>UI: agent.fork_context.response (Attachment)
-    Note over UI: Open draft composer with chat_history attachment.<br/>User can change provider, model, or prompt.
-    UI->>Server: agent.start / turn (with chat_history attachment)
-    Server->>NewAgent: buildAgentPrompt() injects attachment at prompt head
+[User] ...
+[Assistant] ...
+[<Tool name>] <one-line summary>
+</chat-history-summary>
 ```
 
----
+- Only user messages, assistant messages and tool calls are included. Reasoning, task lists, errors and compaction markers are left out.
+- A tool call shows its name and what it acted on (a file path, command, search query or URL), cut to one line. Neither the tool's full input nor its output is included.
+- The source agent and directory lines are left out when the agent has no title or directory. An agent with no history yields "No chat history to display."
 
-## Execution Phases
+### Size limit
 
-### 1. Trigger and Boundary Determination
+The whole text, envelope included, stays under `MAX_FORK_CONTEXT_CHARS` (100,000 characters). When the history is longer, the oldest entries are dropped and the text starts with `[Earlier chat history omitted]`. If even the newest entry does not fit, it is cut in the middle and marked `[Message truncated]`.
 
-The user triggers a fork from the assistant turn footer via [AssistantForkMenu](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/app/src/components/assistant-fork-menu.tsx), selecting either "Fork in new tab" or "Fork in new workspace".
+### Where the history stops
 
-Context capture supports two boundary states:
+- **A finished turn:** the footer of that turn passes a boundary, and the summary ends at it. The app sends a timeline cursor (`boundaryCursor`) when the host reports `agentForkContextCursor`, and the assistant message id (`boundaryMessageId`) otherwise (`packages/app/src/agent-stream/turn-boundary.ts`).
+- **A turn still running:** the footer next to the progress indicator passes no boundary, and the summary holds the whole timeline up to now, including the part of the reply that has streamed so far.
 
-- **Completed turn**: The client passes the turn's `boundaryMessageId` and `boundaryCursor`. The backend extracts history strictly up to that turn boundary.
-- **In-flight (streaming) turn**: The client omits the boundary arguments. When boundary options are omitted, `selectForkContextRows` projects the entire timeline up to the current moment, capturing content that is still actively streaming.
+The request fails if the boundary is gone, or if the checkpoint changed after it was created ("Fork from a later completed response instead").
 
-Client orchestration is managed in [useForkAgent](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/app/src/hooks/use-fork-agent.ts).
+## How a fork runs
 
-### 2. Activity Curation
+1. The user opens the fork menu in a turn footer and picks "Fork in a new tab" or "Fork in a new workspace" (`packages/app/src/components/assistant-fork-menu.tsx`).
+2. `useForkAgent` (`packages/app/src/hooks/use-fork-agent.ts`) sends `agent.fork_context.request` and stores the answer as a `chat_history` attachment on a new draft. The draft starts with the source agent's provider, directory, mode, model, thinking level and feature values. The user can change any of them, or the prompt, before sending.
+3. The daemon handles the request in `handleAgentForkContextRequest` (`packages/server/src/server/session.ts`) and answers with `agent.fork_context.response`.
+4. When the draft is sent, the agent is created the normal way. `buildAgentPrompt` (`packages/server/src/server/agent/prompt-attachments.ts`) puts the summary in front of the typed text, the images and the other attachments.
+5. Each provider turns the blocks into its own input with `renderPromptAttachmentAsText` (Claude, Codex, OpenCode, Pi and ACP agents all do). Only the first message carries the summary.
 
-On receiving `agent.fork_context.request`, the session invokes [buildAgentForkContextAttachment](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/server/src/server/agent/activity-curator.ts#L335):
+## Gotchas
 
-1. **Item selection**: Timeline rows up to the boundary cursor are gathered and passed to `curateProjectedActivityEntries`.
-2. **Text transformation**: Timeline items are formatted into normalized text blocks:
-   - User messages: Raw text.
-   - Assistant responses: `[Assistant] <text>`.
-   - Reasoning / CoT: `[Thought] <text>`.
-   - Tool calls: `[<ToolName>] <summary/inputJson>`.
-3. **Character budget fitting**: Total text is budgeted against `MAX_FORK_CONTEXT_CHARS` (100,000 characters). When history exceeds the budget, earlier entries are dropped and prefixed with `[Earlier chat history omitted]`.
-4. **Envelope**: Entries are wrapped inside an envelope block:
+- **The source agent is loaded first.** The handler calls `ensureAgentLoaded`, which resumes an agent that was closed. In Irix that includes an agent closed by idle release, so forking one starts its provider process again. If the agent's provider is no longer registered, the fork fails with "references unavailable provider".
+- **Older daemons cannot fork.** The app checks the `agentForkContext` feature; without it the fork shows "Update the host to use this." instead of calling the daemon. Provider sub-agent panes are read-only and never fork.
+- **The summary is lossy.** The new agent sees what was said and which tools ran on what, not tool output or the reasoning. Say so in the prompt when the new agent needs a file's content or a command's output.
 
-   ```xml
-   <chat-history-summary>
-   Chat history from a previous Paseo agent.
-   Source agent: <Agent Title>
-   Source directory: <CWD>
+## In Irix
 
-   <Curated Entries>
-   </chat-history-summary>
-   ```
-
-5. **Attachment generation**: Emitted as a standard `type: "text"` attachment with `contextKind: "chat_history"`.
-
-### 3. Draft Composer Staging
-
-The client loads the attachment into the workspace attachment store as a `WorkspaceComposerAttachment` (`kind: "chat_history"`):
-
-- Source agent metadata (such as working directory `cwd` and existing feature values) pre-populates the new draft setup.
-- The composer UI displays the chat history as an attachment pill.
-- The user is free to change the agent provider, model, execution mode, or accompanying prompt before initiating the run.
-
-### 4. Cross-Provider Prompt Ingestion
-
-When the user submits the draft:
-
-1. **Attachment hoisting**: [buildAgentPrompt](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/server/src/server/agent/prompt-attachments.ts#L7) hoists `contextKind: "chat_history"` attachments to the front of the prompt block array, before any user text, images, or review attachments.
-2. **Provider adapter conversion**: Provider implementations (such as [Claude](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/server/src/server/agent/providers/claude/agent.ts), [Codex](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/server/src/server/agent/providers/codex-app-server-agent.ts), [OpenCode](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/server/src/server/agent/providers/opencode-agent.ts), and [Pi](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/server/src/server/agent/providers/pi/agent.ts)) pass all blocks through [renderPromptAttachmentAsText](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/server/src/server/agent/prompt-attachments.ts#L40).
-3. **Execution**: The rendered XML summary block is prepended directly to the first user message sent to the newly instantiated agent CLI or API.
-
----
-
-## Code Reference
-
-| Area                 | Path                                                                                                                                                                                                  | Responsibility                                               |
-| :------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------- |
-| **UI Trigger**       | [packages/app/src/components/assistant-fork-menu.tsx](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/app/src/components/assistant-fork-menu.tsx)       | Turn footer menu and trigger action                          |
-| **Client Hook**      | [packages/app/src/hooks/use-fork-agent.ts](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/app/src/hooks/use-fork-agent.ts)                             | RPC call, draft setup, and attachment staging                |
-| **Activity Curator** | [packages/server/src/server/agent/activity-curator.ts](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/server/src/server/agent/activity-curator.ts)     | Timeline extraction, budget fitting, and XML envelope        |
-| **Session RPC**      | [packages/server/src/server/session.ts](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/server/src/server/session.ts)                                   | `agent.fork_context.request` handler                         |
-| **Prompt Assembly**  | [packages/server/src/server/agent/prompt-attachments.ts](file:///Volumes/ExternalSSD/Workspace/PaseoData/worktrees/1fkfpn5w/unbiased-lionfish/packages/server/src/server/agent/prompt-attachments.ts) | Front-hoisting `chat_history` attachments into prompt blocks |
+- The providers are Claude Code and Devin, so a fork moves a chat between those two.
+- A new Devin agent gets Irix's instruction block (identity, the `irix` commands) before the summary in its first prompt (`packages/server/src/irix/devin-client.ts`). The summary header still says "a previous Paseo agent": it is server text that the brand step does not touch.
+- Nothing in Irix changes how forking works. It adds no upstream edit and no code of its own.

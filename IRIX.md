@@ -68,6 +68,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | `IRIX.md`                      | This guide                                                                                                                  |
 | `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide                                           |
 | `irix/AGENTS.md`               | Windows build recipe and the traps that cost time when packaging                                                            |
+| `irix/docs/`                   | Guide to the agent fork mechanism (continue a chat in another provider)                                                     |
 | `irix/README.md`               | Configuration, GitLab setup, building, publishing                                                                           |
 | `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins                                                   |
 | `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                                               |
