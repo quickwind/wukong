@@ -34,6 +34,7 @@ describe("Irix plugins", () => {
         "irix-gitlab",
         "irix-devin-usage",
         "irix-claude-usage",
+        "irix-context-hint",
       ]);
     });
   });

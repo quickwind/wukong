@@ -76,6 +76,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin                 |
 | `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                                   |
 | `plugins/irix-claude-usage/`   | Bundled plugin: Claude monthly spend cap (and session/weekly windows where a plan has them)                                 |
+| `plugins/irix-context-hint/`   | Bundled plugin: composer pill when an agent's context window passes a threshold; compact or start a new session             |
 | `.github/workflows/irix-*.yml` | CI checks on every push to `irix` (the publish job is switched off); weekly sync with upstream                              |
 
 ## Upstream files we touch (the whole list)
@@ -387,6 +388,13 @@ config`), and the id and default branch of the two projects for a day, in memory
   context window hover card shows the plan usage like Claude's does because `DevinACPAgentClient`
   passes `usageProvider: "devin"` (`devin-client.ts`): upstream's ACP session reports no usage
   account without it.
+- **Context hint** (`plugins/irix-context-hint`): a composer pill that appears when an agent's context window
+  passes the warning (75% by default) or critical (90%) threshold. Its menu offers `/compact`, a new agent in
+  the same workspace with the same provider, model and mode (and switches to it, through a blank
+  `open-agent` screen, since menu callbacks have no navigation), or "don't remind me" (hidden until the level gets
+  worse or usage drops below the warning threshold). The client entry reads `lastUsage` from the agent list
+  stream; the thresholds live in the plugin's settings (Command Center → "Context hint settings") and reach the entry
+  through an RPC, because `useSettings` only works inside components. Nothing upstream is edited.
 - **Claude usage** (`plugins/irix-claude-usage`): upstream's `claude-usage-source` stays off. It
   reads only the 5 hour and weekly windows, and an enterprise seat (`enterprise_usage_based`,
   checked 2026-10-24 on a Dell account) has neither: `/api/oauth/usage` returns them as `null`

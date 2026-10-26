@@ -1,0 +1,6 @@
+{
+  "id": "irix-context-hint",
+  "name": "Context hint",
+  "description": "Warns when an agent's context window is nearly full and offers /compact or a new session.",
+  "requirements": { "paseo": ">=0.13.0" }
+}

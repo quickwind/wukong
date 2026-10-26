@@ -17,6 +17,7 @@ export const IRIX_BUILTIN_PLUGINS: readonly string[] = [
   "irix-gitlab",
   "irix-devin-usage",
   "irix-claude-usage",
+  "irix-context-hint",
 ];
 
 export function irixBuiltinPlugins(
