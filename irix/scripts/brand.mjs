@@ -40,9 +40,9 @@ const ADDED_OVERLAYS = new Set([
 ]);
 
 // An installed Chrome app takes its window, taskbar and desktop icons from the manifest's icon
-// list, picking the entry that fits each size. The small ones carry the mark alone (the text is
-// unreadable at 16 to 32 px); the larger ones, upstream's 192 and 512 replaced by Irix's, carry
-// the mark with the name.
+// list, picking the entry that fits each size. Every PWA icon carries the mark alone so Chrome
+// does not select a wordmark for a small Windows surface; the IRIX wordmark remains in icon.png
+// and the Apple touch icon.
 const MANIFEST_ICONS = [16, 24, 32, 48, 256]
   .map(
     (size) =>
