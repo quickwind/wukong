@@ -245,9 +245,11 @@ describe("the agent id travels in the launch context the hook reads", () => {
       expect(src).toContain("resumeSession: this.resumeSession.bind(this),");
     }
     const devin = source("irix/devin-client.ts");
-    expect(devin).toContain("await super.createSession(config, launchContext, options);");
-    expect(devin).toContain(
-      "await super.resumeSession(handle, overrides, launchContext, options);",
+    // The config and the overrides are Irix's own versions (guide, MCP choice); the launch context
+    // keeps its position, which is what the hook reads.
+    expect(devin).toContain("await super.createSession(guided, launchContext, options);");
+    expect(devin).toMatch(
+      /await super\.resumeSession\(\s*handle,[\s\S]*?,\s*launchContext,\s*options,?\s*\);/u,
     );
   });
 });

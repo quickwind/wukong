@@ -1,6 +1,6 @@
 import { tmpdir } from "node:os";
 import { PassThrough } from "node:stream";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCli } from "../cli.js";
 import { createCliParseArgv } from "../run.js";
 import { markIrixCli } from "./defaults.js";
@@ -39,10 +39,58 @@ describe("Irix CLI surface", () => {
     expect(names(createCli())).toContain("host");
   });
 
-  it("keeps the commands Irix does use", () => {
-    markIrixCli(true);
-    expect(names(createCli())).toEqual(
-      expect.arrayContaining(["run", "ls", "send", "daemon", "plugin", "provider", "schedule"]),
+  describe("commands the daemon switches off", () => {
+    const agentSubcommands = (command: ReturnType<typeof createCli>) => {
+      const agent = command.commands.find((c) => c.name() === "agent");
+      return agent ? names(agent) : [];
+    };
+
+    beforeEach(() => {
+      vi.stubEnv("IRIX_UNRESTRICTED", "");
+      vi.stubEnv("IRIX_ALLOW_SCHEDULES", "");
+      vi.stubEnv("IRIX_ALLOW_AGENT_MESSAGING", "");
+      vi.stubEnv("PASEO_AGENT_ID", "");
+      markIrixCli(true);
+    });
+
+    it("keeps the commands Irix does use", () => {
+      expect(names(createCli())).toEqual(
+        expect.arrayContaining(["run", "ls", "send", "daemon", "plugin", "provider"]),
+      );
+    });
+
+    it("leaves out schedule and heartbeat by default, from the command list and the help", () => {
+      const cli = createCli();
+      expect(names(cli)).not.toContain("schedule");
+      expect(names(cli)).not.toContain("heartbeat");
+      expect(cli.helpInformation()).not.toMatch(/\bschedule\b|\bheartbeat\b/u);
+    });
+
+    it.each(["IRIX_UNRESTRICTED", "IRIX_ALLOW_SCHEDULES"])(
+      "shows schedule and heartbeat when %s is set",
+      (variable) => {
+        vi.stubEnv(variable, "1");
+        expect(names(createCli())).toEqual(expect.arrayContaining(["schedule", "heartbeat"]));
+      },
+    );
+
+    it("keeps send for a person, and drops it for an agent, while messages between agents are off", () => {
+      expect(names(createCli())).toContain("send");
+      expect(agentSubcommands(createCli())).toContain("send");
+
+      vi.stubEnv("PASEO_AGENT_ID", "agent-1");
+      const cli = createCli();
+      expect(names(cli)).not.toContain("send");
+      expect(agentSubcommands(cli)).not.toContain("send");
+    });
+
+    it.each(["IRIX_UNRESTRICTED", "IRIX_ALLOW_AGENT_MESSAGING"])(
+      "keeps send for an agent when %s is set",
+      (variable) => {
+        vi.stubEnv("PASEO_AGENT_ID", "agent-1");
+        vi.stubEnv(variable, "1");
+        expect(names(createCli())).toContain("send");
+      },
     );
   });
 

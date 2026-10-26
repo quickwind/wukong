@@ -34,6 +34,9 @@ import type {
   AgentTimelineItem,
 } from "../server/agent/agent-sdk-types.js";
 import { GenericACPAgentClient } from "../server/agent/providers/generic-acp-agent.js";
+import { irixAgentGuide, withAgentGuide } from "./agent-guide.js";
+import { withResumedAgentTools } from "./agent-tools-resume.js";
+import { getAgentToolsChannel } from "./agent-tools-setting.js";
 import { isIrixActive } from "./policy.js";
 import { isBypassModeId, isIrixRestricted } from "./restrictions.js";
 import { DevinSubagentCards } from "./devin-subagent-card.js";
@@ -61,71 +64,9 @@ interface PromptingConnection {
   prompt: (params: PromptParams, ...rest: unknown[]) => Promise<unknown>;
 }
 
-/** What Devin is told about driving Paseo from its shell, for the tools it cannot get over MCP. */
+/** What Devin is told about Paseo's agent tools: the `irix` command line unless the host says MCP. */
 export function paseoCommandLineGuide(agentId?: string): string {
-  const mayMessage = !isIrixRestricted("agentMessaging");
-  const maySchedule = !isIrixRestricted("schedules");
-  return [
-    "Working with other agents in this app: you have no MCP tools for it. Use the `irix` command in " +
-      "your shell (it talks to the app running on this machine).",
-    ...(agentId
-      ? [`Your own agent ID is ${agentId} (also in the environment as PASEO_AGENT_ID).`]
-      : []),
-    "- `irix agent ls`: list the agents, with their IDs, titles and status",
-    ...(mayMessage
-      ? [
-          '- `irix send <id> "<message>" --no-wait`: send a message to the agent with that ID (an ID ' +
-            "prefix is enough); it knows the message is from you. Leave out --no-wait to wait for its reply",
-        ]
-      : []),
-    "- `irix logs <id> --tail 20`: read what an agent has done and said lately",
-    "- `irix wait <id>`: wait until an agent is idle",
-    '- `irix run --provider <provider> --title <title> "<task>"`: start a new agent on a task',
-    "- `irix script ls`: list this workspace's configured scripts (from paseo.json) with their status, port and URL",
-    "- `irix script start <name>` / `irix script stop <name>`: start or stop one of those scripts, e.g. " +
-      "`typecheck` or a dev server. It runs under the app's supervision, so the user sees it in the Scripts menu",
-    "The script commands act on the workspace of your current directory; add `--workspace <id>` if that is ambiguous. " +
-      "To see a script's output, read its terminal in the app; `start` only starts it.",
-    ...(maySchedule
-      ? [
-          '- `irix schedule create "<prompt>" --every <duration>` (for example 30m or 1h) or `--cron "<expr>"`: ' +
-            "run a prompt on a recurring schedule; each run starts a new agent. Add `--timezone <iana>` for cron, " +
-            "`--name`, `--provider`, `--cwd`, `--max-runs <n>` and `--expires-in <duration>` as needed",
-          "- `irix schedule ls`: list the schedules with their IDs, cadence and status",
-          "- `irix schedule inspect <id>`: show one schedule's details; `irix schedule logs <id>`: show its recent runs",
-          "- `irix schedule pause <id>` / `irix schedule resume <id>`: stop or restart its runs without deleting it",
-          "- `irix schedule run-once <id>`: trigger one extra run now, without changing the cadence",
-          "- `irix schedule update <id>`: change a schedule in place instead of creating a duplicate " +
-            "(cadence, prompt, name, working directory, model, mode, run limit, expiry)",
-          "- `irix schedule delete <id>`: remove a schedule for good",
-          "Use `irix schedule <command> --help` for each command's options.",
-          "- `irix heartbeat --help`: heartbeats are different from schedules: they send a prompt back to you " +
-            "(this agent) on a cron cadence, instead of starting a new agent",
-        ]
-      : []),
-    ...(mayMessage
-      ? [
-          "You are not told when an agent you started or messaged finishes. To get its answer, leave out " +
-            "--no-wait (the command returns when the agent is done), or for long work ask it in the message " +
-            "to report back with `irix send <your ID> ...` when it is finished.",
-        ]
-      : []),
-    "A skill or instruction that names Paseo tools (list_agents, create_agent, send_agent_prompt, " +
-      "get_agent_activity, wait_for_agent, list_profiles, ...) means these commands: use `irix --help` " +
-      "and `irix <command> --help` to find the matching one. Write `irix`, never `paseo`.",
-    "Pass the message straight on the command line; do not write it to a file in the project. Keep it on " +
-      "one line and avoid double quotes inside it. Only if it truly needs line breaks or quotes, write it " +
-      "to a file in the system temp folder (not the project), pass --prompt-file, and delete the file after.",
-    ...(isSubagentApprovalRequired()
-      ? [
-          "POLICY - MANDATORY SUBAGENT APPROVAL: every `run_subagent` call waits for a human to approve " +
-            "it. It may take minutes; wait for it. If it is blocked by a hook, the user denied it: do not " +
-            "retry it or work around it (for example with `irix run`) unless the user asks. Always start " +
-            "subagents in the foreground (`is_background` false): a background subagent cannot ask the user " +
-            "to approve its shell commands, so they fail.",
-        ]
-      : []),
-  ].join("\n");
+  return irixAgentGuide({ provider: DEVIN_PROVIDER_ID, channel: getAgentToolsChannel(), agentId });
 }
 
 /** The standing instructions as a block Devin reads before the user's first message. */
@@ -496,14 +437,20 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     options?: AgentCreateSessionOptions,
   ): Promise<AgentSession> {
     await ensureSubagentGateRunning();
-    const session = await super.createSession(config, launchContext, options);
+    // The guide goes into the stored config as well as the first prompt: both providers persist
+    // `daemonAppendSystemPrompt`, which is how a resume finds out which mode this agent was made in.
+    const guided = withAgentGuide(config, {
+      provider: DEVIN_PROVIDER_ID,
+      channel: getAgentToolsChannel(),
+      agentId: launchContext?.agentId,
+    });
+    const session = await super.createSession(guided, launchContext, options);
     injectInstructionsIntoFirstPrompt(
       session,
       [
         config.systemPrompt?.trim(),
-        // The system prompt set in the app's settings; upstream's ACP client ignores it too.
-        config.daemonAppendSystemPrompt?.trim(),
-        paseoCommandLineGuide(launchContext?.agentId),
+        // The system prompt set in the app's settings, then the guide; upstream's ACP client ignores both.
+        guided.daemonAppendSystemPrompt?.trim(),
       ]
         .filter(Boolean)
         .join("\n\n"),
@@ -524,7 +471,17 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     options?: AgentResumeSessionOptions,
   ): Promise<AgentSession> {
     await ensureSubagentGateRunning();
-    const session = await super.resumeSession(handle, overrides, launchContext, options);
+    // Keeps the guide and the MCP server this agent was created with, not the current setting's.
+    const session = await super.resumeSession(
+      handle,
+      withResumedAgentTools(
+        handle,
+        overrides,
+        launchContext?.agentId,
+      ) as Partial<AgentSessionConfig>,
+      launchContext,
+      options,
+    );
     hideInjectedInstructions(session);
     attachDevinSubagentApprovalGate(session, launchContext?.agentId);
     attachDevinBypassOptionFilter(session);

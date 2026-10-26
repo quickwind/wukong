@@ -183,7 +183,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   a new session gets the block, so a Devin chat made before this stays without it. Devin also ignores
   a server whose name it has seen before; a rename fix was tried and dropped as it helps only where
   MCP is allowed (it is in git history, commit `f7cec3d70`). Irix homes default
-  `daemon.mcp.injectIntoAgents` to true, which serves Claude Code.
+  `daemon.mcp.injectIntoAgents` to true; in `cli` mode (below) neither provider is given the tools anyway.
   On Windows a quoted message run by Devin (`irix send <id> "What are you doing?"`) reached the CLI cut at
   the spaces with the quote marks still on, so the receiver got `"What`. `bin/irix` now passes the
   arguments through `mendSplitQuotedArgs` (`packages/cli/src/irix/argv.ts`), which joins an opening
@@ -199,7 +199,53 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   comes back), so Devin is told to wait or to ask the agent to `irix send` its answer back; and the
   skills Paseo installs for agents name MCP tools, so Devin is told to map them to `irix` commands.
   `brand.mjs` rewrites `paseo <command>` to `irix <command>` in those skills at pack time, since
-  Irix ships no `paseo` command. Paseo's `browser_*` tools have no CLI, so Devin has none.
+  Irix ships no `paseo` command, and in the command line's own hints and errors ("Use `paseo ls` to list
+  agents"; about 30 files), because an agent that follows a hint to a command that does not exist wastes a turn.
+  A source checkout still prints `paseo` there; only the packed build is rewritten. Paseo's `browser_*` tools have no CLI, so Devin has none.
+- **Agent guide and agent tools** (`irix/agent-guide.ts`, `agent-tools-setting.ts`, `claude-agent-guide.ts`;
+  the CLI half is `removeSwitchedOffCommands` in `packages/cli/src/irix/surface.ts`): Claude and Devin are in the same
+  position on a company machine, where MCP may be barred and neither tells the daemon when it drops a
+  server, so the daemon cannot detect it. Agents are taught the `irix` command line instead, by a guide
+  built from the host's switches when a session starts: `send` and the "report back" advice only when agent
+  messaging is allowed (otherwise: start a new agent with the whole task, `wait`, read `logs`), the
+  `schedule` family only when schedules are allowed, the approval policy when subagent approval is on.
+  Devin gets it in its first prompt and in its stored config (`devin-client.ts`, new sessions only; the stored copy is how a resume learns which mode the agent was made in). Claude gets it appended to
+  `daemonAppendSystemPrompt` by a patch on `ClaudeAgentClient.prototype`, installed when the provider
+  registry is built; no chat message. The guide is fixed when the agent is created: with the real Claude CLI, a
+  resumed session ignores a new appended system prompt and keeps its first one (created with "the secret word is
+  ALPHA", resumed with "BRAVO", it still answers ALPHA). So Paseo's MCP tools are fixed at creation as well, or an old
+  agent would be told one thing and given another. A resume reads the guide the agent was created with from its stored
+  metadata and passes it through unchanged; the agent gets Paseo's MCP server, and the per-agent tool policy the MCP
+  route checks (`getPaseoToolPolicy`), only if that guide is not the command-line one (no guide counts as MCP, as
+  agents made before this were). The server entry is built fresh from the agent manager's address and token, which
+  change at every daemon start (`mcpBaseUrl`, `mcpAuthToken`, `paseoToolPolicies` are private members, pinned by a test).
+  Devin takes the same path (`agent-tools-resume.ts` serves both; `DevinACPAgentClient.resumeSession` calls it), and
+  nothing in Irix or upstream keeps MCP away from Devin: the only way Paseo's server reaches it is
+  `config.mcpServers` in `session/new`, `session/load` and `session/resume`, which follows this setting. Checked with
+  the real Devin 3000.11 on macOS: made in Irix-tools mode and resumed under MCP it stays without the server; made
+  over MCP and resumed under Irix tools it keeps it with a fresh token and lists `list_agents`. A Devin with a team
+  MCP registry may still drop the server (see above), which is Devin's choice. An agent's own MCP servers (Claude's
+  settings, Devin's own config) are never touched; a local server in `.mcp.json` still worked in Irix-tools mode.
+  Checked with the real Claude (Haiku 5.5): made in Irix-tools mode and resumed under MCP it still has no `paseo`
+  tools; made over MCP and resumed under Irix tools it calls `list_agents` (without the policy step it connected but
+  was left with no tools).
+  One setting, `daemon.agentTools` in `<home>/daemon.json` (`cli` by default, or `mcp`), covers both
+  providers. It is fixed to `cli` and the Settings → host → Agents row is hidden unless
+  `IRIX_UNRESTRICTED` or `IRIX_ALLOW_AGENT_TOOLS` is set in the daemon's environment
+  (`server_info.features.agentToolsEditable` tells the app). In `cli` mode the daemon config store's `get()`
+  reports `paseoTools.enabled: false` for `claude` and `devin`, so the agent manager hands them neither the
+  MCP server nor the in-process tools (it reads that policy at every start); nothing upstream is edited, but
+  the app's cached config shows those two flags too (the Providers page is hidden in Irix).
+  The `irix` command leaves out what the daemon would refuse: `schedule` and `heartbeat` unless
+  `IRIX_UNRESTRICTED` or `IRIX_ALLOW_SCHEDULES` is set, and `send` (also `agent send`) unless
+  `IRIX_UNRESTRICTED` or `IRIX_ALLOW_AGENT_MESSAGING` is set **and** `PASEO_AGENT_ID` is set, because only an
+  agent's message is refused, so a person at a terminal keeps `send`. It reads the same variables the daemon
+  does: an agent's shell inherits the daemon's environment (`baseEnv: process.env` in the Claude session), the
+  way `isCliSubagentApprovalRequired` already works. A person who lifts a switch on the daemon only has
+  to set it in their own shell to see the command. The daemon enforces its switches whatever the command
+  line shows, and no file in the home says what is switched on (an earlier version wrote one; it was
+  dropped so the switches stay unadvertised). A switch change needs a daemon restart and reaches new agents only.
+
 - **Providers:** removed from the registry, not merely disabled. Terminal profiles are fixed to
   Claude Code. The Providers page and Add provider catalog are hidden. Claude starts disabled when
   its command is not found at daemon start (`detectIrixProviders` in `irix/providers.ts`); an

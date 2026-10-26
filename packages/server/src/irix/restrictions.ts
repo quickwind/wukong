@@ -16,13 +16,15 @@ export type IrixRestriction =
   | "schedules"
   | "agentMessaging"
   | "bypassModes"
-  | "subagentApprovalControl";
+  | "subagentApprovalControl"
+  | "agentToolsControl";
 
 const ALLOW_VARIABLE: Record<IrixRestriction, string> = {
   schedules: "IRIX_ALLOW_SCHEDULES",
   agentMessaging: "IRIX_ALLOW_AGENT_MESSAGING",
   bypassModes: "IRIX_ALLOW_BYPASS_MODES",
   subagentApprovalControl: "IRIX_ALLOW_SUBAGENT_APPROVAL_CONTROL",
+  agentToolsControl: "IRIX_ALLOW_AGENT_TOOLS",
 };
 
 function isOn(value: string | undefined): boolean {

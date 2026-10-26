@@ -54,8 +54,9 @@ const MANIFEST_ICONS = [16, 24, 32, 48, 256]
 // Files with no user-visible product name.
 const I18N_WITHOUT_NAME = new Set(["plugin-settings.ts"]);
 
-// The skills Paseo installs for agents show commands as `paseo <command>`; Irix's command is
-// `irix`. Only a real command is rewritten, so prose such as "the paseo skill" stays. A skill not
+// The skills Paseo installs for agents, and the hints in the command line's own messages ("Use
+// `paseo ls` to list agents"), show commands as `paseo <command>`; Irix's command is `irix`, and an
+// agent that follows a hint to a command that does not exist wastes a turn. Only a real command is rewritten, so prose such as "the paseo skill" stays. A skill not
 // listed here has no command in it; a listed one that loses its commands upstream fails the run.
 const CLI_COMMANDS =
   "ls|run|import|clone|attach|logs|stop|delete|send|inspect|wait|archive|onboard|start|hooks|status|" +
@@ -78,6 +79,15 @@ function listOverlayFiles(directory = OVERLAY_ROOT) {
   });
 }
 
+// Every non-test source file under the command line, for the hints in its messages.
+function cliSourceFiles(root, directory = "packages/cli/src") {
+  return readdirSync(path.join(root, directory), { withFileTypes: true }).flatMap((entry) => {
+    const relative = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) return cliSourceFiles(root, relative);
+    return /\.tsx?$/u.test(entry.name) && !/\.test\.tsx?$/u.test(entry.name) ? [relative] : [];
+  });
+}
+
 function textRules(root) {
   const i18nDirectory = path.join(root, "packages/app/src/i18n/resources");
   const i18n = readdirSync(i18nDirectory)
@@ -97,9 +107,18 @@ function textRules(root) {
       applied: "irix ",
       optional: !SKILLS_WITH_COMMANDS.has(entry.name),
     }));
+  const cliHints = cliSourceFiles(root).map((file) => ({
+    file,
+    pattern: SKILL_COMMAND,
+    replacement: "irix ",
+    applied: "irix ",
+    // Most files carry no hint; the test below pins the ones that matter.
+    optional: true,
+  }));
   return [
     ...i18n,
     ...skills,
+    ...cliHints,
     {
       file: "packages/app/public/manifest.json",
       pattern: /"(name|short_name)": "Paseo"/gu,

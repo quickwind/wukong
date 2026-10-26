@@ -178,6 +178,28 @@ function removeCommand(parent: Command, name: string): void {
   }
 }
 
+/**
+ * Leaves out what the daemon would refuse, read from the same environment variables the daemon
+ * reads (an agent's shell inherits them). The daemon enforces its own switches whatever this does:
+ * schedules are refused for everyone, a message between agents when an agent sends it. Schedules
+ * and heartbeats go for everyone, `send` only inside an agent (PASEO_AGENT_ID is set in an agent's
+ * shell), so a person at a terminal keeps it.
+ */
+function removeSwitchedOffCommands(program: Command, env: NodeJS.ProcessEnv = process.env): void {
+  const unrestricted = isEnvOn(env.IRIX_UNRESTRICTED);
+  if (!unrestricted && !isEnvOn(env.IRIX_ALLOW_SCHEDULES)) {
+    removeCommand(program, "schedule");
+    removeCommand(program, "heartbeat");
+  }
+  if (!unrestricted && !isEnvOn(env.IRIX_ALLOW_AGENT_MESSAGING) && env.PASEO_AGENT_ID) {
+    removeCommand(program, "send");
+    const agent = program.commands.find((command) => command.name() === "agent");
+    if (agent) {
+      removeCommand(agent, "send");
+    }
+  }
+}
+
 export function applyIrixSurface(program: Command): Command {
   program
     .name("irix")
@@ -188,6 +210,7 @@ export function applyIrixSurface(program: Command): Command {
   if (!isEnvOn(process.env.IRIX_ENABLE_CONNECTED_HOSTS)) {
     removeCommand(program, "host");
   }
+  removeSwitchedOffCommands(program);
   const daemon = program.commands.find((command) => command.name() === "daemon");
   if (daemon) {
     removeCommand(daemon, "pair");

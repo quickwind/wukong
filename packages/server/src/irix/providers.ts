@@ -1,6 +1,7 @@
 // Irix edition: Claude Code and Devin CLI are the only agent providers. Devin ships as a
 // configured ACP provider, not a built-in, so upstream's provider code stays untouched.
 
+import { installClaudeAgentGuide } from "./claude-agent-guide.js";
 import { isIrixActive } from "./policy.js";
 import {
   checkProviderLaunchAvailable,
@@ -85,6 +86,8 @@ export function restrictToIrixProviders<T extends Record<string, unknown>>(
   if (!isIrixActive()) {
     return registry;
   }
+  // Built before any session starts, so every Claude session gets the agent guide.
+  installClaudeAgentGuide();
   return Object.fromEntries(
     Object.entries(registry).filter(
       ([id]) =>

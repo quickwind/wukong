@@ -22,6 +22,7 @@ const TOUCHED = [
   "packages/app/public",
   "packages/cli/package.json",
   "packages/cli/bin",
+  "packages/cli/src",
   "skills",
 ];
 
@@ -49,6 +50,16 @@ test("rewrites the commands in the agent skills to `irix`, and leaves prose alon
   assert.match(skill, /irix ls/u);
   assert.doesNotMatch(skill, /\bpaseo (run|send|ls|project|--help)\b/u);
   assert.match(read(root, "skills/paseo-handoff/SKILL.md"), /\*\*paseo\*\* skill/u);
+  applyBrand({ root });
+});
+
+test("rewrites the commands in the command line's own hints to `irix`", () => {
+  const root = copyTree();
+  applyBrand({ root });
+  const allow = read(root, "packages/cli/src/commands/permit/allow.ts");
+  assert.match(allow, /irix ls/u);
+  assert.doesNotMatch(allow, /\bpaseo (ls|agent|permit)\b/u);
+  assert.match(read(root, "packages/cli/src/commands/daemon/reload.ts"), /irix daemon restart/u);
   applyBrand({ root });
 });
 

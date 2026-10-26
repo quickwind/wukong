@@ -10,6 +10,8 @@ import type {
   AgentSessionConfig,
   AgentStreamEvent,
 } from "../server/agent/agent-sdk-types.js";
+import { agentToolsFields, wrapAgentToolsConfigStore } from "./agent-tools-setting.js";
+import { rememberAgentManagerForGuide } from "./agent-tools-resume.js";
 import { isAgentBusy } from "./idle-release-busy.js";
 import { installIdleReleaseSessionHooks } from "./idle-release-sessions.js";
 import { getIdleReleaseSettings, wrapIdleReleaseConfigStore } from "./idle-release-settings.js";
@@ -365,6 +367,7 @@ export function attachIrixAgentManager(managerInput: unknown): void {
     return;
   }
   const manager = managerInput as AgentManagerInternal;
+  rememberAgentManagerForGuide(manager);
   // Runs on every create and resume (from `prepareSessionConfig`), before the client makes a
   // session. The hooks sit on the client prototypes, so replaced clients need nothing more.
   installIdleReleaseSessionHooks();
@@ -612,6 +615,7 @@ export function attachIrixWsServer(wsServerInput: unknown): void {
   // After the approval wrapper above so both chains compose.
   if (isIrixActive()) {
     wrapIdleReleaseConfigStore(wsServer);
+    wrapAgentToolsConfigStore(wsServer);
     wrapDaemonConfigBroadcast(wsServer);
   }
 }
@@ -634,6 +638,7 @@ function wrapDaemonConfigBroadcast(wsServer: WsServerInternal): void {
       requireSubagentApproval: isSubagentApprovalRequired(),
       subagentApprovalLocked: isSubagentApprovalLocked(),
       idleRelease: getIdleReleaseSettings(),
+      ...agentToolsFields(),
     });
   };
 }
