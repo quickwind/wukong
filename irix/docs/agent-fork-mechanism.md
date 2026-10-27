@@ -26,7 +26,7 @@ Source directory: <cwd>
 
 ### Size limit
 
-The whole text, envelope included, stays under `MAX_FORK_CONTEXT_CHARS` (100,000 characters). When the history is longer, the oldest entries are dropped and the text starts with `[Earlier chat history omitted]`. If even the newest entry does not fit, it is cut in the middle and marked `[Message truncated]`.
+The whole text, envelope included, stays under `MAX_FORK_CONTEXT_CHARS` (100,000 characters). When the history is longer, the oldest entries are dropped and the text starts with `[Earlier chat history omitted]`. If even the newest entry does not fit, it is cut in the middle and marked `[Message truncated]`, and the text still starts with the omitted marker.
 
 ### Where the history stops
 
@@ -38,14 +38,14 @@ The request fails if the boundary is gone, or if the checkpoint changed after it
 ## How a fork runs
 
 1. The user opens the fork menu in a turn footer and picks "Fork in a new tab" or "Fork in a new workspace" (`packages/app/src/components/assistant-fork-menu.tsx`).
-2. `useForkAgent` (`packages/app/src/hooks/use-fork-agent.ts`) sends `agent.fork_context.request` and stores the answer as a `chat_history` attachment on a new draft. The draft starts with the source agent's provider, directory, mode, model, thinking level and feature values. The user can change any of them, or the prompt, before sending.
+2. `useForkAgent` (`packages/app/src/hooks/use-fork-agent.ts`) sends `agent.fork_context.request` and stores the answer as a `chat_history` attachment on a new draft. The draft starts with the source agent's provider, directory, mode, model, thinking level and feature values. The user can change any of them, or the prompt, before sending. "Fork in a new workspace" opens the New workspace screen with the same draft, and the attachment stays on it.
 3. The daemon handles the request in `handleAgentForkContextRequest` (`packages/server/src/server/session.ts`) and answers with `agent.fork_context.response`.
 4. When the draft is sent, the agent is created the normal way. `buildAgentPrompt` (`packages/server/src/server/agent/prompt-attachments.ts`) puts the summary in front of the typed text, the images and the other attachments.
 5. Each provider turns the blocks into its own input with `renderPromptAttachmentAsText` (Claude, Codex, OpenCode, Pi and ACP agents all do). Only the first message carries the summary.
 
 ## Gotchas
 
-- **The source agent is loaded first.** The handler calls `ensureAgentLoaded`, which resumes an agent that was closed. In Irix that includes an agent closed by idle release, so forking one starts its provider process again. If the agent's provider is no longer registered, the fork fails with "references unavailable provider".
+- **The source agent is loaded first.** The handler calls `ensureAgentLoaded`, which loads an agent that was closed (its status goes from `closed` to `idle`). In Irix that includes an agent closed by idle release, so forking one reopens it. If the agent's provider is no longer registered, the fork fails with "references unavailable provider".
 - **Older daemons cannot fork.** The app checks the `agentForkContext` feature; without it the fork shows "Update the host to use this." instead of calling the daemon. Provider sub-agent panes are read-only and never fork.
 - **The summary is lossy.** The new agent sees what was said and which tools ran on what, not tool output or the reasoning. Say so in the prompt when the new agent needs a file's content or a command's output.
 
