@@ -8,6 +8,44 @@ function existsIn(paths: string[]) {
 }
 
 describe("resolveRgBinary", () => {
+  it("uses IRIX_RG_PATH first, before the plugin folder and PATH", () => {
+    const bundled = path.posix.join("/plugin", "vendor", "linux-x64", "rg");
+    const result = resolveRgBinary({
+      env: { IRIX_RG_PATH: "/irix/builtin-plugins/irix-content-search/vendor/linux-x64/rg" },
+      pluginDir: "/plugin",
+      platform: "linux",
+      arch: "x64",
+      pathEnv: "/usr/bin",
+      exists: existsIn([
+        "/irix/builtin-plugins/irix-content-search/vendor/linux-x64/rg",
+        bundled,
+        "/usr/bin/rg",
+      ]),
+    });
+    expect(result).toBe("/irix/builtin-plugins/irix-content-search/vendor/linux-x64/rg");
+  });
+
+  it("ignores an IRIX_RG_PATH that names no file", () => {
+    const result = resolveRgBinary({
+      env: { IRIX_RG_PATH: "/gone/rg" },
+      platform: "linux",
+      arch: "x64",
+      pathEnv: "/usr/bin",
+      exists: existsIn(["/usr/bin/rg"]),
+    });
+    expect(result).toBe("/usr/bin/rg");
+  });
+
+  it("reads PATH from the injected env when pathEnv is not given", () => {
+    const result = resolveRgBinary({
+      env: { PATH: "/opt/bin" },
+      platform: "linux",
+      arch: "x64",
+      exists: existsIn(["/opt/bin/rg"]),
+    });
+    expect(result).toBe("/opt/bin/rg");
+  });
+
   it("prefers the bundled binary for the platform and arch", () => {
     const bundled = path.posix.join("/plugin", "vendor", "darwin-arm64", "rg");
     const result = resolveRgBinary({

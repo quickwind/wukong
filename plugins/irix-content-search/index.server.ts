@@ -22,8 +22,8 @@ async function listWorkspaceFolders(context: PluginHandlerContext): Promise<stri
 }
 
 export default function contribute(server: PluginServerContext) {
-  // The plugin host does not tell a plugin its own folder, so a bundled ripgrep under
-  // vendor/ cannot be found from here yet; PATH is used.
+  // The plugin host does not tell a plugin its own folder, so the Irix daemon finds the ripgrep
+  // shipped in this plugin's vendor/ folder and passes it in IRIX_RG_PATH; else PATH is used.
   const sessions = createSearchSessions({ rgPath: resolveRgBinary() });
 
   server.handle(startSearchRpc, async (input, context) => {
