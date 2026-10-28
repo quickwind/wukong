@@ -116,6 +116,20 @@ describe("IrixContentSearchPanel", () => {
     expect(row.contains(marked)).toBe(true);
   });
 
+  it("shows the line number before the line text", () => {
+    fake.state = state({
+      groups: [{ path: "src/app.ts", matches: [first] }],
+      matchCount: 1,
+    });
+    renderPanel();
+
+    const row = screen.getByTestId("content-search-result");
+    const lineNumber = screen.getByTestId("content-search-line-number");
+    expect(lineNumber.textContent).toBe("3");
+    expect(row.contains(lineNumber)).toBe(true);
+    expect(row.textContent).toBe("3const foo = 1;");
+  });
+
   it("calls onOpenMatch with the match when a row is pressed", () => {
     fake.state = found;
     const onOpenMatch = renderPanel();

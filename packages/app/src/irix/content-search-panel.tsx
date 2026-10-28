@@ -124,6 +124,9 @@ function MatchRow({ match, onOpenMatch }: { match: Match; onOpenMatch: (match: M
       accessibilityLabel={`${match.path}, line ${match.line}`}
       testID="content-search-result"
     >
+      <Text style={styles.lineNumber} testID="content-search-line-number">
+        {match.line}
+      </Text>
       <HighlightedText
         text={shown.text}
         ranges={shown.ranges}
@@ -452,6 +455,14 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
     marginLeft: theme.spacing[2],
+  },
+  lineNumber: {
+    minWidth: theme.spacing[8],
+    textAlign: "right",
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    fontVariant: ["tabular-nums"],
+    flexShrink: 0,
   },
   matchText: {
     flex: 1,
