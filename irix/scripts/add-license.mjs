@@ -11,6 +11,8 @@ import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { RIPGREP_VERSION } from "./fetch-ripgrep.mjs";
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PACKAGES = ["highlight", "relay", "protocol", "client", "plugin", "server", "cli"];
 const LICENSE_ID = "Apache-2.0";
@@ -32,6 +34,36 @@ and icons, and its own command, home folder and port. Files of Paseo that were m
 Third-party components included in this product remain licensed under the licenses provided by
 their respective copyright holders.
 `;
+
+const LICENSES = path.join(REPO_ROOT, "irix", "licenses");
+const licenseText = (...parts) => readFileSync(path.join(LICENSES, ...parts), "utf8");
+
+/**
+ * The server ships ripgrep (fetch-ripgrep.mjs puts it in the content search plugin's vendor
+ * folder), and ripgrep's binaries link PCRE2. MIT and BSD ask for their texts to travel with a
+ * binary. The texts in irix/licenses are verbatim: ripgrep's COPYING, LICENSE-MIT and UNLICENSE
+ * from its 15.2.0 tag, and PCRE2's LICENCE.md from its pcre2-10.46 tag.
+ */
+export function ripgrepNotice() {
+  return `ripgrep ${RIPGREP_VERSION} (https://github.com/BurntSushi/ripgrep)
+Copyright (c) 2015 Andrew Gallant
+The unmodified ripgrep release binaries are included in
+dist/server/builtin-plugins/irix-content-search/vendor/, with ripgrep's license files beside them.
+
+${licenseText("ripgrep", "COPYING")}
+--- LICENSE-MIT ---
+
+${licenseText("ripgrep", "LICENSE-MIT")}
+--- UNLICENSE ---
+
+${licenseText("ripgrep", "UNLICENSE")}
+PCRE2 (https://github.com/PCRE2Project/pcre2), compiled into the ripgrep binaries.
+
+${licenseText("pcre2", "LICENCE")}`;
+}
+
+/** Third-party notices for the packages that ship third-party binaries. */
+const SHIPPED_THIRD_PARTY = { server: ripgrepNotice };
 
 /** Apache-2.0 §4d: if upstream ever ships a NOTICE, its text must travel with ours. */
 export function buildNotice(upstreamNotice) {
@@ -63,7 +95,8 @@ export function addLicense({ root = REPO_ROOT, log = () => {} } = {}) {
       throw new Error(`${name} declares license ${manifest.license}, not ${LICENSE_ID}`);
     }
     copyFileSync(licenseFile, path.join(directory, "LICENSE"));
-    writeFileSync(path.join(directory, "NOTICE"), notice);
+    const extra = SHIPPED_THIRD_PARTY[name];
+    writeFileSync(path.join(directory, "NOTICE"), extra ? `${notice}\n${extra()}` : notice);
     manifest.license = LICENSE_ID;
     // LICENSE is always packed; NOTICE only when `files` lists it.
     if (Array.isArray(manifest.files) && !manifest.files.includes("NOTICE")) {

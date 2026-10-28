@@ -1,0 +1,14 @@
+[
+  {
+    "name": "ripgrep (binary in @irix/server)",
+    "version": "15.2.0",
+    "license": "MIT OR Unlicense",
+    "source": "https://github.com/BurntSushi/ripgrep/releases/tag/15.2.0"
+  },
+  {
+    "name": "pcre2 (in the ripgrep binary)",
+    "version": "10.46",
+    "license": "BSD-3-Clause WITH PCRE2-exception",
+    "source": "https://github.com/PCRE2Project/pcre2/releases/tag/pcre2-10.46"
+  }
+]
