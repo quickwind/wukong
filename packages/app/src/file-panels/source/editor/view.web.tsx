@@ -7,6 +7,7 @@ import { getCM, vim } from "@replit/codemirror-vim";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { FileEditorModel } from "./model";
 import { editorBaseExtensions, editorTheme, type EditorVisualTheme } from "./extensions.web";
+import { useIrixFileComments } from "@/irix/file-comments/use-extension.web";
 
 interface FileEditorViewProps {
   model: FileEditorModel;
@@ -46,6 +47,7 @@ export function FileEditorView({
   onReady,
 }: FileEditorViewProps) {
   const [find] = useState(() => new FileFindModel());
+  const irixComments = useIrixFileComments(() => model.getSnapshot().modified); // Irix: line comments
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const snapshot = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot);
@@ -70,6 +72,7 @@ export function FileEditorView({
         extensions: [
           vimCompartment.of(values.vimEnabled ? vim() : []),
           find.extension,
+          irixComments, // Irix
           ...editorBaseExtensions(() => void values.model.save()),
           languageCompartment.of(getLanguageForFile(values.filename)?.extension ?? []),
           wrappingCompartment.of(wrappingForFile(values.filename)),
@@ -98,7 +101,7 @@ export function FileEditorView({
       view.destroy();
       viewRef.current = null;
     };
-  }, [find]);
+  }, [find, irixComments]);
 
   useEffect(() => {
     const view = viewRef.current;

@@ -8,6 +8,7 @@ import type { EditorVisualTheme } from "../editor/extensions.web";
 import { editorTheme } from "../editor/extensions.web";
 import { FilePanelLoading } from "../../loading";
 import type { SourcePresentation } from "./presentation";
+import { useIrixFileComments } from "@/irix/file-comments/use-extension.web";
 
 interface FileSourceViewProps {
   content: string;
@@ -31,6 +32,7 @@ export function FileSourceView({
   theme,
 }: FileSourceViewProps) {
   const [find] = useState(() => new FileFindModel());
+  const irixComments = useIrixFileComments(); // Irix: line comments
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const [ready, setReady] = useState(false);
@@ -45,6 +47,7 @@ export function FileSourceView({
         doc: values.content,
         extensions: [
           find.extension,
+          irixComments, // Irix
           EditorState.readOnly.of(true),
           EditorView.contentAttributes.of({
             tabindex: "0",
@@ -64,7 +67,7 @@ export function FileSourceView({
       view.destroy();
       viewRef.current = null;
     };
-  }, [find]);
+  }, [find, irixComments]);
 
   useEffect(() => {
     const view = viewRef.current;

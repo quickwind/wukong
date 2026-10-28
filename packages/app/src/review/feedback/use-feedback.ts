@@ -24,6 +24,7 @@ import {
 } from "./index";
 import { useToast } from "@/contexts/toast-context";
 import { FeedbackSentMessage } from "./surface";
+import { takeFileCommentsForSend } from "@/irix/file-comments/send";
 
 const feedbackScope = createReviewFeedbackScope();
 
@@ -74,11 +75,12 @@ export function useReviewFeedback(input: {
           const { client: targetClient, sendBehavior } = live.current;
           if (!targetClient) throw new Error(i18n.t("workspace.terminal.hostDisconnected"));
           const activeTurnBehavior = sendBehavior === "steer" ? "steer" : "interrupt";
+          const fileComments = takeFileCommentsForSend(serverId, workspaceId); // Irix: file comments
           await dispatchComposerAgentMessage({
             client: targetClient,
             agentId: recipient.agentId,
             text: i18n.t("review.feedback.prompt"),
-            attachments: [attachment],
+            attachments: [attachment, ...fileComments.attachments], // Irix: file comments
             encodeImages: async () => [],
             submission: createMessageSubmissionWriter(serverId),
             activeTurnBehavior,
@@ -90,6 +92,7 @@ export function useReviewFeedback(input: {
                   ).turnId ?? undefined)
                 : undefined,
           });
+          fileComments.clearSent(); // Irix: file comments
           live.current.toast.show(
             createElement(FeedbackSentMessage, {
               recipient,

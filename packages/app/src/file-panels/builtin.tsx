@@ -9,6 +9,7 @@ import { FilePanelLoading } from "./loading";
 import { FileMarkdownPreview } from "./markdown-preview";
 import { TextFilePanel, type TextFilePreviewProps } from "./source/panel";
 import type { RenderingFilePanel, SourceFilePanel } from "./catalog";
+import { withIrixFileComments } from "@/irix/file-comments/context";
 
 /** Source: the text file panel with no Preview, for text files no other built-in panel claims. */
 function SourcePanel(props: PluginFilePanelProps) {
@@ -85,7 +86,7 @@ export function BuiltinFilePanelView({
   ...props
 }: PluginFilePanelProps & { panel: RenderingFilePanel | SourceFilePanel }) {
   const Component = components[panel.id];
-  return <Component {...props} />;
+  return withIrixFileComments(props, <Component {...props} />); // Irix: comments on file lines
 }
 
 const styles = StyleSheet.create((theme) => ({
