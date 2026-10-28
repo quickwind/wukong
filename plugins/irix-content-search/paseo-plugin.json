@@ -1,0 +1,6 @@
+{
+  "id": "irix-content-search",
+  "name": "Content search",
+  "description": "Searches file contents for the Files panel.",
+  "requirements": { "paseo": ">=0.11.2" }
+}
