@@ -22,14 +22,13 @@ Paseo on company Windows machines, where nothing may be sent to cloud services:
 We want to merge upstream often and cheaply. Every line changed in an upstream file is a future
 merge conflict. An earlier attempt (the `internal-edition` branch, kept only for reference) edited
 126 upstream files and was abandoned for exactly that reason. This branch edits **57 upstream files, 515 lines** (`upstream-footprint.mjs`, against v0.13.0). The
-budget is 57 files and 515 lines. It was 40 and 400. Four things used the room, and nothing else
-may: the Name + Create bar (the New workspace screen and the new chat tab are upstream code, so no
+budget is 57 files and 515 lines. It was 40 and 400. Every raise is recorded here, with its
+reason: the Name + Create bar (the New workspace screen and the new chat tab are upstream code, so no
 Irix-owned file can replace them) took it to 45 files and 420 lines, hiding a plugin-managed
 project from the sidebar (same reason) took the lines to 440, and Devin's skills in the ACP command
 list (one line in `acp-agent.ts`) took them to 447, which moved the budget to 450. The plugin `Markdown` component was carried by hand for a while (upstream 995ad2f87, #7579); v0.13.0 ships it and the copy is gone. Later work (schedules and agent messaging switched off, subagent approval, bypass modes, the CLI and daemon hooks) took it to 462. Fork checkouts then needed `upstream` in the source picker (branches, background fetch, pasted links), which took it to 484, and the setup block for a merge request from another project (below) to 488. Comments on lines of a file (below) took it to 56 files and 506, and the budget to 56 and 510. Content search in the Files panel (below) took it to 57 files and 515, and the budget to 57 and 515. The two lists of
 changes were merged, so the numbers above are measured on the merge, not the sum of the two
-branches. The next upstream edit has to pay for itself by removing another; everything else is new
-files.
+branches. Prefer new files; an upstream edit that raises the budget again gets its line here.
 
 Before editing an upstream file, go down this ladder and stop at the first rung that works:
 
@@ -535,18 +534,27 @@ attachment`), so neither the protocol nor the daemon changed. `dispatchComposerA
   HTML preview is a sandboxed frame and only gets a pointer to the source view. Not built: sending them with the composer's text
   box, which needs a composer attachment kind and about five more upstream files.
 - **Content search in the Files panel** (`plugins/irix-content-search`, app side in
-  `packages/app/src/irix/content-search*.ts(x)`): the magnifier in the Files toolbar shows a search
+  `packages/app/src/irix/content-search*.ts(x)`, `use-content-search.ts` and `open-search-match.ts`): the magnifier in the Files toolbar shows a search
   panel in place of the tree, with match case, whole word, regex (Rust syntax) and include/exclude
   globs, and results grouped by file. A click opens the file at the match line. It is a bundled
   plugin that runs `rg --json` in the workspace folder through three plugin RPCs,
   `irix.search.content.start`, `.poll` and `.cancel`. Plugin RPCs time out after 30 s, so a search is
   started and then polled, and results show as each poll returns them. The protocol is unchanged and
   there is no `server_info` feature flag; a host without the plugin gets "Search is not available on
-  this host". A search stops at 500 matches or 100 files, and a line is trimmed to 240 characters
+  this host. Update the host." A search stops at 500 matches or 100 files, and a line is trimmed to 240 characters
   around the match. The start RPC only searches inside a folder the daemon lists as a workspace.
-  `rg` is looked up on `PATH` once, when the daemon starts. Shipping a bundled `rg` is a later task
-  and is not done yet: a machine without `rg` on `PATH` gets "ripgrep (rg) was not found". Replace is
-  milestone 2 and is not built.
+  **The bundled `rg`:** packing downloads ripgrep 15.2.0 (`irix/scripts/fetch-ripgrep.mjs`, run by
+  `pack-local.mjs` after the brand step) into the throwaway checkout's
+  `plugins/irix-content-search/vendor/<platform>-<arch>/`, for `win32-x64` and the packing machine's
+  platform, and stops the pack if a file's SHA-256 is not the one pinned in `RIPGREP_ASSETS`. The
+  binary is never committed. The plugin host tells a plugin no folder path, so the daemon looks for
+  the binary under its builtin plugins folder at start (`packages/server/src/irix/ripgrep.ts`, called
+  from `edition.ts`) and sets `IRIX_RG_PATH`; a value already set is kept. The plugin uses
+  `IRIX_RG_PATH`, then `PATH`, read once when the daemon starts, so a source checkout uses the `rg` on
+  `PATH` and without one gets "ripgrep (rg) was not found". The executable bit survives the copy into
+  `dist/server/builtin-plugins`, `npm pack` and `npm install` (checked on macOS). Open point: the
+  Windows binary has not yet been confirmed to run on a company machine. Replace is milestone 2 and
+  is not built.
 
 ## License and attribution
 
@@ -574,6 +582,12 @@ What we do about the conditions of §4 and §6:
   technical and stay for cheap merges.
 - **Third-party code** (npm dependencies, bundled web UI libraries) keeps its own licenses. We add
   none and remove none. The python-gitlab config file format is read, but no python-gitlab code is used or installed.
+- **Vendored binaries:** `@irix/server` ships ripgrep's release binaries (MIT or Unlicense; they
+  link PCRE2, BSD-3-Clause with the PCRE2 exception) for content search. `add-license.mjs` appends
+  their license texts, kept verbatim in `irix/licenses/`, to the server's `NOTICE`, and
+  `fetch-ripgrep.mjs` puts ripgrep's own license files beside the binary. `irix/scripts/vendored.json`
+  lists them for `license-audit.mjs`; a new vendored binary gets an entry there and a section in
+  the NOTICE.
 
 Obligations apply on redistribution. Internal use is not that; handing tarballs to contractors or
 another company, or publishing to a public npm registry, is. Before either: legal review, the
