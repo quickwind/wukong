@@ -4,6 +4,8 @@ import type { Match } from "../shared/rpc.js";
 export const LINE_WINDOW = 240;
 const CONTEXT_BEFORE = 40;
 const ELLIPSIS = "…";
+/** Only the first matches of a line can be near the trim window; the rest are not converted. */
+const MAX_SUBMATCHES_PER_LINE = 50;
 
 export interface RgOutputParser {
   /** Matches completed by this chunk. */
@@ -37,8 +39,10 @@ export function trimLineAroundMatch(
   const shift = prefix.length - winStart;
   const kept: Range[] = [];
   for (const r of ranges) {
-    if (r.start >= winStart && r.end <= winEnd) {
-      kept.push({ start: r.start + shift, end: r.end + shift });
+    // A match longer than the window is clamped to the visible text; only ranges that start
+    // outside the window are dropped.
+    if (r.start >= winStart && r.start < winEnd) {
+      kept.push({ start: r.start + shift, end: Math.min(r.end, winEnd) + shift });
     }
   }
   return { text: prefix + line.slice(winStart, winEnd) + suffix, ranges: kept };
@@ -65,7 +69,17 @@ function parseMatch(raw: string): Match | null {
   if (!pathBytes || !lineBytes || typeof data.line_number !== "number") return null;
 
   const path = pathBytes.toString("utf8").replace(/\\/g, "/").replace(/^\.\//, "");
-  const toUtf16 = (byteOffset: number) => lineBytes.subarray(0, byteOffset).toString("utf8").length;
+  // Submatches are sorted, so convert byte offsets to UTF-16 offsets in one forward pass,
+  // decoding only the bytes between consecutive offsets.
+  let bytePos = 0;
+  let utf16Pos = 0;
+  const toUtf16 = (byteOffset: number) => {
+    if (byteOffset > bytePos) {
+      utf16Pos += lineBytes.subarray(bytePos, byteOffset).toString("utf8").length;
+      bytePos = byteOffset;
+    }
+    return utf16Pos;
+  };
 
   // Byte length of the terminator to drop (\n or \r\n).
   let bodyEnd = lineBytes.length;
@@ -74,7 +88,7 @@ function parseMatch(raw: string): Match | null {
   const text = lineBytes.subarray(0, bodyEnd).toString("utf8");
 
   const ranges: Range[] = [];
-  for (const s of data.submatches ?? []) {
+  for (const s of (data.submatches ?? []).slice(0, MAX_SUBMATCHES_PER_LINE)) {
     const start = toUtf16(s.start);
     const end = Math.min(toUtf16(s.end), text.length);
     if (start < text.length || start === end) ranges.push({ start, end });

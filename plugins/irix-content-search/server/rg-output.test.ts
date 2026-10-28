@@ -123,6 +123,26 @@ describe("trimLineAroundMatch", () => {
     expect(out.text.slice(out.ranges[0].start, out.ranges[0].end)).toBe("needle");
   });
 
+  it("clamps a match longer than the window to the visible text", () => {
+    const line = "ab" + "m".repeat(1000) + "cd";
+    const out = trimLineAroundMatch(line, [{ start: 2, end: 1002 }]);
+    expect(out.ranges).toHaveLength(1);
+    expect(out.text.slice(out.ranges[0].start, out.ranges[0].end)).toBe(
+      "m".repeat(out.ranges[0].end - out.ranges[0].start),
+    );
+    expect(out.ranges[0].start).toBe(2);
+    expect(out.ranges[0].end).toBe(out.text.length - 1);
+  });
+
+  it("drops a range that starts after the window", () => {
+    const line = "needle" + "a".repeat(1000) + "needle";
+    const out = trimLineAroundMatch(line, [
+      { start: 0, end: 6 },
+      { start: 1006, end: 1012 },
+    ]);
+    expect(out.ranges).toEqual([{ start: 0, end: 6 }]);
+  });
+
   it("drops ranges that fall outside the window", () => {
     const line = "needle" + "a".repeat(1000) + "needle";
     const out = trimLineAroundMatch(line, [
@@ -131,5 +151,32 @@ describe("trimLineAroundMatch", () => {
     ]);
     expect(out.ranges).toHaveLength(1);
     expect(out.text.slice(out.ranges[0].start, out.ranges[0].end)).toBe("needle");
+  });
+
+  it("keeps a huge line with thousands of submatches fast and correct", () => {
+    const unit = "日needle ";
+    const text = unit.repeat(250_000); // about 2.2 million characters
+    const submatches = [] as { match: { text: string }; start: number; end: number }[];
+    for (let i = 0; i < 250_000; i++) {
+      const start = i * Buffer.byteLength(unit) + 3;
+      submatches.push({ match: { text: "needle" }, start, end: start + 6 });
+    }
+    const msg =
+      JSON.stringify({
+        type: "match",
+        data: {
+          path: { text: "./min.js" },
+          lines: { text: text + "\n" },
+          line_number: 7,
+          submatches,
+        },
+      }) + "\n";
+    const began = performance.now();
+    const out = createRgOutputParser().push(msg);
+    expect(performance.now() - began).toBeLessThan(1000);
+    expect(out).toHaveLength(1);
+    expect(out[0].text.length).toBeLessThanOrEqual(LINE_WINDOW + 2);
+    expect(out[0].column).toBe(2);
+    expect(out[0].ranges[0]).toEqual({ start: 1, end: 7 });
   });
 });
