@@ -38,4 +38,5 @@ export default function contribute(server: PluginServerContext) {
     sessions.cancel(input.id);
     return {};
   });
+  return () => sessions.dispose();
 }

@@ -26,6 +26,8 @@ export interface SearchSessions {
   start(options: SearchOptions): { id: string };
   poll(id: string, cursor: number): PollResult;
   cancel(id: string): void;
+  /** Stops every running search and clears timers; safe to call twice. */
+  dispose(): void;
 }
 
 export interface SearchSessionsDeps {
@@ -218,6 +220,13 @@ export function createSearchSessions(deps: SearchSessionsDeps = {}): SearchSessi
       if (!s) return;
       stop(s);
       forget(s);
+    },
+
+    dispose() {
+      for (const s of sessions.values()) {
+        stop(s);
+        forget(s);
+      }
     },
   };
 }

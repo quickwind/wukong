@@ -229,4 +229,20 @@ describe.skipIf(!RG)("createSearchSessions with a real ripgrep (needs rg on PATH
     expect(last.error).toBeNull();
     expect(sessions.poll(id, last.cursor)).toMatchObject({ done: true, error: "Search expired" });
   });
+
+  it("dispose kills running searches, is idempotent, and leaves polls done", async () => {
+    spawned = [];
+    const sessions = makeSessions();
+    const { id } = sessions.start(options(path.join(root, "many-matches"), "needle"));
+    expect(exited(spawned[0])).toBe(false);
+    sessions.dispose();
+    sessions.dispose();
+    expect(spawned[0].killed).toBe(true);
+    await new Promise((resolve) => {
+      if (exited(spawned[0])) resolve(undefined);
+      else spawned[0].once("exit", resolve);
+    });
+    expect(exited(spawned[0])).toBe(true);
+    expect(sessions.poll(id, 0)).toMatchObject({ done: true });
+  });
 });
