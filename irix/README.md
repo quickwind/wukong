@@ -145,6 +145,10 @@ installs, builds (including the web UI) and writes seven `irix-*.tgz` files to `
 - `--scope acme` builds `@acme/*` instead of `@irix/*`; `--work-dir C:\wk` picks the build
   folder (keep it short on Windows); `--keep` leaves the folder in place.
 - `git config core.autocrlf` may be `true` on Windows; the build copes with CRLF.
+- The build downloads ripgrep from GitHub for content search (Windows x64, and this machine's
+  platform when it differs) and stops if a file's SHA-256 is not the pinned one. The packaging
+  machine needs internet; the installed daemon does not. Extracting the Windows zip on Linux needs
+  `unzip`.
 
 ## Publishing
 
