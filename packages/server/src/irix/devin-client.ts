@@ -32,6 +32,7 @@ import type {
   AgentSessionConfig,
   AgentStreamEvent,
   AgentTimelineItem,
+  AgentUsage,
 } from "../server/agent/agent-sdk-types.js";
 import { GenericACPAgentClient } from "../server/agent/providers/generic-acp-agent.js";
 import { irixAgentGuide, withAgentGuide } from "./agent-guide.js";
@@ -39,6 +40,7 @@ import { withResumedAgentTools } from "./agent-tools-resume.js";
 import { getAgentToolsChannel } from "./agent-tools-setting.js";
 import { isIrixActive } from "./policy.js";
 import { isBypassModeId, isIrixRestricted } from "./restrictions.js";
+import { DevinCompaction } from "./devin-compaction.js";
 import { DevinSubagentCards } from "./devin-subagent-card.js";
 import {
   ensureSubagentGateRunning,
@@ -155,6 +157,8 @@ interface MutableACPSession extends AgentSession {
   replayingHistory?: boolean;
   persistedHistory?: AgentTimelineItem[];
   sessionUpdate?: (params: Record<string, unknown>) => Promise<void>;
+  extNotification?: (method: string, params: Record<string, unknown>) => Promise<void>;
+  currentTurnUsage?: AgentUsage;
 }
 
 /**
@@ -185,6 +189,45 @@ export function attachDevinSubagentCards(sessionInput: AgentSession): void {
       session.pushEvent?.(event);
     } else if (Array.isArray(session.persistedHistory)) {
       session.persistedHistory.push(event.item);
+    }
+  };
+}
+
+/**
+ * Shows Devin's compaction as the compaction marker and clears the context ring when it is done
+ * (see devin-compaction.ts). Devin reports it in extension notifications that upstream's session
+ * ignores, so this reads them after the session has handled them. Not while a resumed session
+ * replays its history: the compaction it shows is long over.
+ */
+export function attachDevinCompaction(sessionInput: AgentSession): void {
+  const session = sessionInput as MutableACPSession;
+  const originalUpdate = session.sessionUpdate?.bind(session);
+  const originalExt = session.extNotification?.bind(session);
+  if (typeof originalUpdate !== "function" || typeof originalExt !== "function") {
+    return;
+  }
+  const compaction = new DevinCompaction();
+  session.sessionUpdate = async (params) => {
+    compaction.observeUpdate(params);
+    if (compaction.isCompactedNotice(params, Boolean(session.activeForegroundTurnId))) {
+      return;
+    }
+    await originalUpdate(params);
+  };
+  session.extNotification = async (method, params) => {
+    await originalExt(method, params);
+    if (session.replayingHistory) {
+      return;
+    }
+    const events = compaction.translate({
+      method,
+      params,
+      provider: DEVIN_PROVIDER_ID,
+      turnId: session.activeForegroundTurnId ?? undefined,
+      turnUsage: session.currentTurnUsage,
+    });
+    for (const event of events) {
+      session.pushEvent?.(event);
     }
   };
 }
@@ -460,6 +503,7 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     attachDevinSubagentApprovalGate(session, launchContext?.agentId);
     attachDevinBypassOptionFilter(session);
     attachDevinSubagentCards(session);
+    attachDevinCompaction(session);
     attachDevinTurnEndWait(session, this.clientLogger);
     return session;
   }
@@ -486,6 +530,7 @@ export class DevinACPAgentClient extends GenericACPAgentClient {
     attachDevinSubagentApprovalGate(session, launchContext?.agentId);
     attachDevinBypassOptionFilter(session);
     attachDevinSubagentCards(session);
+    attachDevinCompaction(session);
     attachDevinTurnEndWait(session, this.clientLogger);
     return session;
   }
