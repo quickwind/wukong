@@ -13,6 +13,9 @@ export function buildRgArgs(options: Omit<SearchOptions, "cwd">): string[] {
   args.push(options.caseSensitive ? "--case-sensitive" : "--ignore-case");
   if (!options.regex) args.push("--fixed-strings");
   if (options.wholeWord) args.push("--word-regexp");
+  // Hidden files are searched, .git is not. Ripgrep gives later globs precedence, so this
+  // comes before the user's.
+  args.push("-g", "!.git");
   for (const glob of splitGlobs(options.include)) args.push("-g", glob);
   for (const glob of splitGlobs(options.exclude)) args.push("-g", `!${glob}`);
   // --regexp keeps a query that starts with "-" from being read as a flag.

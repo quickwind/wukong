@@ -10,6 +10,7 @@ const base = {
   exclude: "",
 };
 const always = ["--json", "--hidden", "--no-require-git", "--no-config", "--crlf"];
+const noGit = ["-g", "!.git"];
 
 describe("buildRgArgs", () => {
   it("builds a case-insensitive literal search", () => {
@@ -17,6 +18,7 @@ describe("buildRgArgs", () => {
       ...always,
       "--ignore-case",
       "--fixed-strings",
+      ...noGit,
       "--regexp",
       "foo",
       ".",
@@ -28,6 +30,7 @@ describe("buildRgArgs", () => {
       ...always,
       "--case-sensitive",
       "--fixed-strings",
+      ...noGit,
       "--regexp",
       "foo",
       ".",
@@ -38,6 +41,7 @@ describe("buildRgArgs", () => {
     expect(buildRgArgs({ ...base, regex: true, query: "a.b" })).toEqual([
       ...always,
       "--ignore-case",
+      ...noGit,
       "--regexp",
       "a.b",
       ".",
@@ -50,6 +54,7 @@ describe("buildRgArgs", () => {
       "--ignore-case",
       "--fixed-strings",
       "--word-regexp",
+      ...noGit,
       "--regexp",
       "foo",
       ".",
@@ -58,6 +63,7 @@ describe("buildRgArgs", () => {
       ...always,
       "--ignore-case",
       "--word-regexp",
+      ...noGit,
       "--regexp",
       "foo",
       ".",
@@ -69,6 +75,7 @@ describe("buildRgArgs", () => {
       ...always,
       "--ignore-case",
       "--fixed-strings",
+      ...noGit,
       "--regexp",
       "-foo",
       ".",
@@ -80,6 +87,7 @@ describe("buildRgArgs", () => {
       ...always,
       "--ignore-case",
       "--fixed-strings",
+      ...noGit,
       "-g",
       "src/**",
       "-g",
@@ -95,6 +103,7 @@ describe("buildRgArgs", () => {
       ...always,
       "--ignore-case",
       "--fixed-strings",
+      ...noGit,
       "-g",
       "!dist",
       "-g",
@@ -103,6 +112,15 @@ describe("buildRgArgs", () => {
       "foo",
       ".",
     ]);
+  });
+
+  it("excludes .git by default, before the user's globs", () => {
+    const args = buildRgArgs({ ...base, include: "src/**", exclude: "dist" });
+    const gitAt = args.indexOf("!.git");
+    expect(gitAt).toBeGreaterThan(0);
+    expect(gitAt).toBeLessThan(args.indexOf("src/**"));
+    expect(gitAt).toBeLessThan(args.indexOf("!dist"));
+    expect(args).toContain("--hidden");
   });
 
   it("does not pass --glob-case-insensitive or --max-columns", () => {

@@ -102,6 +102,11 @@ describe.skipIf(!RG)("createSearchSessions with a real ripgrep (needs rg on PATH
     writeFileSync(path.join(root, "small", "a.txt"), "first line\n  the needle is here\nlast\n");
     writeFileSync(path.join(root, "small", "sub", "b.txt"), "no match\nanother needle\n");
 
+    mkdirSync(path.join(root, "dotdirs", ".git", "hooks"), { recursive: true });
+    mkdirSync(path.join(root, "dotdirs", ".github"));
+    writeFileSync(path.join(root, "dotdirs", ".git", "hooks", "x.sample"), "needle\n");
+    writeFileSync(path.join(root, "dotdirs", ".github", "y.yml"), "needle\n");
+
     mkdirSync(path.join(root, "many-matches"));
     writeFileSync(
       path.join(root, "many-matches", "big.txt"),
@@ -130,6 +135,14 @@ describe.skipIf(!RG)("createSearchSessions with a real ripgrep (needs rg on PATH
     expect(Object.keys(byPath).sort()).toEqual(["a.txt", "sub/b.txt"]);
     expect(byPath["a.txt"]).toMatchObject({ line: 2, column: 7, text: "  the needle is here" });
     expect(byPath["sub/b.txt"]).toMatchObject({ line: 2, column: 9 });
+  });
+
+  it("skips .git but still searches other hidden folders", async () => {
+    const sessions = makeSessions();
+    const { id } = sessions.start(options(path.join(root, "dotdirs"), "needle"));
+    const { matches, last } = await drain(sessions, id);
+    expect(last.error).toBeNull();
+    expect(matches.map((m) => m.path)).toEqual([".github/y.yml"]);
   });
 
   it("poll returns only the matches after the cursor", async () => {
