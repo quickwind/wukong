@@ -2,6 +2,7 @@ import { type WorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
 import type { AgentMessageDelivery } from "./agent/agent-messages/index.js";
 import { AgentDirectory } from "./agent/directory.js";
 import { assertCloneAllowed } from "../irix/gitlab/clone-policy.js"; // Irix
+import { assertIrixCreateApproved, cancelIrixApprovalsFor } from "../irix/create-approval.js"; // Irix
 import { ConnectedHostSession } from "./connected-hosts/index.js";
 import type { ConnectedHosts } from "./connected-hosts/index.js";
 import { searchTimeline } from "./agent/chat-search/index.js";
@@ -4190,6 +4191,8 @@ export class Session {
         throw new Error("Session is not authorized to create an agent");
       }
       const agentInput = request.agent;
+      if (agentInput)
+        await assertIrixCreateApproved(this.agentManager, "workspace", request, this.sessionLogger); // Irix
       const creation = await this.creationService.create(
         {
           kind: "workspace",
@@ -4290,6 +4293,8 @@ export class Session {
     }
   }
 
+  readonly cancelIrixApprovals = () => cancelIrixApprovalsFor(this.sessionLogger); // Irix
+
   private async handleCreateAgentRequest(msg: CreateAgentRequestMessage): Promise<void> {
     try {
       let agent: AgentSnapshotPayload;
@@ -4389,6 +4394,7 @@ export class Session {
     let createdWorktreeForCleanup: CreatePaseoWorktreeWorkflowResult | null = null;
     let createdAgentId: string | null = null;
     try {
+      await assertIrixCreateApproved(this.agentManager, "agent", msg, this.sessionLogger); // Irix
       const requestedCwd = resolve(config.cwd);
       const needsRequestedDirectory = Boolean(worktree) || (!msg.workspaceId && !msg.callerAgentId);
       if (needsRequestedDirectory && !(await this.filesystem.isDirectory(requestedCwd))) {

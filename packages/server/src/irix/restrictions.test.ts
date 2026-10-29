@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { paseoCommandLineGuide } from "./devin-client.js";
 import { activateIrixPolicy } from "./policy.js";
@@ -16,6 +16,7 @@ import {
   withoutIrixBypassModes,
 } from "./restrictions.js";
 import {
+  attachClaudeSessionSubagentGate,
   isSubagentApprovalLocked,
   isSubagentApprovalRequired,
   resetSubagentApprovalCacheForTests,
@@ -211,7 +212,7 @@ describe("Irix restrictions", () => {
     const tool = tools.get("create_agent")!;
     const createPromise = tool.handler({ provider: "claude", prompt: "run child" });
     expect(created).toBe(0);
-    expect(emitted).toHaveLength(1);
+    await vi.waitFor(() => expect(emitted).toHaveLength(1));
     expect(emitted[0]).toMatchObject({
       type: "permission_requested",
       agentId: "parent-1",
@@ -227,6 +228,7 @@ describe("Irix restrictions", () => {
 
     // Rejecting blocks child creation before handler runs
     const rejectPromise = tool.handler({ provider: "claude", prompt: "run child 2" });
+    await vi.waitFor(() => expect(emitted).toHaveLength(3));
     const thirdEvent = emitted[2]!;
     const secondRequestId = (thirdEvent.request as { id: string }).id;
     await fakeAgentManager.respondToPermission("parent-1", secondRequestId, {
@@ -234,5 +236,139 @@ describe("Irix restrictions", () => {
     } as never);
     await expect(rejectPromise).rejects.toThrow(/rejected/);
     expect(created).toBe(1);
+  });
+
+  it("gates MCP schedule tools on parent approval, once per call, and skips a name-only update", async () => {
+    const parentAgent = {
+      id: "parent-1",
+      config: { provider: "claude", cwd: "/tmp" },
+      pendingPermissions: new Map(),
+    };
+    const emitted: Array<Record<string, unknown>> = [];
+    const fakeAgentManager = {
+      agents: new Map([["parent-1", parentAgent]]),
+      emit: (event: Record<string, unknown>) => emitted.push(event),
+      respondToPermission: async () => {},
+    };
+    process.env.IRIX_UNRESTRICTED = "1";
+    const tools = new Map<
+      string,
+      { name: string; handler: (input: Record<string, unknown>) => Promise<unknown> }
+    >();
+    isIrixToolBlocked("create_schedule", tools, {
+      agentManager: fakeAgentManager,
+      callerAgentId: "parent-1",
+      scheduleService: {
+        inspect: async () => ({ status: "paused", prompt: "p", target: { type: "new-agent" } }),
+      },
+    });
+    const ran: string[] = [];
+    for (const name of [
+      "create_schedule",
+      "resume_schedule",
+      "run_schedule_once",
+      "update_schedule",
+    ]) {
+      tools.set(name, {
+        name,
+        handler: async () => {
+          ran.push(name);
+          return {};
+        },
+      });
+    }
+    const requests = () => emitted.filter((event) => event.type === "permission_requested");
+    const answer = async (index: number, behavior: "allow" | "deny") => {
+      const request = requests()[index]!.request as { id: string };
+      await fakeAgentManager.respondToPermission("parent-1", request.id, { behavior } as never);
+    };
+
+    const create = tools.get("create_schedule")!.handler({ prompt: "p", cron: "* * * * *" });
+    expect(ran).toEqual([]);
+    await vi.waitFor(() => expect(requests()).toHaveLength(1));
+    await answer(0, "allow");
+    await create;
+    expect(ran).toEqual(["create_schedule"]);
+
+    const runOnce = tools.get("run_schedule_once")!.handler({ id: "s1" });
+    await vi.waitFor(() => expect(requests()).toHaveLength(2));
+    await answer(1, "deny");
+    await expect(runOnce).rejects.toThrow(/rejected/);
+    expect(ran).toEqual(["create_schedule"]);
+
+    await tools.get("update_schedule")!.handler({ id: "s1", name: "renamed" });
+    await vi.waitFor(() => expect(requests()).toHaveLength(2));
+    expect(ran).toEqual(["create_schedule", "update_schedule"]);
+
+    const edit = tools.get("update_schedule")!.handler({ id: "s1", cron: "0 * * * *" });
+    await vi.waitFor(() => expect(requests()).toHaveLength(3));
+    await answer(2, "allow");
+    await edit;
+    expect(ran).toEqual(["create_schedule", "update_schedule", "update_schedule"]);
+  });
+
+  it("makes Claude ask before its own Task/Agent tool, and only while approval is required", async () => {
+    const observe = async () => ({});
+    const session: Record<string, unknown> = {
+      buildSubagentEffortHooks: () => ({
+        PreToolUse: [{ hooks: [observe] }],
+        SubagentStop: [{ hooks: [observe] }],
+      }),
+    };
+    attachClaudeSessionSubagentGate(session);
+
+    const hooks = (
+      session.buildSubagentEffortHooks as () => Record<
+        string,
+        Array<{ matcher?: string; hooks: Array<() => Promise<unknown>> }>
+      >
+    )();
+    expect(hooks.SubagentStop).toHaveLength(1);
+    expect(hooks.PreToolUse).toHaveLength(2);
+    expect(hooks.PreToolUse![0]!.matcher).toBe("Task|Agent");
+    expect(hooks.PreToolUse![1]!.hooks).toEqual([observe]);
+
+    const ask = hooks.PreToolUse![0]!.hooks[0]!;
+    resetSubagentApprovalCacheForTests(true);
+    await expect(ask()).resolves.toMatchObject({
+      hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask" },
+    });
+    // The setting can be turned off only where its control is unlocked.
+    process.env.IRIX_ALLOW_SUBAGENT_APPROVAL_CONTROL = "1";
+    resetSubagentApprovalCacheForTests(false);
+    await expect(ask()).resolves.toEqual({});
+
+    // A second attach does not add the hook twice.
+    attachClaudeSessionSubagentGate(session);
+    const again = (session.buildSubagentEffortHooks as () => typeof hooks)();
+    expect(again.PreToolUse).toHaveLength(2);
+  });
+
+  it("replaces Claude's JSON card for its Task/Agent tool with a form that names the model, and leaves other cards alone", () => {
+    const pushed: Array<{ type: string; request: { name: string; detail?: unknown } }> = [];
+    const session: Record<string, unknown> = {
+      config: { model: "claude-haiku-5-5" },
+      pushEvent: (event: (typeof pushed)[number]) => pushed.push(event),
+    };
+    attachClaudeSessionSubagentGate(session);
+    const push = session.pushEvent as (event: unknown) => void;
+
+    push({
+      type: "permission_requested",
+      request: {
+        name: "Agent",
+        input: { subagent_type: "Explore", model: "sonnet", prompt: "look around" },
+        detail: { type: "unknown" },
+      },
+    });
+    push({ type: "permission_requested", request: { name: "Bash", detail: { type: "shell" } } });
+    push({ type: "permission_resolved", requestId: "x" });
+
+    expect(pushed).toHaveLength(3);
+    expect(pushed[0]!.request.detail).toEqual({
+      type: "plain_text",
+      text: "Subagent: Explore\nModel: sonnet\nPrompt: look around",
+    });
+    expect(pushed[1]!.request.detail).toEqual({ type: "shell" });
   });
 });

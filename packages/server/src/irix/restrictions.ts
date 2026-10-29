@@ -64,7 +64,7 @@ const SCHEDULE_TOOLS: ReadonlySet<string> = new Set([
 export function isIrixToolBlocked(
   toolName: string,
   toolsMap?: unknown,
-  options?: { agentManager?: unknown; callerAgentId?: string; paseoHome?: string },
+  options?: Parameters<typeof attachIrixPaseoToolsGate>[1],
 ): boolean {
   if (toolsMap && options) {
     attachIrixPaseoToolsGate(toolsMap, options);

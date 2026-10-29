@@ -1,5 +1,6 @@
 import type pino from "pino";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
+import { assertIrixScheduleApproved } from "../../../irix/create-approval.js"; // Irix
 import type { ScheduleService } from "../../schedule/service.js";
 
 export interface ScheduleSessionHost {
@@ -68,6 +69,7 @@ export class ScheduleSession {
     request: Extract<SessionInboundMessage, { type: "schedule/create" }>,
   ): Promise<void> {
     try {
+      await assertIrixScheduleApproved(this.scheduleService, "create", request, this.logger); // Irix
       const target =
         request.target.type === "self"
           ? { type: "agent" as const, agentId: request.target.agentId }
@@ -170,6 +172,7 @@ export class ScheduleSession {
     request: Extract<SessionInboundMessage, { type: "schedule/resume" }>,
   ): Promise<void> {
     try {
+      await assertIrixScheduleApproved(this.scheduleService, "resume", request, this.logger); // Irix
       const schedule = await this.scheduleService.resume(request.scheduleId);
       this.host.emit({
         type: "schedule/resume/response",
@@ -206,6 +209,7 @@ export class ScheduleSession {
     request: Extract<SessionInboundMessage, { type: "schedule/run-once" }>,
   ): Promise<void> {
     try {
+      await assertIrixScheduleApproved(this.scheduleService, "run-once", request, this.logger); // Irix
       const schedule = await this.scheduleService.runOnce(request.scheduleId);
       this.host.emit({
         type: "schedule/run-once/response",
@@ -224,6 +228,7 @@ export class ScheduleSession {
     request: Extract<SessionInboundMessage, { type: "schedule/update" }>,
   ): Promise<void> {
     try {
+      await assertIrixScheduleApproved(this.scheduleService, "update", request, this.logger); // Irix
       const schedule = await this.scheduleService.update({
         id: request.scheduleId,
         ...(request.name !== undefined ? { name: request.name } : {}),

@@ -154,7 +154,20 @@ Paths are under `packages/server/src/irix/` unless they say otherwise.
     a stored bypass mode falls back to the default.
 12. **Mandatory approval for subagents.** Creating or delegating to a subagent waits for a person;
     Devin's `run_subagent` is held by a `PreToolUse` hook (`subagent-approval.ts`,
-    `devin-subagent-gate.ts`). The setting is locked in Settings.
+    `devin-subagent-gate.ts`). The setting is locked in Settings. It also covers what an agent
+    starts from its shell: `irix run` and `irix agent run` (a workspace created with an agent
+    included) and the schedule operations that can start a new agent (create, resume, run once,
+    and updates that change what runs, when, or for how long). The daemon asks the calling agent
+    in its chat before any worktree exists, one card per request, and the CLI never reads stdin
+    for an agent (`create-approval.ts`; CLI side `cli/src/irix/caller-routing.ts`). A person at a
+    terminal with no calling agent still gets the prompt; with no terminal the run is refused. An agent's
+    `irix run` waits 20 s, then exits asking to be run again; the request and its card stay open for ten
+    minutes (`cli/src/irix/pending-run.ts`), because Devin's shell tool fails a command after 30 s.
+    Claude's own Task/Agent tool asks too, through an in-process hook (the `ask` rule in settings is
+    ignored where the organization allows managed rules only), and Devin's `run_subagent` hook has
+    an explicit timeout. The cards read as a form (provider, model, directory, title, prompt; for
+    Claude's Agent tool the subagent type and the model the agent chose, or "not set"), built by
+    `approval-form.ts`.
 13. **Agent tools through the CLI.** Claude and Devin get the `irix` command line instead of
     Paseo's MCP server, because a company MCP registry drops servers passed in by a client.
 

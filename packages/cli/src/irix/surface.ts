@@ -6,6 +6,7 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import type { Command } from "commander";
 import { resolveClientPaseoHome } from "../utils/client.js";
+import { installCallerRouting } from "./caller-routing.js";
 import { selectDaemonTarget } from "../utils/daemon-target.js";
 
 const UNUSED_COMMANDS = ["clone", "onboard", "pair", "hub", "speech"];
@@ -135,6 +136,40 @@ export async function promptCliSubagentApproval(
   return decisionPromise;
 }
 
+export interface CliApprovalContext {
+  /** The agent this shell belongs to (PASEO_AGENT_ID), checked with the daemon when the run sends. */
+  callerAgentId: string | undefined;
+  interactive: boolean;
+  summary: { provider: string; cwd: string; prompt: string };
+}
+
+/**
+ * Who asks for approval before a run starts. An agent's own shell never answers: the daemon raises
+ * the approval card in that agent's chat when it gets the request with the caller named (see
+ * `server/irix/create-approval.ts`), so nothing here reads stdin. Only a person at a terminal, with
+ * no calling agent, is prompted; with no terminal the run is refused without reading stdin. The
+ * environment and the terminal only route the request, the daemon decides for any agent caller.
+ */
+export async function resolveCliApproval(context: CliApprovalContext): Promise<void> {
+  if (context.callerAgentId) {
+    return;
+  }
+  if (!context.interactive) {
+    throw {
+      code: "SUBAGENT_APPROVAL_REQUIRED",
+      message:
+        "Subagent approval is required, and no calling agent or interactive terminal is available to approve this run.",
+    };
+  }
+  const approved = await promptCliSubagentApproval(context.summary);
+  if (!approved) {
+    throw {
+      code: "SUBAGENT_APPROVAL_REJECTED",
+      message: "Agent task launch rejected (denied by user or approval timed out).",
+    };
+  }
+}
+
 function attachRunApprovalHook(runCommand: Command | undefined): void {
   if (!runCommand) {
     return;
@@ -156,17 +191,14 @@ function attachRunApprovalHook(runCommand: Command | undefined): void {
       return;
     }
 
-    const approved = await promptCliSubagentApproval({
-      provider: opts.provider ?? "default",
-      cwd: opts.cwd ?? process.cwd(),
-      prompt,
+    // Inside an agent's shell the daemon asks that agent; `installCallerRouting` refuses a creation
+    // that names no caller the daemon knows, on the run's own connection.
+    const callerAgentId = process.env.PASEO_AGENT_ID?.trim() || undefined;
+    await resolveCliApproval({
+      callerAgentId,
+      interactive: Boolean(process.stdin.isTTY && process.stderr.isTTY),
+      summary: { provider: opts.provider ?? "default", cwd: opts.cwd ?? process.cwd(), prompt },
     });
-    if (!approved) {
-      throw {
-        code: "SUBAGENT_APPROVAL_REJECTED",
-        message: "Agent task launch rejected (denied by user or approval timed out).",
-      };
-    }
   });
 }
 
@@ -211,6 +243,7 @@ export function applyIrixSurface(program: Command): Command {
     removeCommand(program, "host");
   }
   removeSwitchedOffCommands(program);
+  installCallerRouting();
   const daemon = program.commands.find((command) => command.name() === "daemon");
   if (daemon) {
     removeCommand(daemon, "pair");

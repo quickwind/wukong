@@ -25,6 +25,18 @@ import {
 } from "./idle-release.js";
 import { isIrixActive } from "./policy.js";
 import { isIrixRestricted } from "./restrictions.js";
+import {
+  describeSubagentRequest,
+  formatApprovalForm,
+  previewForApproval,
+} from "./approval-form.js";
+import {
+  askCallerForApproval,
+  assertIrixMcpScheduleApproved,
+  isIrixMcpScheduleTool,
+  type IrixScheduleLookup,
+  rememberIrixApprovalHost,
+} from "./create-approval.js";
 
 export const SUBAGENT_APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -210,6 +222,7 @@ interface AgentManagerInternal {
   agents?: Map<string, ManagedAgentInternal>;
   clients?: Map<string, unknown>;
   emit?: (event: unknown) => void;
+  notifyAgentState?: (agentId: string) => void;
   respondToPermission: (
     agentId: string,
     requestId: string,
@@ -246,6 +259,9 @@ function settleSyntheticApproval(
     requestId,
     resolution: response,
   });
+  // The event alone does not refresh the pending list of an agent that is idle: the app kept the
+  // card, with its button spinning, until it was reloaded.
+  manager.notifyAgentState?.(entry.agentId);
 
   entry.resolve(response.behavior === "allow");
   return true;
@@ -262,11 +278,98 @@ function cancelSyntheticApprovalsForAgent(manager: AgentManagerInternal, agentId
   }
 }
 
-function attachClaudeSessionSubagentGate(session: Record<string, unknown>): void {
+interface ClaudeHookMatcher {
+  matcher?: string;
+  hooks: Array<(input: unknown) => Promise<Record<string, unknown>>>;
+}
+
+/**
+ * Claude starts a subagent with its Task/Agent tool without asking, and the `ask` rule Irix puts in
+ * the session settings does not change that where the organization's managed settings allow only
+ * managed permission rules and hooks (`allowManagedPermissionRulesOnly`, `allowManagedHooksOnly`):
+ * both are ignored there. A hook passed in-process through the SDK is not a settings hook and still
+ * runs, and a PreToolUse hook that answers "ask" makes Claude call the permission handler, which
+ * raises the card (tested with Claude Code 2.1.311). The hook is added to what the session builds
+ * for its queries, so it applies to every turn and every resume.
+ */
+function addSubagentAskHook(session: Record<string, unknown>): void {
+  const original = session.buildSubagentEffortHooks;
+  if (typeof original !== "function") {
+    return;
+  }
+  session.buildSubagentEffortHooks = function withSubagentAskHook(
+    this: unknown,
+    ...args: unknown[]
+  ): Record<string, ClaudeHookMatcher[]> {
+    const hooks = (original as (...a: unknown[]) => Record<string, ClaudeHookMatcher[]>).apply(
+      this,
+      args,
+    );
+    const ask: ClaudeHookMatcher = {
+      matcher: "Task|Agent",
+      hooks: [
+        async () =>
+          isSubagentApprovalRequired()
+            ? {
+                hookSpecificOutput: {
+                  hookEventName: "PreToolUse",
+                  permissionDecision: "ask",
+                  permissionDecisionReason: "Starting a subagent needs a person's approval.",
+                },
+              }
+            : {},
+      ],
+    };
+    return { ...hooks, PreToolUse: [ask, ...(hooks.PreToolUse ?? [])] };
+  };
+}
+
+/**
+ * Claude builds the card for its own Task/Agent tool and shows the tool input as JSON, with no
+ * model unless the agent set one. The card's request object is shared with the session's pending
+ * list, so a `detail` set here, before the event goes out, is what the app draws.
+ */
+function addSubagentCardDetail(session: Record<string, unknown>): void {
+  const original = session.pushEvent;
+  if (typeof original !== "function") {
+    return;
+  }
+  session.pushEvent = function withSubagentCardDetail(
+    this: unknown,
+    event: unknown,
+    ...rest: unknown[]
+  ) {
+    try {
+      const request = (
+        event as {
+          type?: string;
+          request?: { name?: string; input?: Record<string, unknown>; detail?: unknown };
+        }
+      ).request;
+      if ((event as { type?: string }).type === "permission_requested" && request) {
+        if (request.name === "Task" || request.name === "Agent") {
+          const model = (session.config as { model?: string } | undefined)?.model;
+          request.detail = {
+            type: "plain_text",
+            text: describeSubagentRequest(request.input, model),
+          };
+        }
+      }
+    } catch {
+      // The card still shows Claude's own detail.
+    }
+    return (original as (...a: unknown[]) => unknown).call(this, event, ...rest);
+  };
+}
+
+export function attachClaudeSessionSubagentGate(session: Record<string, unknown>): void {
   if (hookedClaudeSessions.has(session)) {
     return;
   }
   hookedClaudeSessions.add(session);
+
+  addSubagentAskHook(session);
+  addSubagentCardDetail(session);
 
   // Add 10-minute auto-deny timeout to Claude's handlePermissionRequest for Task/Agent tools,
   // and also enforce approval via PreToolUse hook if the session runs in bypassPermissions mode.
@@ -426,6 +529,10 @@ export async function requestSyntheticSubagentApproval(input: {
   reason: string;
   inputSummary: Record<string, unknown>;
   timeoutMs?: number;
+  /** Aborting (the requester went away) denies the request and takes the card down. */
+  signal?: AbortSignal;
+  /** What the card shows instead of a JSON dump of `inputSummary` (see approval-form.ts). */
+  detailText?: string;
 }): Promise<boolean> {
   attachIrixAgentManager(input.agentManager);
   const manager = input.agentManager as AgentManagerInternal;
@@ -444,6 +551,9 @@ export async function requestSyntheticSubagentApproval(input: {
     title: input.title,
     description: input.reason,
     input: input.inputSummary,
+    ...(input.detailText
+      ? { detail: { type: "plain_text" as const, text: input.detailText } }
+      : {}),
   };
 
   agent.pendingPermissions.set(requestId, request);
@@ -468,12 +578,24 @@ export async function requestSyntheticSubagentApproval(input: {
     });
   });
 
+  const onAbort = () =>
+    settleSyntheticApproval(manager, requestId, {
+      behavior: "deny",
+      message: "Subagent approval canceled because the requester went away.",
+    });
+  if (input.signal?.aborted) {
+    onAbort();
+  } else {
+    input.signal?.addEventListener("abort", onAbort, { once: true });
+  }
+
   manager.emit?.({
     type: "permission_requested",
     agentId: input.targetAgentId,
     provider,
     request,
   } satisfies Partial<AgentStreamEvent> & Record<string, unknown>);
+  manager.notifyAgentState?.(input.targetAgentId);
 
   return promise;
 }
@@ -486,6 +608,7 @@ export function attachIrixPaseoToolsGate(
     agentManager?: unknown;
     callerAgentId?: string;
     paseoHome?: string;
+    scheduleService?: IrixScheduleLookup | null;
   },
 ): void {
   if (options?.paseoHome) {
@@ -523,24 +646,44 @@ export function attachIrixPaseoToolsGate(
                 "Subagent creation blocked: mandatory human approval requires a parent agent session.",
               );
             }
-            const promptText = typeof input.prompt === "string" ? input.prompt : "";
-            const approved = await requestSyntheticSubagentApproval({
+            const approved = await askCallerForApproval({
               agentManager: options.agentManager,
-              targetAgentId: parentAgentId,
-              title: "审批子代理创建 (create_agent)",
-              reason: `当前代理请求启动新的子代理 (${String(input.provider ?? "default")})，请确认是否批准。`,
-              inputSummary: {
+              callerAgentId: parentAgentId,
+              title: "Approve subagent creation (create_agent)",
+              reason: `This agent asks to start a new subagent (${String(input.provider ?? "default")}). Approve?`,
+              summary: {
                 provider: input.provider ?? "default",
                 cwd: input.cwd ?? input.workspaceId ?? "workspace",
                 title: input.title ?? null,
-                prompt: promptText.length > 200 ? `${promptText.slice(0, 200)}...` : promptText,
+                prompt: previewForApproval(input.prompt),
               },
+              detailText: formatApprovalForm([
+                ["Provider", input.provider ?? "default"],
+                ["Mode", input.mode],
+                ["Directory", input.cwd ?? input.workspaceId ?? "workspace"],
+                ["Title", input.title],
+                ["Prompt", previewForApproval(input.prompt)],
+              ]),
             });
             if (!approved) {
               throw new Error("Subagent creation was rejected by user (or timed out after 10m).");
             }
           }
           return originalHandler(input, context);
+        },
+      };
+    }
+    if (isIrixMcpScheduleTool(key) && value && typeof value.handler === "function") {
+      const scheduleHandler = value.handler;
+      value = {
+        ...value,
+        handler: async (input, context) => {
+          await assertIrixMcpScheduleApproved(key, input, {
+            agentManager: options?.agentManager,
+            callerAgentId: context?.callerAgentId ?? options?.callerAgentId,
+            schedules: options?.scheduleService,
+          });
+          return scheduleHandler(input, context);
         },
       };
     }
@@ -575,6 +718,7 @@ export function attachIrixWsServer(wsServerInput: unknown): void {
   if (wsServer.agentManager) {
     attachIrixAgentManager(wsServer.agentManager);
   }
+  rememberIrixApprovalHost(wsServer);
   if (hookedWsServers.has(wsServer)) {
     return;
   }

@@ -113,4 +113,12 @@ describe("Devin subagent approval gate", () => {
     expect(config.hooks.Stop).toEqual([]);
     expect(config.hooks.PreToolUse).toHaveLength(2);
   });
+
+  it("gives the hook a timeout longer than the ten-minute approval wait", () => {
+    const config = buildGatedDevinConfig({}, "run-it") as {
+      hooks: { PreToolUse: Array<{ hooks: Array<{ timeout?: number }> }> };
+    };
+    const timeout = config.hooks.PreToolUse[0]!.hooks[0]!.timeout;
+    expect(timeout).toBeGreaterThan((10 * 60 * 1000) / 1000);
+  });
 });

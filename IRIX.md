@@ -27,12 +27,12 @@ commit.**
 
 We want to merge upstream often and cheaply. Every line changed in an upstream file is a future
 merge conflict. An earlier attempt (the `internal-edition` branch, kept only for reference) edited
-126 upstream files and was abandoned for exactly that reason. This branch edits **58 upstream files, 543 lines** (`upstream-footprint.mjs`, against v0.13.0). The
-budget is 58 files and 550 lines. It was 40 and 400. Every raise is recorded here, with its
+126 upstream files and was abandoned for exactly that reason. This branch edits **60 upstream files, 559 lines** (`upstream-footprint.mjs`, against v0.13.0). The
+budget is 60 files and 560 lines. It was 40 and 400. Every raise is recorded here, with its
 reason: the Name + Create bar (the New workspace screen and the new chat tab are upstream code, so no
 Irix-owned file can replace them) took it to 45 files and 420 lines, hiding a plugin-managed
 project from the sidebar (same reason) took the lines to 440, and Devin's skills in the ACP command
-list (one line in `acp-agent.ts`) took them to 447, which moved the budget to 450. The plugin `Markdown` component was carried by hand for a while (upstream 995ad2f87, #7579); v0.13.0 ships it and the copy is gone. Later work (schedules and agent messaging switched off, subagent approval, bypass modes, the CLI and daemon hooks) took it to 462. Fork checkouts then needed `upstream` in the source picker (branches, background fetch, pasted links), which took it to 484, and the setup block for a merge request from another project (below) to 488. Comments on lines of a file (below) took it to 56 files and 506, and the budget to 56 and 510. Content search in the Files panel (below) took it to 57 files and 515, and the budget to 57 and 515. Irix workspace scripts in `paseo.json` (below) took it to 58 files and 543 lines, and the budget to 58 and 550. The two lists of
+list (one line in `acp-agent.ts`) took them to 447, which moved the budget to 450. The plugin `Markdown` component was carried by hand for a while (upstream 995ad2f87, #7579); v0.13.0 ships it and the copy is gone. Later work (schedules and agent messaging switched off, subagent approval, bypass modes, the CLI and daemon hooks) took it to 462. Fork checkouts then needed `upstream` in the source picker (branches, background fetch, pasted links), which took it to 484, and the setup block for a merge request from another project (below) to 488. Comments on lines of a file (below) took it to 56 files and 506, and the budget to 56 and 510. Content search in the Files panel (below) took it to 57 files and 515, and the budget to 57 and 515. Irix workspace scripts in `paseo.json` (below) took it to 58 files and 543 lines, and the budget to 58 and 550. Approval for agent-started agents and schedules (below) took it to 60 files and 559 lines, and the budget to 60 and 560. The two lists of
 changes were merged, so the numbers above are measured on the merge, not the sum of the two
 branches. Prefer new files; an upstream edit that raises the budget again gets its line here.
 
@@ -62,7 +62,7 @@ node irix/scripts/upstream-footprint.mjs     # lists every upstream file we modi
 ```
 
 It fails if an upstream file is deleted or renamed, if a modified upstream file has no `Irix`
-marker in the lines added, or if the totals pass the budget (58 files, 550 lines; change with
+marker in the lines added, or if the totals pass the budget (60 files, 560 lines; change with
 `--max-files`/`--max-lines`). **Run it before every commit that touches upstream files** and when
 you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
@@ -255,6 +255,86 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   line shows, and no file in the home says what is switched on (an earlier version wrote one; it was
   dropped so the switches stay unadvertised). A switch change needs a daemon restart and reaches new agents only.
 
+- **Approval for agents and schedules started by an agent** (`irix/create-approval.ts`, the CLI half in
+  `cli/src/irix/surface.ts` and `caller-routing.ts`): the daemon decides, the CLI only routes. `irix run`
+  and `irix agent run` send `callerAgentId` (read from `PASEO_AGENT_ID`, and only if the daemon knows that
+  agent). The daemon then raises the synthetic approval card in the caller's chat before anything is
+  created: `createSessionAgent` asks first thing, ahead of any worktree, and a workspace created with an
+  agent asks before the workspace exists. That approval reaches the agent step as a symbol-keyed mark on
+  the request's `agent` object, which the session spreads into the agent step and which JSON cannot carry,
+  so one request raises one card and no later request can reuse the answer. A resent workspace request
+  that the creation service answers from its record (agent made, completed, or outcome unknown) is not
+  asked again. A caller that idle release has closed is loaded to show the card. When no card can be
+  shown (unknown or archived caller) the error says so instead of "rejected by user".
+  The CLI never reads stdin for an agent. `caller-routing.ts` hooks the client's session-request send,
+  on the command's own connection: inside an agent's shell, while the daemon reports
+  `requireSubagentApproval`, a creation that names no caller the daemon knows is refused, and the four
+  `schedule/*` requests that can start an agent get the checked caller id (one lookup per connection) and
+  no deadline, since the approval can take ten minutes (creation requests already use `timeout: 0`). A
+  person at a terminal with no calling agent still gets the yes/no prompt; with no terminal the run is
+  refused without reading stdin.
+  Schedules: creating a new-agent schedule, resuming a paused one, running one once, and an update that
+  changes prompt, cadence, agent config, run limit or expiry are asked; the card shows the stored prompt
+  when the request carries none. `callerAgentId` is optional in those four protocol schemas, so old
+  clients and daemons still parse each other. MCP `create_schedule`, `resume_schedule`,
+  `run_schedule_once` and `update_schedule` use the same rules from the tools gate in
+  `subagent-approval.ts`, looking the schedule up first, so a missing schedule or one that messages an
+  existing agent gets the tool's own error and no card. A name-only update, resuming an active schedule,
+  and the daemon's own ticks are not asked: an approved schedule keeps running. Denial, the ten-minute
+  timeout, or the calling agent being closed or interrupted denies the request and takes the card down.
+  An agent's shell tool gives up on a long command: Devin's fails the call after 30 s ("The command
+  timed out after 30 seconds"), Claude's moves it to the background after 120 s. So an agent's `irix run`
+  does not block until a person answers. `caller-routing.ts` gives the request an idempotency key
+  (`pending-run.ts`: a file in `<home>/pending-runs/` keyed by the caller and the request's content, good
+  for ten minutes, deleted once the request has an outcome), waits 20 s (`IRIX_APPROVAL_WINDOW_MS`), and
+  exits with `SUBAGENT_APPROVAL_PENDING`, telling the agent to run exactly the same command again. The
+  daemon keeps the request and the card open: creation requests carry a key, so the creation service keeps
+  running them after the connection closes, and the repeat attaches to the running one. A repeat of a
+  pending question joins it rather than raising a second card, a refusal is remembered under the same key
+  for ten minutes so the repeat is refused without a new card, and a person who accepts after the CLI has
+  gone still gets the agent created (an agent the parent never collects, if it never reruns; that is
+  what the card said). The agent guide teaches the rerun. Requests without a key (the `schedule/*`
+  requests) are still withdrawn when their connection closes (`cancelIrixApprovals`, called from
+  `websocket-server.ts` when the last socket closes, not after the 90 s reconnect grace), so with Devin a
+  schedule approval must come within its 30 s. Cards are in English: the daemon has no locale and Irix's
+  UI is English only. A card carries its choices (provider, model, mode, thinking, directory, title, prompt; for
+  a schedule the cadence, agent config, limits and the stored prompt) as a `plain_text` detail built by
+  `approval-form.ts`, which the app draws as aligned lines in a monospace block; the JSON `input` stays
+  for other readers (`irix permit ls`). A real form widget would need an app change. Devin's own `run_subagent` card uses the same text. Its hook now carries an explicit `timeout` of 11
+  minutes (`HOOK_TIMEOUT_SECONDS`): with none, a subagent ran while its card was still waiting (answer
+  "NOPE" before anyone clicked, Devin 3000.11, seen in `out/approval-e2e`); with it, the card held for over
+  three minutes, Deny stopped the subagent and Accept let it run. Not yet verified: the full ten minutes,
+  or that Devin counts the timeout in seconds as assumed (the three-minute hold fits seconds).
+  Claude's own Task/Agent tool had the same kind of hole, for a different reason. Irix puts
+  `permissions.ask: ["Task", "Agent"]` in the session settings, but where the organization's managed
+  Claude settings set `allowManagedPermissionRulesOnly` and `allowManagedHooksOnly` (the
+  `remote-settings.json` that Claude Code caches in `~/.claude`), Claude ignores that rule, and its Agent
+  tool asks for nothing by default: with those settings a `deny` or `allow` rule given as a project file,
+  `--settings` or `--allowedTools` has no effect either (checked with Claude Code 2.1.311). Only
+  `--disallowedTools` still works. A hook passed in-process through the SDK is not a settings hook and still
+  runs, so `addSubagentAskHook` (`subagent-approval.ts`) adds a `PreToolUse` hook for `Task|Agent` that
+  answers "ask" while approval is required; Claude then calls the permission handler and the app shows its
+  card (Always ask, Auto and Bypass all checked). It is attached to the real session by the prototype patch
+  in `idle-release-sessions.ts`: the registry hands the manager a facade without the session's members, and
+  the `wrapClaudeClient` patch in `subagent-approval.ts` only ever touched the facade, so the ten-minute
+  timeout wrapper on `handlePermissionRequest` was not applied before either. Claude builds the card for that tool and shows
+  the tool input as JSON; `addSubagentCardDetail` (same file) sets a `detail` on it before the event goes out
+  (the request object is shared with the pending list), so it reads as a form: subagent type, model,
+  description, background, prompt. The model line is what the agent chose (for example "sonnet", and a
+  subagent started that way did run on `claude-sonnet-5-5`), or "not set" with the starting agent's model: in
+  the runs checked an unset model meant the same model as the parent, but a built-in subagent type may
+  define its own default, so the card does not claim more than that.
+  Residual limits, on purpose: the identity is a routing signal, not a credential. A shell that drops
+  `PASEO_AGENT_ID`, or a client that writes its own WebSocket messages, looks like a person; the daemon
+  cannot tell it from the app's own New chat, so it cannot ask. A caller that allocates a
+  pseudo-terminal gets the stdin prompt, which it controls. `irix run --new-workspace` makes a bare
+  workspace (not gated) before the agent step asks, so a denial leaves that empty workspace behind.
+  Schedule requests with no calling agent are not asked.
+  Tests: `create-approval.e2e.test.ts` and `schedule-approval.e2e.test.ts` run a real daemon (allow, deny,
+  caller closed or idle-released, setting off, no worktree before the answer, one card per request,
+  resent request, a request that outlives its connection); `create-approval.test.ts` covers the timeout,
+  the mark, the stored prompt, joining and remembered refusals; `caller-routing.test.ts` and
+  `pending-run.test.ts` cover the CLI routing and the window.
 - **Providers:** removed from the registry, not merely disabled. Terminal profiles are fixed to
   Claude Code. The Providers page and Add provider catalog are hidden. Claude starts disabled when
   its command is not found at daemon start (`detectIrixProviders` in `irix/providers.ts`); an
