@@ -11,6 +11,10 @@ export const MAX_MATCHES = 500;
 export const MAX_FILES = 100;
 /** How long a finished search is kept for a client that stops polling. */
 const FINISHED_TTL_MS = 60_000;
+/** A running search that goes this long without a poll is stopped: its client has gone. */
+export const NO_POLL_TIMEOUT_MS = 30_000;
+/** Searches running at once, across all clients; a new one stops the oldest beyond this. */
+export const MAX_RUNNING_SEARCHES = 4;
 const MAX_STDERR = 10 * 1024;
 const NOT_AVAILABLE = "Search is not available on this machine";
 
@@ -49,6 +53,8 @@ interface Session {
   truncated: boolean;
   error: string | null;
   expiry: ReturnType<typeof setTimeout> | null;
+  /** Stops the search if no poll comes; restarted by each poll while it runs. */
+  idle: ReturnType<typeof setTimeout> | null;
 }
 
 function isDirectory(p: string): boolean {
@@ -68,9 +74,15 @@ export function createSearchSessions(deps: SearchSessionsDeps = {}): SearchSessi
   const sessions = new Map<string, Session>();
   const byCwd = new Map<string, Session>();
 
+  function clearIdle(s: Session) {
+    if (s.idle) clearTimeout(s.idle);
+    s.idle = null;
+  }
+
   function forget(s: Session) {
     if (s.expiry) clearTimeout(s.expiry);
     s.expiry = null;
+    clearIdle(s);
     sessions.delete(s.id);
     if (byCwd.get(s.cwdKey) === s) byCwd.delete(s.cwdKey);
   }
@@ -78,6 +90,7 @@ export function createSearchSessions(deps: SearchSessionsDeps = {}): SearchSessi
   function finish(s: Session) {
     if (s.done) return;
     s.done = true;
+    clearIdle(s);
     if (sessions.get(s.id) !== s) return;
     s.expiry = setTimeout(() => forget(s), FINISHED_TTL_MS);
     s.expiry.unref?.();
@@ -92,6 +105,29 @@ export function createSearchSessions(deps: SearchSessionsDeps = {}): SearchSessi
   function fail(s: Session, message: string) {
     if (s.error === null) s.error = message;
     stop(s);
+  }
+
+  /** Ends a running search now, so a later poll answers done with `message`. */
+  function abandon(s: Session, message: string) {
+    fail(s, message);
+    finish(s);
+  }
+
+  function watchPolls(s: Session) {
+    clearIdle(s);
+    s.idle = setTimeout(
+      () => abandon(s, "Search stopped: no client was polling."),
+      NO_POLL_TIMEOUT_MS,
+    );
+    s.idle.unref?.();
+  }
+
+  function stopOldestBeyondLimit() {
+    // Map order is start order, so the first running ones are the oldest.
+    const running = [...sessions.values()].filter((s) => !s.done && !s.stopped);
+    for (const s of running.slice(0, Math.max(0, running.length - MAX_RUNNING_SEARCHES + 1))) {
+      abandon(s, "Search stopped: too many searches at once.");
+    }
   }
 
   function ingest(s: Session, found: Match[]) {
@@ -180,9 +216,11 @@ export function createSearchSessions(deps: SearchSessionsDeps = {}): SearchSessi
         truncated: false,
         error: null,
         expiry: null,
+        idle: null,
       };
       const previous = byCwd.get(s.cwdKey);
       if (previous) stop(previous);
+      stopOldestBeyondLimit();
       sessions.set(s.id, s);
       byCwd.set(s.cwdKey, s);
 
@@ -194,6 +232,7 @@ export function createSearchSessions(deps: SearchSessionsDeps = {}): SearchSessi
         finish(s);
       } else {
         run(s, rgPath, options, cwd);
+        if (!s.done) watchPolls(s);
       }
       return { id: s.id };
     },
@@ -203,6 +242,7 @@ export function createSearchSessions(deps: SearchSessionsDeps = {}): SearchSessi
       if (!s) {
         return { batch: [], cursor, done: true, truncated: false, error: "Search expired" };
       }
+      if (!s.done) watchPolls(s);
       const next = Math.max(cursor, s.matches.length);
       const result: PollResult = {
         batch: s.matches.slice(cursor),

@@ -98,9 +98,16 @@ function parseMatch(raw: string): Match | null {
   return { path, line: data.line_number, column, text: trimmed.text, ranges: trimmed.ranges };
 }
 
-export function createRgOutputParser(): RgOutputParser {
+/** Test hook: how many characters the parser searched for a newline. */
+export interface RgOutputParserStats {
+  scanned: number;
+}
+
+export function createRgOutputParser(stats?: RgOutputParserStats): RgOutputParser {
   const decoder = new StringDecoder("utf8");
-  let rest = "";
+  // The unfinished line, in the pieces it arrived in. Only new text is searched for a newline, so
+  // a long line that arrives in many chunks is read once, not once per chunk.
+  let pending: string[] = [];
 
   const parseLine = (line: string, out: Match[]) => {
     if (line.length === 0) return;
@@ -108,23 +115,33 @@ export function createRgOutputParser(): RgOutputParser {
     if (m) out.push(m);
   };
 
+  const takeLine = (tail: string): string => {
+    if (pending.length === 0) return tail;
+    pending.push(tail);
+    const line = pending.join("");
+    pending = [];
+    return line;
+  };
+
   return {
     push(chunk) {
-      rest += typeof chunk === "string" ? chunk : decoder.write(chunk);
+      const text = typeof chunk === "string" ? chunk : decoder.write(chunk);
       const out: Match[] = [];
-      let nl = rest.indexOf("\n");
+      let start = 0;
+      let nl = text.indexOf("\n");
       while (nl !== -1) {
-        parseLine(rest.slice(0, nl), out);
-        rest = rest.slice(nl + 1);
-        nl = rest.indexOf("\n");
+        if (stats) stats.scanned += nl + 1 - start;
+        parseLine(takeLine(text.slice(start, nl)), out);
+        start = nl + 1;
+        nl = text.indexOf("\n", start);
       }
+      if (stats) stats.scanned += text.length - start;
+      if (start < text.length) pending.push(text.slice(start));
       return out;
     },
     end() {
-      rest += decoder.end();
       const out: Match[] = [];
-      parseLine(rest, out);
-      rest = "";
+      parseLine(takeLine(decoder.end()), out);
       return out;
     },
   };

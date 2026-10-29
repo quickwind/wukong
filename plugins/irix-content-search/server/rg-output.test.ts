@@ -179,4 +179,33 @@ describe("trimLineAroundMatch", () => {
     expect(out[0].column).toBe(2);
     expect(out[0].ranges[0]).toEqual({ start: 1, end: 7 });
   });
+
+  it("looks for a newline only in new text, so a long line in many chunks costs linear work", () => {
+    const line =
+      JSON.stringify({
+        type: "match",
+        data: {
+          path: { text: "./big.min.js" },
+          lines: { text: `${"x".repeat(3_000_000)} needle\n` },
+          line_number: 1,
+          submatches: [{ match: { text: "needle" }, start: 3_000_001, end: 3_000_007 }],
+        },
+      }) + "\n";
+    const whole = createRgOutputParser().push(line);
+
+    const stats = { scanned: 0 };
+    const chunked = createRgOutputParser(stats);
+    const chunkSize = 64 * 1024;
+    const out = [];
+    for (let at = 0; at < line.length; at += chunkSize) {
+      out.push(...chunked.push(line.slice(at, at + chunkSize)));
+    }
+    out.push(...chunked.end());
+
+    expect(out).toEqual(whole);
+    expect(out).toHaveLength(1);
+    // Rescanning the whole buffer on each of the 46 chunks reads about 23 times the line.
+    expect(stats.scanned).toBeGreaterThanOrEqual(line.length);
+    expect(stats.scanned).toBeLessThanOrEqual(line.length + 1);
+  });
 });

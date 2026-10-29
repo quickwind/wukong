@@ -20,7 +20,10 @@ function isFile(p: string): boolean {
   }
 }
 
-/** `IRIX_RG_PATH`, else the bundled `rg` in `pluginDir`, else the first `rg` on PATH, else null. */
+/**
+ * `IRIX_RG_PATH`, else the bundled `rg` in `pluginDir`, else the first `rg` in an absolute PATH
+ * entry, else null.
+ */
 export function resolveRgBinary(options: ResolveRgBinaryOptions = {}): string | null {
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
@@ -42,7 +45,9 @@ export function resolveRgBinary(options: ResolveRgBinaryOptions = {}): string | 
   for (const raw of pathEnv.split(windows ? ";" : ":")) {
     // Windows PATH entries may be quoted.
     const dir = windows ? raw.trim().replace(/^"(.*)"$/, "$1") : raw;
-    if (dir.length === 0) continue;
+    // A relative entry would resolve against the child's cwd, the workspace, so a repository's own
+    // bin/rg could run.
+    if (dir.length === 0 || !paths.isAbsolute(dir)) continue;
     const candidate = paths.join(dir, exe);
     if (exists(candidate)) return candidate;
   }

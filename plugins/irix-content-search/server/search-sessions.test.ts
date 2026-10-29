@@ -1,5 +1,5 @@
 import type { ChildProcess } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -9,6 +9,8 @@ import { resolveRgBinary } from "./rg-binary.js";
 import {
   MAX_FILES,
   MAX_MATCHES,
+  MAX_RUNNING_SEARCHES,
+  NO_POLL_TIMEOUT_MS,
   type PollResult,
   type SearchSessions,
   createSearchSessions,
@@ -113,8 +115,10 @@ describe.skipIf(!RG)("createSearchSessions with a real ripgrep (needs rg on PATH
       Array.from({ length: MAX_MATCHES * 3 }, (_, i) => `needle ${i}`).join("\n"),
     );
 
+    // Enough output (about 600 KB) that ripgrep is still blocked writing to the pipe when the cap
+    // trips; with 150 files its 75 KB could fit the pipe buffer and it could exit first.
     mkdirSync(path.join(root, "many-files"));
-    for (let i = 0; i < MAX_FILES + 50; i += 1) {
+    for (let i = 0; i < 1000; i += 1) {
       writeFileSync(path.join(root, "many-files", `f${i}.txt`), "one needle\n");
     }
   });
@@ -143,6 +147,22 @@ describe.skipIf(!RG)("createSearchSessions with a real ripgrep (needs rg on PATH
     const { matches, last } = await drain(sessions, id);
     expect(last.error).toBeNull();
     expect(matches.map((m) => m.path)).toEqual([".github/y.yml"]);
+  });
+
+  it("skips .git also when the include is *", async () => {
+    const sessions = makeSessions();
+    const { id } = sessions.start(options(path.join(root, "dotdirs"), "needle", { include: "*" }));
+    const { matches, last } = await drain(sessions, id);
+    expect(last.error).toBeNull();
+    expect(matches.map((m) => m.path)).toEqual([".github/y.yml"]);
+  });
+
+  it("applies an exclude the user wrote with a leading !", async () => {
+    const sessions = makeSessions();
+    const { id } = sessions.start(options(path.join(root, "small"), "needle", { exclude: "!sub" }));
+    const { matches, last } = await drain(sessions, id);
+    expect(last.error).toBeNull();
+    expect(matches.map((m) => m.path)).toEqual(["a.txt"]);
   });
 
   it("poll returns only the matches after the cursor", async () => {
@@ -257,5 +277,78 @@ describe.skipIf(!RG)("createSearchSessions with a real ripgrep (needs rg on PATH
     });
     expect(exited(spawned[0])).toBe(true);
     expect(sessions.poll(id, 0)).toMatchObject({ done: true });
+  });
+});
+
+// A stand-in for ripgrep that runs until it is killed, so a search stays running.
+describe.skipIf(process.platform === "win32")("createSearchSessions limits", () => {
+  let root: string;
+  let slowRg: string;
+  let spawned: ChildProcess[];
+
+  function makeSessions(): SearchSessions {
+    return createSearchSessions({ rgPath: slowRg, onSpawn: (child) => spawned.push(child) });
+  }
+
+  beforeAll(() => {
+    root = mkdtempSync(path.join(tmpdir(), "irix-content-search-limits-"));
+    slowRg = path.join(root, "slow-rg");
+    writeFileSync(slowRg, "#!/bin/sh\nexec sleep 30\n");
+    chmodSync(slowRg, 0o755);
+    for (let i = 0; i <= MAX_RUNNING_SEARCHES; i += 1) mkdirSync(path.join(root, `w${i}`));
+  });
+
+  afterAll(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it(`stops a search nobody has polled for ${NO_POLL_TIMEOUT_MS / 1000} s`, () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    spawned = [];
+    const sessions = makeSessions();
+    try {
+      const { id } = sessions.start(options(path.join(root, "w0"), "needle"));
+      vi.advanceTimersByTime(NO_POLL_TIMEOUT_MS - 1000);
+      expect(sessions.poll(id, 0).done).toBe(false);
+      // The poll restarted the clock.
+      vi.advanceTimersByTime(NO_POLL_TIMEOUT_MS - 1000);
+      expect(spawned[0].killed).toBe(false);
+      expect(sessions.poll(id, 0).done).toBe(false);
+      vi.advanceTimersByTime(NO_POLL_TIMEOUT_MS);
+      expect(spawned[0].killed).toBe(true);
+      expect(sessions.poll(id, 0)).toMatchObject({
+        done: true,
+        error: "Search stopped: no client was polling.",
+      });
+    } finally {
+      sessions.dispose();
+      vi.useRealTimers();
+    }
+  });
+
+  it(`stops the oldest running search when search ${MAX_RUNNING_SEARCHES + 1} starts`, () => {
+    spawned = [];
+    const sessions = makeSessions();
+    try {
+      const ids = Array.from(
+        { length: MAX_RUNNING_SEARCHES },
+        (_, i) => sessions.start(options(path.join(root, `w${i}`), "needle")).id,
+      );
+      expect(spawned.map((child) => child.killed)).toEqual(
+        Array.from({ length: MAX_RUNNING_SEARCHES }, () => false),
+      );
+      sessions.start(options(path.join(root, `w${MAX_RUNNING_SEARCHES}`), "needle"));
+      expect(spawned.map((child) => child.killed)).toEqual([
+        true,
+        ...Array.from({ length: MAX_RUNNING_SEARCHES }, () => false),
+      ]);
+      expect(sessions.poll(ids[0], 0)).toMatchObject({
+        done: true,
+        error: "Search stopped: too many searches at once.",
+      });
+      expect(sessions.poll(ids[1], 0).done).toBe(false);
+    } finally {
+      sessions.dispose();
+    }
   });
 });

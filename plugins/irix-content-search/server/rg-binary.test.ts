@@ -113,4 +113,34 @@ describe("resolveRgBinary", () => {
       }),
     ).toBe("/usr/bin/rg");
   });
+
+  it("skips relative PATH entries, which would resolve against the workspace", () => {
+    expect(
+      resolveRgBinary({
+        env: {},
+        platform: "linux",
+        arch: "x64",
+        pathEnv: "bin:./tools:/usr/bin",
+        exists: existsIn(["bin/rg", "tools/rg", "./tools/rg", "/usr/bin/rg"]),
+      }),
+    ).toBe("/usr/bin/rg");
+    expect(
+      resolveRgBinary({
+        env: {},
+        platform: "win32",
+        arch: "x64",
+        pathEnv: 'bin;".\\tools";C:\\tools',
+        exists: existsIn(["bin\\rg.exe", "tools\\rg.exe", "C:\\tools\\rg.exe"]),
+      }),
+    ).toBe("C:\\tools\\rg.exe");
+    expect(
+      resolveRgBinary({
+        env: {},
+        platform: "linux",
+        arch: "x64",
+        pathEnv: "bin",
+        exists: existsIn(["bin/rg"]),
+      }),
+    ).toBeNull();
+  });
 });

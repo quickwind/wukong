@@ -87,11 +87,11 @@ describe("buildRgArgs", () => {
       ...always,
       "--ignore-case",
       "--fixed-strings",
-      ...noGit,
       "-g",
       "src/**",
       "-g",
       "*.ts",
+      ...noGit,
       "--regexp",
       "foo",
       ".",
@@ -103,24 +103,43 @@ describe("buildRgArgs", () => {
       ...always,
       "--ignore-case",
       "--fixed-strings",
-      ...noGit,
       "-g",
       "!dist",
       "-g",
       "!node_modules/**",
+      ...noGit,
       "--regexp",
       "foo",
       ".",
     ]);
   });
 
-  it("excludes .git by default, before the user's globs", () => {
-    const args = buildRgArgs({ ...base, include: "src/**", exclude: "dist" });
+  it("excludes .git after the user's globs, so an include cannot bring it back", () => {
+    const args = buildRgArgs({ ...base, include: "*", exclude: "dist" });
     const gitAt = args.indexOf("!.git");
-    expect(gitAt).toBeGreaterThan(0);
-    expect(gitAt).toBeLessThan(args.indexOf("src/**"));
-    expect(gitAt).toBeLessThan(args.indexOf("!dist"));
+    expect(args[gitAt - 1]).toBe("-g");
+    expect(gitAt).toBeGreaterThan(args.indexOf("*"));
+    expect(gitAt).toBeGreaterThan(args.indexOf("!dist"));
+    expect(args.lastIndexOf("-g")).toBe(gitAt - 1);
     expect(args).toContain("--hidden");
+  });
+
+  it("drops the leading ! a user wrote on an exclude, and an entry that is only !", () => {
+    expect(buildRgArgs({ ...base, exclude: "!dist, !!build/**, !, src" })).toEqual([
+      ...always,
+      "--ignore-case",
+      "--fixed-strings",
+      "-g",
+      "!dist",
+      "-g",
+      "!build/**",
+      "-g",
+      "!src",
+      ...noGit,
+      "--regexp",
+      "foo",
+      ".",
+    ]);
   });
 
   it("does not pass --glob-case-insensitive or --max-columns", () => {
