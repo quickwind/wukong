@@ -13,17 +13,8 @@ import type {
 } from "../server/agent/agent-sdk-types.js";
 import { agentToolsFields, wrapAgentToolsConfigStore } from "./agent-tools-setting.js";
 import { rememberAgentManagerForGuide } from "./agent-tools-resume.js";
-import { isAgentBusy } from "./idle-release-busy.js";
-import { installIdleReleaseSessionHooks } from "./idle-release-sessions.js";
-import { getIdleReleaseSettings, wrapIdleReleaseConfigStore } from "./idle-release-settings.js";
-import { attachIdleReleaseWsServer, viewedAgentIds } from "./idle-release-viewers.js";
-import {
-  type IdleReleaseDeps,
-  type IdleReleaseLogger,
-  type IdleReleaseManager,
-  type ManagedAgentLike,
-  startIdleRelease,
-} from "./idle-release.js";
+import { installClaudeSessionGate } from "./claude-session-gate.js";
+import { attachIdleViewers } from "./idle-viewers.js";
 import { isIrixActive } from "./policy.js";
 import { isIrixRestricted } from "./restrictions.js";
 import {
@@ -416,28 +407,6 @@ export function attachClaudeSessionSubagentGate(session: Record<string, unknown>
   }
 }
 
-let idleReleaseDepsOverride: IdleReleaseDeps = {};
-
-/** Test seam: inject the clock, interval or probes used by sweeps started from the hook. */
-export function setIdleReleaseWiringDepsForTests(deps: IdleReleaseDeps | null): void {
-  idleReleaseDepsOverride = deps ?? {};
-}
-
-const NOOP_LOGGER: IdleReleaseLogger = { info: () => undefined, warn: () => undefined };
-
-/** AgentManager keeps its pino logger in a private field; fall back to silence if it moves. */
-function readManagerLogger(manager: object): IdleReleaseLogger {
-  const logger = (manager as { logger?: Partial<IdleReleaseLogger> }).logger;
-  if (logger && typeof logger.info === "function" && typeof logger.warn === "function") {
-    const source = logger as IdleReleaseLogger;
-    return {
-      info: (fields, message) => source.info(fields, message),
-      warn: (fields, message) => source.warn(fields, message),
-    };
-  }
-  return NOOP_LOGGER;
-}
-
 function wrapClaudeClient(manager: AgentManagerInternal): void {
   const claudeClient = manager.clients?.get("claude") as Record<string, unknown> | undefined;
   if (claudeClient && typeof claudeClient === "object" && !hookedClaudeClients.has(claudeClient)) {
@@ -473,8 +442,8 @@ export function attachIrixAgentManager(managerInput: unknown): void {
   const manager = managerInput as AgentManagerInternal;
   rememberAgentManagerForGuide(manager);
   // Runs on every create and resume (from `prepareSessionConfig`), before the client makes a
-  // session. The hooks sit on the client prototypes, so replaced clients need nothing more.
-  installIdleReleaseSessionHooks();
+  // session. The gate sits on the client prototype, so replaced clients need nothing more.
+  installClaudeSessionGate();
   // Before the manager guard: upstream `updateProviderRegistry` installs a new Claude client
   // whenever the `providers.claude` config changes, and this hook runs on every create and
   // resume (from `prepareSessionConfig`, before the client is picked), so the replacement is
@@ -484,15 +453,6 @@ export function attachIrixAgentManager(managerInput: unknown): void {
     return;
   }
   hookedAgentManagers.add(manager);
-
-  const logger = readManagerLogger(manager);
-  startIdleRelease(manager as unknown as IdleReleaseManager, {
-    isBusy: (agent: ManagedAgentLike) =>
-      isAgentBusy(manager as unknown as Parameters<typeof isAgentBusy>[0], agent as never, logger),
-    viewed: viewedAgentIds,
-    logger,
-    ...idleReleaseDepsOverride,
-  });
 
   const originalRespond = manager.respondToPermission.bind(manager);
   manager.respondToPermission = async (
@@ -713,9 +673,8 @@ export function attachIrixWsServer(wsServerInput: unknown): void {
   if (wsServer.paseoHome) {
     runtimePaseoHome = wsServer.paseoHome;
   }
-  // Viewers first: the idle-release sweep reads them, and attaching is idempotent.
-  attachIdleReleaseWsServer(wsServer);
-  installIdleReleaseSessionHooks();
+  attachIdleViewers(wsServer);
+  installClaudeSessionGate();
   if (wsServer.agentManager) {
     attachIrixAgentManager(wsServer.agentManager);
   }
@@ -759,7 +718,6 @@ export function attachIrixWsServer(wsServerInput: unknown): void {
 
   // After the approval wrapper above so both chains compose.
   if (isIrixActive()) {
-    wrapIdleReleaseConfigStore(wsServer);
     wrapAgentToolsConfigStore(wsServer);
     wrapDaemonConfigBroadcast(wsServer);
   }
@@ -782,7 +740,6 @@ function wrapDaemonConfigBroadcast(wsServer: WsServerInternal): void {
       ...base,
       requireSubagentApproval: isSubagentApprovalRequired(),
       subagentApprovalLocked: isSubagentApprovalLocked(),
-      idleRelease: getIdleReleaseSettings(),
       ...agentToolsFields(),
     });
   };

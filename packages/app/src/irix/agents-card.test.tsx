@@ -42,13 +42,14 @@ describe("irixAgentsCard", () => {
     expect(irixAgentsCard(Upstream)).toBe(Upstream);
   });
 
-  it("renders the subagent approval card then the idle release card in Irix builds", () => {
+  it("renders the subagent approval card then the agent tools card in Irix builds", () => {
     build.irix = true;
+    host.config = { agentToolsEditable: true, agentTools: "cli" };
     const Card = irixAgentsCard((_props: { serverId: string }) => null);
     const view = render(<Card serverId="s1" />);
     const approval = view.getByTestId("host-page-subagent-approval-card");
-    const idle = view.getByTestId("host-page-idle-release-card");
-    expect(approval.compareDocumentPosition(idle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const tools = view.getByTestId("host-page-agent-tools-card");
+    expect(approval.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("hides the agent tools choice while the daemon keeps it fixed", () => {
@@ -59,15 +60,13 @@ describe("irixAgentsCard", () => {
     expect(view.queryByTestId("host-page-agent-tools-card")).toBeNull();
   });
 
-  it("offers the agent tools choice after idle release once it may be changed, and saves it", () => {
+  it("offers the agent tools choice once it may be changed, and saves it", () => {
     build.irix = true;
     host.config = { agentToolsEditable: true, agentTools: "cli" };
     host.patchConfig.mockClear();
     const Card = irixAgentsCard((_props: { serverId: string }) => null);
     const view = render(<Card serverId="s1" />);
-    const idle = view.getByTestId("host-page-idle-release-card");
-    const tools = view.getByTestId("host-page-agent-tools-card");
-    expect(idle.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(view.getByTestId("host-page-agent-tools-card")).toBeTruthy();
     expect(view.getByTestId("host-page-agent-tools-control")).toBeTruthy();
     act(() => host.pick("mcp"));
     expect(host.patchConfig).toHaveBeenCalledWith({ agentTools: "mcp" });

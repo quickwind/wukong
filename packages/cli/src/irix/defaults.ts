@@ -53,7 +53,6 @@ export function applyIrixDefaults(
       {
         version: 1,
         daemon: { listen: `127.0.0.1:${IRIX_DEFAULT_PORT}`, mcp: { injectIntoAgents: true } },
-        agents: { idleRuntimeCleanup: false },
       },
       null,
       2,
@@ -74,24 +73,10 @@ function enableAgentTools(configPath: string): void {
     const daemon = config.daemon ?? {};
     if (typeof daemon !== "object" || Array.isArray(daemon)) return;
     const mcp = daemon.mcp ?? {};
-    if (typeof mcp !== "object" || Array.isArray(mcp)) return;
-    const agents = config.agents ?? {};
-    if (typeof agents !== "object" || Array.isArray(agents)) return;
-    const toolsUnset = mcp.injectIntoAgents === undefined;
-    // Upstream's own idle collector (fixed one hour) stays off: Irix has its own idle release.
-    const cleanupUnset = agents.idleRuntimeCleanup === undefined;
-    if (!toolsUnset && !cleanupUnset) return;
+    if (typeof mcp !== "object" || Array.isArray(mcp) || mcp.injectIntoAgents !== undefined) return;
     writeFileSync(
       configPath,
-      `${JSON.stringify(
-        {
-          ...config,
-          ...(toolsUnset ? { daemon: { ...daemon, mcp: { ...mcp, injectIntoAgents: true } } } : {}),
-          ...(cleanupUnset ? { agents: { ...agents, idleRuntimeCleanup: false } } : {}),
-        },
-        null,
-        2,
-      )}\n`,
+      `${JSON.stringify({ ...config, daemon: { ...daemon, mcp: { ...mcp, injectIntoAgents: true } } }, null, 2)}\n`,
     );
   } catch {
     // Unreadable or not JSON: the daemon reports that; do not make it worse.

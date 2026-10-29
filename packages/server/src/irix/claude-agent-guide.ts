@@ -7,7 +7,7 @@
 // manager sets afresh on every create. Both providers persist that field, which is how a resume
 // finds out which mode the agent was made in.
 //
-// The hook sits on `ClaudeAgentClient.prototype` like idle-release-sessions.ts, so it sees the
+// The hook sits on `ClaudeAgentClient.prototype`, so it sees the
 // registry's real client whatever wraps it. It is installed when the provider registry is built
 // (providers.ts), which comes before any session.
 

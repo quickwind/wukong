@@ -27,12 +27,12 @@ commit.**
 
 We want to merge upstream often and cheaply. Every line changed in an upstream file is a future
 merge conflict. An earlier attempt (the `internal-edition` branch, kept only for reference) edited
-126 upstream files and was abandoned for exactly that reason. This branch edits **60 upstream files, 559 lines** (`upstream-footprint.mjs`, against v0.13.0). The
-budget is 60 files and 560 lines. It was 40 and 400. Every raise is recorded here, with its
+126 upstream files and was abandoned for exactly that reason. This branch edits **61 upstream files, 553 lines** (`upstream-footprint.mjs`, against v0.14.0). The
+budget is 61 files and 560 lines. It was 40 and 400. Every raise is recorded here, with its
 reason: the Name + Create bar (the New workspace screen and the new chat tab are upstream code, so no
 Irix-owned file can replace them) took it to 45 files and 420 lines, hiding a plugin-managed
 project from the sidebar (same reason) took the lines to 440, and Devin's skills in the ACP command
-list (one line in `acp-agent.ts`) took them to 447, which moved the budget to 450. The plugin `Markdown` component was carried by hand for a while (upstream 995ad2f87, #7579); v0.13.0 ships it and the copy is gone. Later work (schedules and agent messaging switched off, subagent approval, bypass modes, the CLI and daemon hooks) took it to 462. Fork checkouts then needed `upstream` in the source picker (branches, background fetch, pasted links), which took it to 484, and the setup block for a merge request from another project (below) to 488. Comments on lines of a file (below) took it to 56 files and 506, and the budget to 56 and 510. Content search in the Files panel (below) took it to 57 files and 515, and the budget to 57 and 515. Irix workspace scripts in `paseo.json` (below) took it to 58 files and 543 lines, and the budget to 58 and 550. Approval for agent-started agents and schedules (below) took it to 60 files and 559 lines, and the budget to 60 and 560. The two lists of
+list (one line in `acp-agent.ts`) took them to 447, which moved the budget to 450. The plugin `Markdown` component was carried by hand for a while (upstream 995ad2f87, #7579); v0.13.0 ships it and the copy is gone. Later work (schedules and agent messaging switched off, subagent approval, bypass modes, the CLI and daemon hooks) took it to 462. Fork checkouts then needed `upstream` in the source picker (branches, background fetch, pasted links), which took it to 484, and the setup block for a merge request from another project (below) to 488. Comments on lines of a file (below) took it to 56 files and 506, and the budget to 56 and 510. Content search in the Files panel (below) took it to 57 files and 515, and the budget to 57 and 515. Irix workspace scripts in `paseo.json` (below) took it to 58 files and 543 lines, and the budget to 58 and 550. Approval for agent-started agents and schedules (below) took it to 60 files and 559 lines, and the budget to 60 and 560. Idle release moved onto upstream's collector (below): the collector's idle period and its viewed-agent check took it to 61 files and 553 lines (the old `idle-release*` files were Irix-owned, so removing them gave nothing back), and the budget to 61 and 560. The two lists of
 changes were merged, so the numbers above are measured on the merge, not the sum of the two
 branches. Prefer new files; an upstream edit that raises the budget again gets its line here.
 
@@ -62,7 +62,7 @@ node irix/scripts/upstream-footprint.mjs     # lists every upstream file we modi
 ```
 
 It fails if an upstream file is deleted or renamed, if a modified upstream file has no `Irix`
-marker in the lines added, or if the totals pass the budget (60 files, 560 lines; change with
+marker in the lines added, or if the totals pass the budget (61 files, 560 lines; change with
 `--max-files`/`--max-lines`). **Run it before every commit that touches upstream files** and when
 you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
@@ -315,7 +315,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   runs, so `addSubagentAskHook` (`subagent-approval.ts`) adds a `PreToolUse` hook for `Task|Agent` that
   answers "ask" while approval is required; Claude then calls the permission handler and the app shows its
   card (Always ask, Auto and Bypass all checked). It is attached to the real session by the prototype patch
-  in `idle-release-sessions.ts`: the registry hands the manager a facade without the session's members, and
+  in `claude-session-gate.ts`: the registry hands the manager a facade without the session's members, and
   the `wrapClaudeClient` patch in `subagent-approval.ts` only ever touched the facade, so the ten-minute
   timeout wrapper on `handlePermissionRequest` was not applied before either. Claude builds the card for that tool and shows
   the tool input as JSON; `addSubagentCardDetail` (same file) sets a `detail` on it before the event goes out
@@ -339,49 +339,26 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   Claude Code. The Providers page and Add provider catalog are hidden. Claude starts disabled when
   its command is not found at daemon start (`detectIrixProviders` in `irix/providers.ts`); an
   explicit enabled setting wins, and installing Claude later takes effect at the next start.
-- **Upstream's idle collector is off** (upstream 0.14.0, #7782): it releases idle runtimes after a fixed
-  hour and has its own settings card. Irix keeps its own release (below; 15 minutes, tuned for Devin's
-  memory on Windows), so `applyIrixDefaults` (`packages/cli/src/irix/defaults.ts`) writes
-  `agents.idleRuntimeCleanup: false` into a new home's `config.json`, and into an existing one that has no
-  value; a value the user set is kept. Upstream's card in Settings → host still shows and is off. Upstream's
-  `startAgentRun` now waits for a close in flight, but the known gap below remains: Irix closes through the
-  public `closeAgent`, with no only-if-idle check; since 0.14.0 the racing prompt also is not in the saved
-  timeline. If upstream's collector should replace Irix's, drop `idle-release*` and this default.
-- **Idle release** (`irix/idle-release*.ts`, setting UI in `app/src/irix/idle-release-setting.tsx`):
-  upstream keeps an idle agent's provider process for as long as the daemon runs
-  (`docs/agent-lifecycle.md`, "Runtime residency"). On Windows each idle `devin acp` grew past 170 MB,
-  and 31 of them used up a 32 GB machine and crashed the daemon. A sweep every minute calls upstream
-  `AgentManager.closeAgent` on a Claude or Devin agent that has been idle for the configured time. The
-  agent stays, closed, with its timeline; the next open or prompt resumes it through `ensureAgentLoaded`.
-  Nothing happens when the Irix policy is off. It does not release an agent that has a turn running or a
-  pending permission, an internal agent, one a client is viewing (visible and focused on it, with a
-  heartbeat inside the idle window), a Devin with a terminal still running, or a Claude with a running
-  background shell or provider subagent. The setting is `idleRelease: { enabled, minutes }` in
-  `<home>/daemon.json`, beside `requireSubagentApproval`: on and 15 by default, minutes an integer from 1 to
-  1440, edited under Settings → host → Agents, read on every sweep so a change needs no restart.
-  Nothing upstream is edited. It hangs off the hooks Irix already had (`attachIrixAgentManager`,
-  `attachIrixWsServer`). Upstream hands the manager a facade (`wrapSessionProvider` in
-  `provider-registry.ts`) that hides the real provider session, so Irix patches the `createSession` and
-  `resumeSession` prototype methods of `ClaudeAgentClient` and `ACPAgentClient` and keeps the real session
-  by the launch context's agent id (`irix/idle-release-sessions.ts`). The probes read `terminalEntries`
-  (`acp-agent.ts`) and `translateMessageToEvents` (`claude/agent.ts`) on that session, and the viewers come
-  from `sessions` and `getClientActivity` (the ws server and `Session`). A test pins each upstream member
-  and argument position. An agent whose real session cannot be resolved or inspected counts as busy and
-  is never released.
-  An agent is closed only when the same provider session was also releasable on the previous sweep, so
-  every release waits one extra tick. A resumed agent keeps its old `updatedAt` and is releasable as soon
-  as it loads; the extra tick keeps a prompt that resumes a released agent (an `irix send` to a child, a
-  schedule) from seeing it closed again before the turn starts.
-  **Known gap:** `closeAgent` does not check again, inside the agent's lifecycle lane, that the agent is
-  still idle, and `startAgentRun` does not wait for a close in flight. What remains is an agent that is
-  loaded and was already releasable on the previous tick, for example one that crossed the idle window or
-  stopped being viewed or busy a minute earlier. A prompt from the CLI, a schedule or MCP that lands
-  between load and run on its closing tick is recorded and never answered. A prompt from a focused client
-  is safe: the viewers are read again right before each agent's close, and a focused agent counts as
-  viewed. Irix cannot close the gap without patching private `AgentManager` methods. The fix belongs
-  upstream: an only-if-idle `closeAgent`, or `startAgentRun` waiting on `inFlightAgentCloses`. The
-  "residual hazard" test in `idle-release.test.ts` asserts the current outcome; when upstream fixes it,
-  that test fails and becomes one that expects a reply.
+- **Idle release uses upstream's collector** (upstream 0.14.0, #7782; two hooks, `irix/idle-viewers.ts`):
+  upstream keeps an idle agent's provider process for as long as the daemon runs unless its collector
+  closes it: every minute it releases a runtime idle for an hour, with the agent kept (record, timeline,
+  provider session) and resumed on the next open or prompt. On Windows each idle `devin acp` grew past
+  170 MB and 31 of them used up a 32 GB machine, so one hour is too long. Irix had its own release
+  (15 minutes, a patch on the provider session classes, its own setting); it is gone, because upstream's
+  does the same job with more checks: it closes inside the agent's lifecycle lane after blocking new
+  prompts (the race the old release had is closed), looks at the agent's whole family of subagents,
+  protects a caller that is waiting for a child's result, reads Claude's own background-task roster, and
+  vetoes a Devin with a running terminal. Two upstream lines: `idle-runtime-cleanup/index.ts` takes its idle
+  period from `irixIdlePeriodMs` (`IRIX_IDLE_MINUTES` in the daemon's environment, 1 to 1440, default 15;
+  upstream's hour when the edition is off), and `bootstrap.ts` adds `isIrixAgentViewed` to the collector's
+  `isProtected`, so an agent a client has open and focused (visible, with a heartbeat inside the idle
+  period) is kept: upstream does not look at who is viewing, and with 15 minutes instead of an hour that
+  would release agents people are watching. The on/off switch is upstream's card in Settings → host
+  (`agents.idleRuntimeCleanup`); there is no minutes box, so the time is set by the environment variable
+  and needs a daemon restart. `idle-viewers.ts` reads the ws server's `sessions` and
+  `Session.getClientActivity` (upstream internals; `idle-viewers.test.ts` pins them).
+  Upstream collects only agents with a saved provider session, and a Claude CLI older than 2.1.292 that
+  has not sent a background-task roster is never collected.
 - **No connected hosts** (upstream 0.13.0, #7370; `irix/connected-hosts-policy.ts`): the daemon never dials
   or accepts another daemon. `websocket-server.ts` builds its registry through
   `createIrixConnectedHosts`, which returns an always-empty one that refuses `add`, `update`,

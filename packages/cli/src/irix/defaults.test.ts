@@ -23,7 +23,6 @@ describe("applyIrixDefaults", () => {
     expect(readConfig(env.PASEO_HOME ?? "")).toEqual({
       version: 1,
       daemon: { listen: "127.0.0.1:6890", mcp: { injectIntoAgents: true } },
-      agents: { idleRuntimeCleanup: false },
     });
   });
 
@@ -70,7 +69,6 @@ describe("handing Paseo's tools to agents", () => {
     expect(readConfig(home)).toEqual({
       version: 1,
       daemon: { listen: "127.0.0.1:7000", mcp: { enabled: true, injectIntoAgents: true } },
-      agents: { idleRuntimeCleanup: false },
     });
   });
 
@@ -84,7 +82,7 @@ describe("handing Paseo's tools to agents", () => {
   it("respects a value the user set, on or off", () => {
     for (const value of [true, false]) {
       const home = freshHome();
-      const text = `{"version":1,"daemon":{"mcp":{"injectIntoAgents":${value}}},"agents":{"idleRuntimeCleanup":${value}}}`;
+      const text = `{"version":1,"daemon":{"mcp":{"injectIntoAgents":${value}}}}`;
       writeConfig(home, text);
       applyIrixDefaults({ IRIX_HOME: home }, home);
       expect(readText(home)).toBe(text);

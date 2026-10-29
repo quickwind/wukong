@@ -136,6 +136,7 @@ import { DownloadTokenStore } from "./file-download/token-store.js";
 import { formatAttachmentContentDisposition } from "./file-download/content-disposition.js";
 import type { OpenAiSpeechProviderConfig } from "./speech/providers/openai/config.js";
 import { detectIrixProviders } from "../irix/providers.js"; // Irix
+import { isIrixAgentViewed } from "../irix/idle-viewers.js"; // Irix
 import type { LocalSpeechProviderConfig } from "./speech/providers/local/config.js";
 import type { RequestedSpeechProviders } from "./speech/speech-types.js";
 import { createSpeechService } from "./speech/speech-runtime.js";
@@ -1483,7 +1484,8 @@ export async function createPaseoDaemon(
     runtimes: () => agentManager.getRuntimeCleanupCandidates(),
     isProtected: (agentId) =>
       finishSubscriptions.hasPendingForCaller(agentId) ||
-      (wsServer?.agentMessages.hasPending(agentId) ?? false),
+      (wsServer?.agentMessages.hasPending(agentId) ?? false) ||
+      isIrixAgentViewed(agentId), // Irix: an agent a person has open is kept
     logger,
   });
 

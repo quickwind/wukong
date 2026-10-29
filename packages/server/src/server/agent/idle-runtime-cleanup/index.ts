@@ -1,5 +1,6 @@
 import type { Logger } from "pino";
 import { withTimeout } from "../../../utils/promise-timeout.js";
+import { irixIdlePeriodMs } from "../../../irix/idle-viewers.js"; // Irix
 
 /** A captured runtime capability. Its lifecycle owner revalidates before releasing it. */
 export interface RuntimeCleanupCandidate {
@@ -31,6 +32,7 @@ interface CollectionResult {
   failures: Array<{ agentId: string; error: unknown }>;
 }
 const IDLE_PERIOD_MS = 60 * 60_000;
+const idlePeriodMs = () => irixIdlePeriodMs(IDLE_PERIOD_MS); // Irix: IRIX_IDLE_MINUTES, default 15
 
 /** Owns idle clocks, baseline eligibility, optional provider vetoes and the sweep lifetime. */
 export function createIdleRuntimeCleanup(options: Options) {
@@ -99,7 +101,7 @@ export function createIdleRuntimeCleanup(options: Options) {
           runtime.lastActivityAt,
           protectedAt.get(runtime.identity)?.at ?? 0,
         );
-        if (timestamp - idleSince < IDLE_PERIOD_MS) continue;
+        if (timestamp - idleSince < idlePeriodMs()) continue; // Irix
         const revalidate = () => {
           const currentFamily = familyOf(runtime, options.runtimes());
           return (

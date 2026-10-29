@@ -4,7 +4,6 @@ import type { MutableDaemonConfigPatch } from "@getpaseo/protocol/messages";
 import { Switch } from "@/components/ui/switch";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { IrixAgentToolsCard } from "@/irix/agent-tools-setting";
-import { IrixIdleReleaseCard } from "@/irix/idle-release-setting";
 import { HIDDEN_ROW_STYLE, IRIX_BUILD, upstreamOnly } from "@/irix/build";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
@@ -16,7 +15,6 @@ function IrixAgentsCards({ serverId }: { serverId: string }) {
   return (
     <>
       <IrixSubagentApprovalCard serverId={serverId} />
-      <IrixIdleReleaseCard serverId={serverId} />
       <IrixAgentToolsCard serverId={serverId} />
     </>
   );
