@@ -27,6 +27,34 @@
     },
     "typecheck": {
       "command": "npm run typecheck"
+    },
+    "irix:build:windows-package": {
+      "command": "node irix/scripts/pack-local.mjs",
+      "description": "Irix: Build Windows distribution package"
+    },
+    "irix:verify": {
+      "command": "node irix/scripts/upstream-footprint.mjs && node irix/scripts/license-audit.mjs && node --test \"irix/scripts/*.test.mjs\"",
+      "description": "Irix: One-step verification for budget, license audit, and script tests"
+    },
+    "irix:check:budget": {
+      "command": "node irix/scripts/upstream-footprint.mjs",
+      "description": "Irix: Check upstream footprint against files and lines budget"
+    },
+    "irix:check:license": {
+      "command": "node irix/scripts/license-audit.mjs",
+      "description": "Irix: Audit dependency licenses"
+    },
+    "irix:test:scripts": {
+      "command": "node --test \"irix/scripts/*.test.mjs\"",
+      "description": "Irix: Run brand, pack, license, and footprint script tests"
+    },
+    "irix:test:server": {
+      "command": "npx vitest run --bail=1 packages/server/src/irix",
+      "description": "Irix: Run core server unit test suite"
+    },
+    "irix:probe:devin:usage": {
+      "command": "node irix/scripts/devin-usage-probe.mjs",
+      "description": "Irix: Probe live Devin ACU quota and consumption directly from Devin API"
     }
   }
 }
