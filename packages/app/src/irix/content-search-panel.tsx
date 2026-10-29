@@ -7,8 +7,9 @@ import {
   type PressableStateCallbackType,
 } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { MoreHorizontal } from "lucide-react-native";
+import { Check, MoreHorizontal, Pencil, X } from "lucide-react-native";
 import type { MatchRange } from "@getpaseo/protocol/search/text-match";
+import { confirmDialog } from "@/utils/confirm-dialog";
 import { MaterialFileIcon } from "@/components/material-file-icon";
 import {
   treeRowPaddingLeft,
@@ -30,12 +31,23 @@ import { EditingTextInput } from "@/components/ui/text-input";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import type { Theme } from "@/styles/theme";
-import type { Match } from "./content-search";
+import { replaceMatches, type Match, type ReplaceFile } from "./content-search";
+import {
+  describeReplace,
+  matchKey,
+  planReplace,
+  previewSegments,
+  summarizeReplace,
+  type ReplaceSummary,
+} from "./content-search-replace";
 import type { FileGroup, SearchState } from "./content-search-state";
-import { useContentSearch } from "./use-content-search";
+import { describeSearchFailure, useContentSearch } from "./use-content-search";
 
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const ThemedMoreHorizontal = withUnistyles(MoreHorizontal);
+const ThemedPencil = withUnistyles(Pencil);
+const ThemedCheck = withUnistyles(Check);
+const ThemedX = withUnistyles(X);
 const ThemedTextInput = withUnistyles(EditingTextInput, (theme: Theme) => ({
   placeholderTextColor: theme.colors.foregroundMuted,
   selectionColor: theme.colors.foreground,
@@ -82,14 +94,81 @@ function toRows(groups: readonly FileGroup[]): ResultRow[] {
   return rows;
 }
 
-function FileHeaderRow({ group }: { group: FileGroup }) {
+/** What the results need to show a replace: the text, and which lines and files are left out. */
+export interface ReplaceControls {
+  replacement: string;
+  excludedMatches: ReadonlySet<string>;
+  excludedFiles: ReadonlySet<string>;
+  toggleMatch: (key: string) => void;
+  toggleFile: (path: string) => void;
+  /** False while a search or replace is running, or without a host. */
+  canReplace: boolean;
+  replaceMatch: (match: Match) => void;
+  replaceFile: (path: string) => void;
+}
+
+function ExcludeButton({
+  excluded,
+  label,
+  onPress,
+  testID,
+}: {
+  excluded: boolean;
+  label: string;
+  onPress: () => void;
+  testID: string;
+}) {
+  return (
+    <ToolbarButton
+      label={excluded ? `Include ${label}` : `Leave out ${label}`}
+      compact
+      hitSlop={8}
+      testID={testID}
+      onPress={onPress}
+    >
+      <ThemedX size={14} uniProps={excluded ? mutedColorMapping : extraMutedColorMapping} />
+    </ToolbarButton>
+  );
+}
+
+function ReplaceButton({
+  label,
+  disabled,
+  onPress,
+  testID,
+}: {
+  label: string;
+  disabled: boolean;
+  onPress: () => void;
+  testID: string;
+}) {
+  return (
+    <ToolbarButton
+      label={label}
+      disabled={disabled}
+      compact
+      hitSlop={8}
+      testID={testID}
+      onPress={onPress}
+    >
+      <ThemedCheck size={14} uniProps={extraMutedColorMapping} />
+    </ToolbarButton>
+  );
+}
+
+function FileHeaderRow({ group, replace }: { group: FileGroup; replace: ReplaceControls | null }) {
   const { name, folder } = splitPath(group.path);
+  const toggleFile = replace?.toggleFile;
+  const pressExclude = useCallback(() => toggleFile?.(group.path), [toggleFile, group.path]);
+  const replaceFile = replace?.replaceFile;
+  const pressReplace = useCallback(() => replaceFile?.(group.path), [replaceFile, group.path]);
+  const excluded = replace?.excludedFiles.has(group.path) ?? false;
   return (
     <View
       style={[workspaceTreeRowStyles.row, { paddingLeft: treeRowPaddingLeft(0) }]}
       testID="content-search-file"
     >
-      <View style={styles.rowInfo}>
+      <View style={[styles.rowInfo, excluded ? styles.excluded : null]}>
         <View style={styles.rowIcon}>
           <MaterialFileIcon fileName={name} size={WORKSPACE_TREE_ICON_SIZE} />
         </View>
@@ -99,14 +178,62 @@ function FileHeaderRow({ group }: { group: FileGroup }) {
         </Text>
       </View>
       <Text style={styles.count}>{group.matches.length}</Text>
+      {replace ? (
+        <ReplaceButton
+          label="Replace in this file"
+          disabled={!replace.canReplace || excluded}
+          onPress={pressReplace}
+          testID="content-search-replace-file"
+        />
+      ) : null}
+      {replace ? (
+        <ExcludeButton
+          excluded={excluded}
+          label={group.path}
+          onPress={pressExclude}
+          testID="content-search-exclude-file"
+        />
+      ) : null}
     </View>
   );
 }
 
+function segmentStyle(kind: "keep" | "old" | "new") {
+  if (kind === "old") return styles.previewOld;
+  if (kind === "new") return styles.previewNew;
+  return undefined;
+}
+
 type HoverState = PressableStateCallbackType & { hovered?: boolean };
 
-function MatchRow({ match, onOpenMatch }: { match: Match; onOpenMatch: (match: Match) => void }) {
+function MatchRow({
+  match,
+  onOpenMatch,
+  replace,
+}: {
+  match: Match;
+  onOpenMatch: (match: Match) => void;
+  replace: ReplaceControls | null;
+}) {
   const shown = useMemo(() => displayLine(match.text, match.ranges), [match.text, match.ranges]);
+  const key = matchKey(match);
+  const toggleMatch = replace?.toggleMatch;
+  const pressExclude = useCallback(() => toggleMatch?.(key), [toggleMatch, key]);
+  const replaceMatch = replace?.replaceMatch;
+  const pressReplace = useCallback(() => replaceMatch?.(match), [replaceMatch, match]);
+  const excluded =
+    replace !== null && (replace.excludedMatches.has(key) || replace.excludedFiles.has(match.path));
+  const segments = useMemo(
+    () =>
+      replace
+        ? previewSegments(
+            shown.text,
+            shown.ranges.map((range) => ({ start: range.start, end: range.start + range.length })),
+            replace.replacement,
+          )
+        : null,
+    [replace, shown],
+  );
   const press = useCallback(() => onOpenMatch(match), [match, onOpenMatch]);
   const style = useCallback(
     ({ hovered = false, pressed }: HoverState) => [
@@ -127,12 +254,42 @@ function MatchRow({ match, onOpenMatch }: { match: Match; onOpenMatch: (match: M
       <Text style={styles.lineNumber} testID="content-search-line-number">
         {match.line}
       </Text>
-      <HighlightedText
-        text={shown.text}
-        ranges={shown.ranges}
-        style={styles.matchText}
-        numberOfLines={1}
-      />
+      {segments ? (
+        <Text
+          style={[styles.matchText, excluded ? styles.excluded : null]}
+          numberOfLines={1}
+          testID="content-search-preview"
+        >
+          {segments.map((segment) => (
+            <Text key={segment.id} style={segmentStyle(segment.kind)}>
+              {segment.text}
+            </Text>
+          ))}
+        </Text>
+      ) : (
+        <HighlightedText
+          text={shown.text}
+          ranges={shown.ranges}
+          style={styles.matchText}
+          numberOfLines={1}
+        />
+      )}
+      {replace ? (
+        <ReplaceButton
+          label="Replace this match"
+          disabled={!replace.canReplace || excluded}
+          onPress={pressReplace}
+          testID="content-search-replace-match"
+        />
+      ) : null}
+      {replace ? (
+        <ExcludeButton
+          excluded={excluded}
+          label={`line ${match.line}`}
+          onPress={pressExclude}
+          testID="content-search-exclude-match"
+        />
+      ) : null}
     </PressHighlight>
   );
 }
@@ -162,10 +319,12 @@ function SearchResults({
   search,
   isCompact,
   onOpenMatch,
+  replace,
 }: {
   search: SearchState;
   isCompact: boolean;
   onOpenMatch: (match: Match) => void;
+  replace: ReplaceControls | null;
 }) {
   const listRef = useRef<FlatList<ResultRow>>(null);
   const scrollbar = useOverlayFlatListScrollbar(listRef, { enabled: !isCompact });
@@ -173,11 +332,11 @@ function SearchResults({
   const renderRow = useCallback(
     ({ item }: ListRenderItemInfo<ResultRow>) =>
       item.type === "file" ? (
-        <FileHeaderRow group={item.group} />
+        <FileHeaderRow group={item.group} replace={replace} />
       ) : (
-        <MatchRow match={item.match} onOpenMatch={onOpenMatch} />
+        <MatchRow match={item.match} onOpenMatch={onOpenMatch} replace={replace} />
       ),
-    [onOpenMatch],
+    [onOpenMatch, replace],
   );
   const footer = useMemo(() => <ResultsFooter search={search} />, [search]);
 
@@ -194,6 +353,7 @@ function SearchResults({
         ref={listRef}
         style={styles.list}
         data={rows}
+        extraData={replace}
         renderItem={renderRow}
         keyExtractor={resultRowKey}
         ListFooterComponent={footer}
@@ -242,6 +402,40 @@ function ToggleGlyph({ text, selected }: { text: string; selected: boolean }) {
   );
 }
 
+function ReplaceStatus({
+  replacing,
+  failure,
+  summary,
+  unversioned,
+}: {
+  replacing: boolean;
+  failure: string | null;
+  summary: ReplaceSummary | null;
+  unversioned: number;
+}) {
+  return (
+    <>
+      {replacing ? <Text style={styles.hint}>Replacing…</Text> : null}
+      {failure !== null ? <Text style={styles.errorText}>{failure}</Text> : null}
+      {summary ? (
+        <View testID="content-search-replace-summary">
+          <Text style={styles.hint}>{describeReplace(summary)}</Text>
+          {summary.skipped.map((entry) => (
+            <Text key={entry.path} style={styles.hint}>
+              {`${entry.path}: ${entry.reason}`}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+      {unversioned > 0 ? (
+        <Text style={styles.hint}>
+          {`${unversioned} file(s) cannot be checked and are left out. Search again.`}
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
 function ContentSearchBody({
   serverId,
   cwd,
@@ -260,12 +454,121 @@ function ContentSearchBody({
   const [include, setInclude] = useState("");
   const [exclude, setExclude] = useState("");
   const [showDetails, setShowDetails] = useState(false);
+  const [showReplace, setShowReplace] = useState(false);
+  const [replacement, setReplacement] = useState("");
+  const [excludedMatches, setExcludedMatches] = useState<ReadonlySet<string>>(new Set());
+  const [excludedFiles, setExcludedFiles] = useState<ReadonlySet<string>>(new Set());
+  const [replacing, setReplacing] = useState(false);
+  const [replaceFailure, setReplaceFailure] = useState<string | null>(null);
+  const [replaced, setReplaced] = useState<ReplaceSummary | null>(null);
+  const [refresh, setRefresh] = useState(0);
 
   const options = useMemo(
     () => ({ query, caseSensitive, regex, wholeWord, include, exclude }),
     [query, caseSensitive, regex, wholeWord, include, exclude],
   );
-  const search = useContentSearch({ client, cwd, options });
+  const search = useContentSearch({ client, cwd, options, refresh });
+  const plan = useMemo(
+    () => planReplace(search.groups, excludedMatches, excludedFiles),
+    [search.groups, excludedMatches, excludedFiles],
+  );
+  const toggleMatch = useCallback(
+    (key: string) =>
+      setExcludedMatches((current) => {
+        const next = new Set(current);
+        if (!next.delete(key)) next.add(key);
+        return next;
+      }),
+    [],
+  );
+  const toggleFile = useCallback(
+    (path: string) =>
+      setExcludedFiles((current) => {
+        const next = new Set(current);
+        if (!next.delete(path)) next.add(path);
+        return next;
+      }),
+    [],
+  );
+  const canReplace =
+    !replacing && search.status === "done" && client !== null && plan.files.length > 0;
+  const replaceFiles = useCallback(
+    async (files: ReplaceFile[]) => {
+      if (!client) return;
+      setReplacing(true);
+      setReplaceFailure(null);
+      setReplaced(null);
+      const request = { cwd, query, caseSensitive, regex, wholeWord, replacement, files };
+      try {
+        setReplaced(summarizeReplace(await replaceMatches(client, request)));
+        setExcludedMatches(new Set());
+        setExcludedFiles(new Set());
+        // The shown lines are out of date now; search again.
+        setRefresh((value) => value + 1);
+      } catch (error) {
+        setReplaceFailure(describeSearchFailure(error));
+      } finally {
+        setReplacing(false);
+      }
+    },
+    [client, cwd, query, caseSensitive, regex, wholeWord, replacement],
+  );
+  const runReplace = useCallback(async () => {
+    if (!canReplace) return;
+    const files = plan.files.length === 1 ? "1 file" : `${plan.files.length} files`;
+    const confirmed = await confirmDialog({
+      title: "Replace all",
+      message: `Replace ${plan.matchCount} in ${files}? This writes to the files on disk.`,
+      confirmLabel: "Replace",
+      destructive: true,
+    });
+    if (confirmed) await replaceFiles(plan.files);
+  }, [canReplace, plan, replaceFiles]);
+  const pressReplaceAll = useCallback(() => {
+    runReplace().catch(() => undefined);
+  }, [runReplace]);
+  const canReplaceNow = !replacing && search.status === "done" && client !== null;
+  const replaceMatch = useCallback(
+    (match: Match) => {
+      const one = planReplace([{ path: match.path, matches: [match] }], new Set(), new Set());
+      replaceFiles(one.files).catch(() => undefined);
+    },
+    [replaceFiles],
+  );
+  const replaceFile = useCallback(
+    (path: string) => {
+      const group = search.groups.filter((candidate) => candidate.path === path);
+      replaceFiles(planReplace(group, excludedMatches, new Set()).files).catch(() => undefined);
+    },
+    [replaceFiles, search.groups, excludedMatches],
+  );
+  const replaceControls = useMemo<ReplaceControls | null>(
+    () =>
+      showReplace
+        ? {
+            replacement,
+            excludedMatches,
+            excludedFiles,
+            toggleMatch,
+            toggleFile,
+            canReplace: canReplaceNow,
+            replaceMatch,
+            replaceFile,
+          }
+        : null,
+    [
+      showReplace,
+      replacement,
+      excludedMatches,
+      excludedFiles,
+      toggleMatch,
+      toggleFile,
+      canReplaceNow,
+      replaceMatch,
+      replaceFile,
+    ],
+  );
+  const toggleReplace = useCallback(() => setShowReplace((value) => !value), []);
 
   const toggleCase = useCallback(() => setCaseSensitive((value) => !value), []);
   const toggleRegex = useCallback(() => setRegex((value) => !value), []);
@@ -320,6 +623,16 @@ function ContentSearchBody({
               <ToggleGlyph text=".*" selected={regex} />
             </ToolbarButton>
             <ToolbarButton
+              label="Replace"
+              selected={showReplace}
+              compact={isCompact}
+              hitSlop={4}
+              testID="content-search-replace-toggle"
+              onPress={toggleReplace}
+            >
+              <ThemedPencil size={iconSize} uniProps={extraMutedColorMapping} />
+            </ToolbarButton>
+            <ToolbarButton
               label="Files to include and exclude"
               selected={showDetails}
               compact={isCompact}
@@ -332,6 +645,41 @@ function ContentSearchBody({
           </ToolbarControls>
         </View>
         {regex ? <Text style={styles.hint}>Rust regex syntax</Text> : null}
+        {showReplace ? (
+          <View style={styles.queryRow}>
+            <ThemedTextInput
+              initialValue={replacement}
+              onChangeText={setReplacement}
+              placeholder={regex ? "Replace with, $1 for a group" : "Replace with"}
+              accessibilityLabel="Replace with"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={[styles.globInput, styles.replaceInput]}
+              testID="content-search-replace-input"
+            />
+            <ToolbarButton
+              label={`Replace all (${plan.matchCount} in ${plan.files.length} files)`}
+              disabled={!canReplace}
+              compact={isCompact}
+              hitSlop={4}
+              testID="content-search-replace-all"
+              onPress={pressReplaceAll}
+            >
+              <ToggleGlyph text="✓✓" selected={false} />
+            </ToolbarButton>
+          </View>
+        ) : null}
+        {showReplace && search.status === "done" && plan.matchCount > 0 ? (
+          <Text style={styles.hint} testID="content-search-replace-plan">
+            {`Replace ${plan.matchCount} in ${plan.files.length} ${plan.files.length === 1 ? "file" : "files"}`}
+          </Text>
+        ) : null}
+        <ReplaceStatus
+          replacing={replacing}
+          failure={replaceFailure}
+          summary={replaced}
+          unversioned={showReplace ? plan.unversioned.length : 0}
+        />
         {showDetails ? (
           <>
             <ThemedTextInput
@@ -358,7 +706,12 @@ function ContentSearchBody({
         ) : null}
         <SearchStatusLine search={search} />
       </View>
-      <SearchResults search={search} isCompact={isCompact} onOpenMatch={onOpenMatch} />
+      <SearchResults
+        search={search}
+        isCompact={isCompact}
+        onOpenMatch={onOpenMatch}
+        replace={replaceControls}
+      />
     </View>
   );
 }
@@ -423,6 +776,20 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.border,
     fontSize: theme.fontSize.sm,
     outlineWidth: 0,
+  },
+  replaceInput: {
+    flex: 1,
+  },
+  excluded: {
+    opacity: 0.4,
+  },
+  previewOld: {
+    color: theme.colors.destructive,
+    textDecorationLine: "line-through",
+  },
+  previewNew: {
+    color: theme.colors.foreground,
+    fontWeight: theme.fontWeight.medium,
   },
   statusLine: {
     flexDirection: "row",

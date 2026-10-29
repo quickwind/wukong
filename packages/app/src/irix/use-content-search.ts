@@ -51,8 +51,10 @@ export function useContentSearch(input: {
   client: ContentSearchClient | null;
   cwd: string | null;
   options: Omit<SearchOptions, "cwd">;
+  /** Changes to search again with the same options, e.g. after a replace. */
+  refresh?: number;
 }): SearchState {
-  const { client, cwd } = input;
+  const { client, cwd, refresh = 0 } = input;
   const { query, caseSensitive, regex, wholeWord, include, exclude } = input.options;
   const [state, dispatch] = useReducer(reduceSearch, IDLE);
   const active = client !== null && cwd !== null && shouldSearch(query);
@@ -122,7 +124,7 @@ export function useContentSearch(input: {
       clearTimeout(timer);
       if (id !== null) cancelRunning(id);
     };
-  }, [client, cwd, query, caseSensitive, regex, wholeWord, include, exclude]);
+  }, [client, cwd, query, caseSensitive, regex, wholeWord, include, exclude, refresh]);
 
   return useMemo(() => (active ? state : IDLE), [active, state]);
 }

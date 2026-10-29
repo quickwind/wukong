@@ -46,7 +46,9 @@ interface Session {
   cwdKey: string;
   child: ChildProcess | null;
   matches: Match[];
-  files: Set<string>;
+  cwd: string;
+  /** Each matched file's version when first seen, for replace to compare against. */
+  files: Map<string, { mtimeMs?: number; size?: number }>;
   /** Output after this point is ignored: capped, cancelled or replaced. */
   stopped: boolean;
   done: boolean;
@@ -62,6 +64,15 @@ function isDirectory(p: string): boolean {
     return statSync(p).isDirectory();
   } catch {
     return false;
+  }
+}
+
+function statFile(p: string): { mtimeMs?: number; size?: number } {
+  try {
+    const st = statSync(p);
+    return { mtimeMs: st.mtimeMs, size: st.size };
+  } catch {
+    return {};
   }
 }
 
@@ -139,8 +150,10 @@ export function createSearchSessions(deps: SearchSessionsDeps = {}): SearchSessi
         stop(s);
         return;
       }
-      s.matches.push(m);
-      if (newFile) s.files.add(m.path);
+      if (newFile) {
+        s.files.set(m.path, statFile(path.join(s.cwd, m.path)));
+      }
+      s.matches.push({ ...m, ...s.files.get(m.path) });
     }
   }
 
@@ -210,7 +223,8 @@ export function createSearchSessions(deps: SearchSessionsDeps = {}): SearchSessi
         cwdKey: process.platform === "win32" ? cwd.toLowerCase() : cwd,
         child: null,
         matches: [],
-        files: new Set(),
+        cwd,
+        files: new Map(),
         stopped: false,
         done: false,
         truncated: false,

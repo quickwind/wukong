@@ -94,7 +94,9 @@ Paths are under `packages/server/src/irix/` unless they say otherwise.
 29. **`irix-context-hint`:** composer pill when the context window passes a threshold (50% and 75%
     by default); compact or start a new agent from it.
 30. **`irix-content-search`:** content search in the Files panel (ripgrep-backed streaming search,
-    regex/case/word switches, include/exclude globs, jump to line on click, bundled `rg` binary).
+    regex/case/word switches, include/exclude globs, jump to line on click, bundled `rg` binary),
+    and replace across files with a preview, per-line and per-file exclusion, and files that
+    changed on disk skipped and reported.
 
 ### Build and delivery
 
