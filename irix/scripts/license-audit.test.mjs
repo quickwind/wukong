@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { audit, classify, shippedPackages } from "./license-audit.mjs";
+import { RIPGREP_VERSION } from "./fetch-ripgrep.mjs";
+import { audit, classify, shippedPackages, VENDORED } from "./license-audit.mjs";
 
 const lock = {
   packages: {
@@ -59,6 +60,9 @@ test("classifies expressions by their worst applicable reading", () => {
     "BUSL-1.1": "blocked",
     UNLICENSED: "blocked",
     "GPL-2.0 OR AGPL-3.0": "blocked",
+    // An exception only adds permissions, so the base license decides.
+    "BSD-3-Clause WITH PCRE2-exception": "ok",
+    "GPL-2.0-only WITH Classpath-exception-2.0": "blocked",
   };
   for (const [expression, level] of Object.entries(cases)) {
     assert.equal(classify(expression), level, expression);
@@ -75,4 +79,36 @@ test("--since keeps only packages the lockfile gained", () => {
     ),
   };
   assert.deepEqual(byName(audit(lock, before)), { gamma: "blocked", native: "review" });
+});
+
+test("lists the vendored ripgrep binary and the PCRE2 inside it as permissive", () => {
+  const rows = audit({ packages: {} }, null, VENDORED);
+  assert.deepEqual(
+    rows.map(({ name, version, level }) => [name, version, level]),
+    [
+      ["pcre2 (in the ripgrep binary)", "10.46", "ok"],
+      ["ripgrep (binary in @irix/server)", RIPGREP_VERSION, "ok"],
+    ],
+  );
+});
+
+test("--since lists a vendored component only when it or its version is new", () => {
+  const ripgrep = VENDORED.find((entry) => entry.name.startsWith("ripgrep"));
+  const others = VENDORED.filter((entry) => entry !== ripgrep);
+  const empty = { packages: {} };
+  assert.deepEqual(
+    audit(empty, empty, VENDORED, others).map((row) => row.name),
+    [ripgrep.name],
+  );
+  assert.deepEqual(audit(empty, empty, VENDORED, VENDORED), []);
+  const older = [{ ...ripgrep, version: "14.0.0" }, ...others];
+  assert.deepEqual(
+    audit(empty, empty, VENDORED, older).map((row) => row.name),
+    [ripgrep.name],
+  );
+});
+
+test("vendored.json names the ripgrep version fetch-ripgrep.mjs pins", () => {
+  const ripgrep = VENDORED.find((entry) => entry.name.startsWith("ripgrep"));
+  assert.equal(ripgrep.version, RIPGREP_VERSION);
 });

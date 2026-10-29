@@ -184,6 +184,10 @@ jobs:
       - name: Apply the brand
         run: node irix/scripts/brand.mjs
 
+      # Content search runs the ripgrep shipped in its plugin folder (checksum-pinned).
+      - name: Fetch ripgrep
+        run: node irix/scripts/fetch-ripgrep.mjs plugins/irix-content-search
+
       - name: Install dependencies
         run: |
           node scripts/npm-retry.mjs ci --ignore-scripts --no-audit --no-fund

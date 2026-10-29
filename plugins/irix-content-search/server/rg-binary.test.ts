@@ -1,0 +1,146 @@
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { resolveRgBinary } from "./rg-binary.js";
+
+function existsIn(paths: string[]) {
+  const set = new Set(paths);
+  return (p: string) => set.has(p);
+}
+
+describe("resolveRgBinary", () => {
+  it("uses IRIX_RG_PATH first, before the plugin folder and PATH", () => {
+    const bundled = path.posix.join("/plugin", "vendor", "linux-x64", "rg");
+    const result = resolveRgBinary({
+      env: { IRIX_RG_PATH: "/irix/builtin-plugins/irix-content-search/vendor/linux-x64/rg" },
+      pluginDir: "/plugin",
+      platform: "linux",
+      arch: "x64",
+      pathEnv: "/usr/bin",
+      exists: existsIn([
+        "/irix/builtin-plugins/irix-content-search/vendor/linux-x64/rg",
+        bundled,
+        "/usr/bin/rg",
+      ]),
+    });
+    expect(result).toBe("/irix/builtin-plugins/irix-content-search/vendor/linux-x64/rg");
+  });
+
+  it("ignores an IRIX_RG_PATH that names no file", () => {
+    const result = resolveRgBinary({
+      env: { IRIX_RG_PATH: "/gone/rg" },
+      platform: "linux",
+      arch: "x64",
+      pathEnv: "/usr/bin",
+      exists: existsIn(["/usr/bin/rg"]),
+    });
+    expect(result).toBe("/usr/bin/rg");
+  });
+
+  it("reads PATH from the injected env when pathEnv is not given", () => {
+    const result = resolveRgBinary({
+      env: { PATH: "/opt/bin" },
+      platform: "linux",
+      arch: "x64",
+      exists: existsIn(["/opt/bin/rg"]),
+    });
+    expect(result).toBe("/opt/bin/rg");
+  });
+
+  it("prefers the bundled binary for the platform and arch", () => {
+    const bundled = path.posix.join("/plugin", "vendor", "darwin-arm64", "rg");
+    const result = resolveRgBinary({
+      pluginDir: "/plugin",
+      platform: "darwin",
+      arch: "arm64",
+      pathEnv: "/usr/bin:/opt/homebrew/bin",
+      exists: existsIn([bundled, "/opt/homebrew/bin/rg"]),
+    });
+    expect(result).toBe(bundled);
+  });
+
+  it("falls back to the first rg on PATH", () => {
+    const result = resolveRgBinary({
+      pluginDir: "/plugin",
+      platform: "linux",
+      arch: "x64",
+      pathEnv: "/usr/local/bin::/usr/bin:/opt/bin",
+      exists: existsIn(["/usr/bin/rg", "/opt/bin/rg"]),
+    });
+    expect(result).toBe("/usr/bin/rg");
+  });
+
+  it("uses rg.exe and ; separators on Windows", () => {
+    const bundled = path.win32.join("C:\\irix\\plugin", "vendor", "win32-x64", "rg.exe");
+    expect(
+      resolveRgBinary({
+        pluginDir: "C:\\irix\\plugin",
+        platform: "win32",
+        arch: "x64",
+        pathEnv: "C:\\Windows;C:\\tools",
+        exists: existsIn([bundled]),
+      }),
+    ).toBe(bundled);
+    expect(
+      resolveRgBinary({
+        pluginDir: "C:\\irix\\plugin",
+        platform: "win32",
+        arch: "x64",
+        pathEnv: 'C:\\Windows;"C:\\Program Files\\rg"',
+        exists: existsIn(["C:\\Program Files\\rg\\rg.exe"]),
+      }),
+    ).toBe("C:\\Program Files\\rg\\rg.exe");
+  });
+
+  it("returns null when neither the bundled binary nor PATH has rg", () => {
+    expect(
+      resolveRgBinary({
+        pluginDir: "/plugin",
+        platform: "linux",
+        arch: "x64",
+        pathEnv: "/usr/bin",
+        exists: () => false,
+      }),
+    ).toBeNull();
+  });
+
+  it("works without a plugin directory", () => {
+    expect(
+      resolveRgBinary({
+        platform: "linux",
+        arch: "x64",
+        pathEnv: "/usr/bin",
+        exists: existsIn(["/usr/bin/rg"]),
+      }),
+    ).toBe("/usr/bin/rg");
+  });
+
+  it("skips relative PATH entries, which would resolve against the workspace", () => {
+    expect(
+      resolveRgBinary({
+        env: {},
+        platform: "linux",
+        arch: "x64",
+        pathEnv: "bin:./tools:/usr/bin",
+        exists: existsIn(["bin/rg", "tools/rg", "./tools/rg", "/usr/bin/rg"]),
+      }),
+    ).toBe("/usr/bin/rg");
+    expect(
+      resolveRgBinary({
+        env: {},
+        platform: "win32",
+        arch: "x64",
+        pathEnv: 'bin;".\\tools";C:\\tools',
+        exists: existsIn(["bin\\rg.exe", "tools\\rg.exe", "C:\\tools\\rg.exe"]),
+      }),
+    ).toBe("C:\\tools\\rg.exe");
+    expect(
+      resolveRgBinary({
+        env: {},
+        platform: "linux",
+        arch: "x64",
+        pathEnv: "bin",
+        exists: existsIn(["bin/rg"]),
+      }),
+    ).toBeNull();
+  });
+});

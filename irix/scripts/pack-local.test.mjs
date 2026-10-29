@@ -11,6 +11,7 @@ import {
   coreVersion,
   makeZip,
   parseArgs,
+  ripgrepStepArgs,
   staleBundle,
   staleTarball,
   zipAttempts,
@@ -158,4 +159,18 @@ test("makeZip fails clearly when a member is missing", () => {
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("fetches ripgrep into the content search plugin for Windows x64 and this machine", () => {
+  assert.deepEqual(ripgrepStepArgs("darwin", "arm64"), [
+    "irix/scripts/fetch-ripgrep.mjs",
+    "plugins/irix-content-search",
+    "win32-x64",
+    "darwin-arm64",
+  ]);
+  assert.deepEqual(ripgrepStepArgs("win32", "x64"), [
+    "irix/scripts/fetch-ripgrep.mjs",
+    "plugins/irix-content-search",
+    "win32-x64",
+  ]);
 });

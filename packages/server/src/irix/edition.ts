@@ -7,6 +7,7 @@ import { CLAUDE_USAGE_HOSTS } from "./claude-hosts.js";
 import { devinUsageHosts } from "./devin-hosts.js";
 import { allowEgressHost, installEgressGuard } from "./egress-guard.js";
 import { IRIX_HOST_CAPS_ENV, irixHostCapsEnvValue } from "./host-caps.js";
+import { applyBundledRgPath } from "./ripgrep.js";
 
 export function applyIrixEdition(): void {
   if (isIrixActive()) {
@@ -45,6 +46,8 @@ export function applyIrixEdition(): void {
 
   // Plugin servers are forked from this process: this is how they learn what Irix does for Devin.
   process.env[IRIX_HOST_CAPS_ENV] = irixHostCapsEnvValue();
+  // The content search plugin runs this ripgrep (shipped in its vendor folder) before one on PATH.
+  applyBundledRgPath();
 
   activateIrixPolicy();
 

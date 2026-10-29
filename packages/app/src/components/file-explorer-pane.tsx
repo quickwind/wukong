@@ -78,6 +78,7 @@ import { confirmDialog } from "@/utils/confirm-dialog";
 import { useToast } from "@/contexts/toast-context";
 import { openDesktopTarget, useDesktopOpenTargets } from "@/workspace/desktop-open-targets";
 import { useOpenDirectoryInEditor } from "@/workspace/open-in-editor/directory";
+import * as Irix from "@/irix/content-search-host"; // Irix: content search
 
 const SORT_OPTIONS: { value: SortOption }[] = [
   { value: "name" },
@@ -417,6 +418,7 @@ export function FileExplorerPane({
   const isCompact = useIsCompactFormFactor();
 
   const normalizedWorkspaceRoot = useMemo(() => workspaceRoot.trim(), [workspaceRoot]);
+  const irixSearch = Irix.useSearch(serverId, workspaceId, normalizedWorkspaceRoot); // Irix
   const workspaceStateKey = useMemo(
     () =>
       buildWorkspaceExplorerStateKey({
@@ -1064,6 +1066,7 @@ export function FileExplorerPane({
         showBackFromError={showBackFromError}
         listRows={listRows}
         onNewEntryAtRoot={fsEntryOpsEnabled ? handleNewEntry : undefined}
+        irixSearch={irixSearch} // Irix: content search
         currentSortLabel={currentSortLabel}
         isRefreshFetching={isRefreshFetching}
         treeListRef={treeListRef}
@@ -1138,6 +1141,7 @@ interface FileExplorerPaneContentProps {
   showBackFromError: boolean;
   listRows: ExplorerListRow[];
   onNewEntryAtRoot?: (parentPath: string, kind: "file" | "directory") => void;
+  irixSearch?: Irix.FilesSearch; // Irix: content search
   currentSortLabel: string;
   isRefreshFetching: boolean;
   treeListRef: RefObject<FlatList<ExplorerListRow> | null>;
@@ -1265,6 +1269,7 @@ function FileExplorerPaneContent(props: FileExplorerPaneContentProps) {
               </ToolbarButton>
             </>
           ) : null}
+          {props.irixSearch?.button /* Irix: content search */}
           <ToolbarButton
             label={hiddenFilesToggleAccessibilityLabel}
             selected={!showHiddenFiles}
@@ -1313,7 +1318,7 @@ function FileExplorerPaneContent(props: FileExplorerPaneContentProps) {
           </ToolbarButton>
         </ToolbarControls>
       </PaneContentToolbar>
-      <ContextMenu>
+      <Irix.TreeMenu search={props.irixSearch} /* Irix: search panel in place of the tree */>
         <RootCreationContextTarget enabled={Boolean(onNewEntryAtRoot)}>
           {listRows.length === 0 ? (
             <View style={styles.centerState}>
@@ -1348,7 +1353,7 @@ function FileExplorerPaneContent(props: FileExplorerPaneContentProps) {
             testIDPrefix="files-empty-area"
           />
         ) : null}
-      </ContextMenu>
+      </Irix.TreeMenu>
     </View>
   );
 }

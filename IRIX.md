@@ -17,19 +17,24 @@ Paseo on company Windows machines, where nothing may be sent to cloud services:
   mobile app. The team uses Windows and has no administrator rights.
 - Runs next to a normal Paseo install: own command (`irix`), home (`~/.irix`), port (6890).
 
+For a numbered list of what Irix changes on top of upstream, split into enhancements and changes
+made because of company restrictions, see
+[irix/docs/changes-from-upstream.md](irix/docs/changes-from-upstream.md). **Every change to Irix
+must update both this file (`IRIX.md`) and `irix/docs/changes-from-upstream.md` in the same
+commit.**
+
 ## The prime rule: the smallest possible footprint on upstream
 
 We want to merge upstream often and cheaply. Every line changed in an upstream file is a future
 merge conflict. An earlier attempt (the `internal-edition` branch, kept only for reference) edited
-126 upstream files and was abandoned for exactly that reason. This branch edits **56 upstream files, 506 lines** (`upstream-footprint.mjs`, against v0.13.0). The
-budget is 56 files and 510 lines. It was 40 and 400. Four things used the room, and nothing else
-may: the Name + Create bar (the New workspace screen and the new chat tab are upstream code, so no
+126 upstream files and was abandoned for exactly that reason. This branch edits **58 upstream files, 543 lines** (`upstream-footprint.mjs`, against v0.13.0). The
+budget is 58 files and 550 lines. It was 40 and 400. Every raise is recorded here, with its
+reason: the Name + Create bar (the New workspace screen and the new chat tab are upstream code, so no
 Irix-owned file can replace them) took it to 45 files and 420 lines, hiding a plugin-managed
 project from the sidebar (same reason) took the lines to 440, and Devin's skills in the ACP command
-list (one line in `acp-agent.ts`) took them to 447, which moved the budget to 450. The plugin `Markdown` component was carried by hand for a while (upstream 995ad2f87, #7579); v0.13.0 ships it and the copy is gone. Later work (schedules and agent messaging switched off, subagent approval, bypass modes, the CLI and daemon hooks) took it to 462. Fork checkouts then needed `upstream` in the source picker (branches, background fetch, pasted links), which took it to 484, and the setup block for a merge request from another project (below) to 488. Comments on lines of a file (below) took it to 56 files and 506, and the budget to 56 and 510. The two lists of
+list (one line in `acp-agent.ts`) took them to 447, which moved the budget to 450. The plugin `Markdown` component was carried by hand for a while (upstream 995ad2f87, #7579); v0.13.0 ships it and the copy is gone. Later work (schedules and agent messaging switched off, subagent approval, bypass modes, the CLI and daemon hooks) took it to 462. Fork checkouts then needed `upstream` in the source picker (branches, background fetch, pasted links), which took it to 484, and the setup block for a merge request from another project (below) to 488. Comments on lines of a file (below) took it to 56 files and 506, and the budget to 56 and 510. Content search in the Files panel (below) took it to 57 files and 515, and the budget to 57 and 515. Irix workspace scripts in `paseo.json` (below) took it to 58 files and 543 lines, and the budget to 58 and 550. The two lists of
 changes were merged, so the numbers above are measured on the merge, not the sum of the two
-branches. The next upstream edit has to pay for itself by removing another; everything else is new
-files.
+branches. Prefer new files; an upstream edit that raises the budget again gets its line here.
 
 Before editing an upstream file, go down this ladder and stop at the first rung that works:
 
@@ -57,28 +62,29 @@ node irix/scripts/upstream-footprint.mjs     # lists every upstream file we modi
 ```
 
 It fails if an upstream file is deleted or renamed, if a modified upstream file has no `Irix`
-marker in the lines added, or if the totals pass the budget (56 files, 510 lines; change with
+marker in the lines added, or if the totals pass the budget (58 files, 550 lines; change with
 `--max-files`/`--max-lines`). **Run it before every commit that touches upstream files** and when
 you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
 ## Where Irix lives
 
-| Path                           | What                                                                                                                        |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `IRIX.md`                      | This guide                                                                                                                  |
-| `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide                                           |
-| `irix/AGENTS.md`               | Windows build recipe and the traps that cost time when packaging                                                            |
-| `irix/docs/`                   | Agent fork: mechanism guide, and staff training notes                                                                       |
-| `irix/README.md`               | Configuration, GitLab setup, building, publishing                                                                           |
-| `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins                                                   |
-| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                                               |
-| `packages/cli/src/irix/`       | `irix` command defaults (home, port, ignore Paseo's environment); `irix` has no clone, onboard, pair, hub or speech command |
-| `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                                                              |
-| `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin                 |
-| `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                                   |
-| `plugins/irix-claude-usage/`   | Bundled plugin: Claude monthly spend cap (and session/weekly windows where a plan has them)                                 |
-| `plugins/irix-context-hint/`   | Bundled plugin: composer pill when an agent's context window passes a threshold; compact or start a new session             |
-| `.github/workflows/irix-*.yml` | CI checks on every push to `irix` (the publish job is switched off); weekly sync with upstream                              |
+| Path                           | What                                                                                                                               |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `IRIX.md`                      | This guide                                                                                                                         |
+| `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide                                                  |
+| `irix/AGENTS.md`               | Windows build recipe and the traps that cost time when packaging                                                                   |
+| `irix/docs/`                   | Changes from upstream (numbered list); agent fork: mechanism guide, and staff training notes                                       |
+| `irix/README.md`               | Configuration, GitLab setup, building, publishing                                                                                  |
+| `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins                                                          |
+| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                                                      |
+| `packages/cli/src/irix/`       | `irix` command defaults (home, port, ignore Paseo's environment); `irix` has no clone, onboard, pair, hub or speech command        |
+| `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                                                                     |
+| `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin, Open in File Explorer |
+| `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                                          |
+| `plugins/irix-claude-usage/`   | Bundled plugin: Claude monthly spend cap (and session/weekly windows where a plan has them)                                        |
+| `plugins/irix-context-hint/`   | Bundled plugin: composer pill when an agent's context window passes a threshold; compact or start a new session                    |
+| `plugins/irix-content-search/` | Bundled plugin: content search in the Files panel (`rg --json` behind start, poll and cancel RPCs)                                 |
+| `.github/workflows/irix-*.yml` | CI checks on every push to `irix` (the publish job is switched off); weekly sync with upstream                                     |
 
 ## Upstream files we touch (the whole list)
 
@@ -89,12 +95,12 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CLAUDE.md` (`AGENTS.md` links to it)                                                                                                                                                                                                                    | One line at the top pointing agents here                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `server/daemon-worker.ts`                                                                                                                                                                                                                                | Imports the edition entry first (egress guard, policy)                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `server/agent/providers/acp-agent.ts`, `terminal/terminal.ts`                                                                                                                                                                                            | One line each: Windows shell comes from `irixWindowsShell()` (PowerShell by default); `acp-agent.ts` also spreads `additionalDirectoriesParams(...)` into `session/new`, `session/load` and `session/resume`, and reads a provider's skills from `irix/command-kind.ts`                                                                                                                                                                                                         |
+| `server/agent/providers/acp-agent.ts`, `terminal/terminal.ts`                                                                                                                                                                                            | One line each: Windows shell comes from `irixWindowsShell()` (PowerShell by default); `acp-agent.ts` also spreads `additionalDirectoriesParams(...)` into `session/new`, `session/load` and `session/resume`, reads a provider's skills from `irix/command-kind.ts`, leaves out the auto-accept feature (`irixFeatures`), and keeps released terminals for Devin's shell output                                                                                                 |
 | `server/config.ts`                                                                                                                                                                                                                                       | Terminal profiles fixed to Claude Code                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `server/websocket-server.ts`                                                                                                                                                                                                                             | Builds the connected-hosts registry through `createIrixConnectedHosts` (always empty in Irix)                                                                                                                                                                                                                                                                                                                                                                                   |
-| `server/session.ts`                                                                                                                                                                                                                                      | Clone requests only from the company GitLab; pull request text without the LLM (`irix/pr-text.ts`, two lines)                                                                                                                                                                                                                                                                                                                                                                   |
-| `server/agent/provider-registry.ts`                                                                                                                                                                                                                      | Restrict to Claude and Devin; Devin as configured ACP, with Irix's Devin client                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `server/plugins/index.ts`                                                                                                                                                                                                                                | No managed sources; only Irix's bundled plugins                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `server/session.ts`                                                                                                                                                                                                                                      | Clone requests only from the company GitLab; pull request text without the LLM (`irix/pr-text.ts`, two lines); `beforeSessionRun` hook                                                                                                                                                                                                                                                                                                                                          |
+| `server/agent/provider-registry.ts`                                                                                                                                                                                                                      | Restrict to Claude and Devin; Devin as configured ACP, with Irix's Devin client; `onRegistryClientAttached` hook                                                                                                                                                                                                                                                                                                                                                                |
+| `server/plugins/index.ts`                                                                                                                                                                                                                                | No managed sources; only Irix's bundled plugins (`irixBuiltinPlugins`)                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `server/plugins/compiler.ts`                                                                                                                                                                                                                             | Lets plugins written for `@getpaseo/plugin` build here                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `server/services/forge-registry.ts`                                                                                                                                                                                                                      | GitLab is the only forge                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `server/package.json` (and the lockfile)                                                                                                                                                                                                                 | One dependency, `@gitbeaker/rest`, for the GitLab REST client; JSON has no comments, so no marker                                                                                                                                                                                                                                                                                                                                                                               |
@@ -105,7 +111,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | `app/components/sidebar/sidebar-help-menu.tsx`, `community-links.tsx`, `changelog/.../changelog-source.ts`                                                                                                                                               | No upstream links, no What's new request                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `app/components/add-host-method-modal.tsx`                                                                                                                                                                                                               | No pairing-link option (it reaches the public relay)                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `app/composer/input-mode.ts`                                                                                                                                                                                                                             | No dictation or voice mode                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `app/screens/settings-screen.tsx`, `settings/host-page.tsx`, `settings/providers-section.tsx`, `settings/plugins-page.tsx`                                                                                                                               | No pairing, locked providers and terminal profiles, local-folder plugin text                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `app/screens/settings-screen.tsx`, `settings/host-page.tsx`, `settings/providers-section.tsx`, `settings/plugins-page.tsx`                                                                                                                               | No pairing, locked providers and terminal profiles, local-folder plugin text, bypass-modes switch hidden                                                                                                                                                                                                                                                                                                                                                                        |
 | `app/usage/queries.ts`                                                                                                                                                                                                                                   | Pinned usage re-reads on a timer (Irix builds only)                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `app/plugins/react-native/ui.ts`, `plugin/src/client/ui.ts`                                                                                                                                                                                              | Plugins get `ui.AgentView` and `ui.capabilities` (one re-export each; code and types are Irix files)                                                                                                                                                                                                                                                                                                                                                                            |
 | `app/hooks/use-sidebar-workspaces-list.ts`, `app/screens/new-workspace-screen.tsx`                                                                                                                                                                       | A plugin-managed project (Bot Crew's `Bots`) is left out of the sidebar and the New workspace project list and preselection; one call each into `app/src/irix/managed-projects.ts`; also the Name + Create bar (`app/irix/workspace-name.tsx`): create the workspace first, chat after                                                                                                                                                                                          |
@@ -113,6 +119,7 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 | `server/workspace-git-fetch.ts`, `server/session/checkout/checkout-session.ts`, `protocol/src/messages.ts`, `app/screens/new-workspace-picker-item.ts`, `app/git/forge-refs.ts`, `app/composer/forge-auto-attach.ts`, `server/paseo-worktree-service.ts` | Fork checkouts: the background fetch also fetches `upstream` (`irix/upstream-remote.ts`), its branches are listed with a `remote` field and shown as their own rows (`app/irix/remote-branch.ts`), and a pasted merge request or issue link of another project on the host is accepted and checked by project (`app/irix/forge-reference.ts`). One to three lines each; `paseo-worktree-service.ts` only asks `irix/workspace-automation.ts` whether there is anything to block |
 | `app/panels/agent-panel.tsx`                                                                                                                                                                                                                             | A new chat tab is titled with the name given in `IrixCreateAgentBar`                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `app/file-panels/builtin.tsx`, `app/file-panels/source/editor/view.web.tsx`, `app/file-panels/source/readonly/view.web.tsx`, `app/review/feedback/use-feedback.ts`                                                                                       | Comments on lines of a file: the built-in file panels render inside `withIrixFileComments` (the file and workspace the comments belong to, and the send button), the two CodeMirror source views add the extension from `app/irix/file-comments/use-extension.web.ts`, and the diff's send takes the workspace's file comments along. One to three lines each; everything else is under `app/src/irix/file-comments/`                                                           |
+| `app/components/file-explorer-pane.tsx`                                                                                                                                                                                                                  | Content search: the Search in files button in the toolbar, and the search panel in place of the tree while it is open (`app/irix/content-search-host.tsx`, through `Irix.useSearch` and `Irix.TreeMenu`). Five new lines and two renamed tags (+7 -2)                                                                                                                                                                                                                           |
 
 ## Design decisions, and why
 
@@ -532,6 +539,36 @@ attachment`), so neither the protocol nor the daemon changed. `dispatchComposerA
   guess. It is mounted by the same `withIrixFileComments` host, so it costs no upstream lines. The
   HTML preview is a sandboxed frame and only gets a pointer to the source view. Not built: sending them with the composer's text
   box, which needs a composer attachment kind and about five more upstream files.
+- **Content search in the Files panel** (`plugins/irix-content-search`, app side in
+  `packages/app/src/irix/content-search*.ts(x)`, `use-content-search.ts` and `open-search-match.ts`): the magnifier in the Files toolbar shows a search
+  panel in place of the tree, with match case, whole word, regex (Rust syntax) and include/exclude
+  globs, and results grouped by file. A click opens the file at the match line. Closing the search
+  mounts the tree again, so its scroll position is lost: keeping it mounted would leave New file and
+  New folder editing a hidden tree, and fixing that needs an upstream line. It is a bundled
+  plugin that runs `rg --json` in the workspace folder through three plugin RPCs,
+  `irix.search.content.start`, `.poll` and `.cancel`. Plugin RPCs time out after 30 s, so a search is
+  started and then polled, and results show as each poll returns them. The protocol is unchanged and
+  there is no `server_info` feature flag; when the daemon says the plugin or the RPC is unknown the
+  panel says "Search is not available on this host. Update the host.", and any other error is shown
+  as the daemon gave it. A search stops at 500 matches or 100 files, and a line is trimmed to 240
+  characters around the match. A running search that gets no poll for 30 s is stopped, and at most
+  four run at once on a daemon (a fifth stops the oldest). The start RPC only searches inside a
+  folder the daemon lists as a workspace. `.git` is never searched, whatever the include globs say
+  (`-g !.git` comes last; ripgrep lets the last matching glob win), and an exclude may be written
+  with or without a leading `!`.
+  **The bundled `rg`:** packing downloads ripgrep 15.2.0 (`irix/scripts/fetch-ripgrep.mjs`, run by
+  `pack-local.mjs` after the brand step) into the throwaway checkout's
+  `plugins/irix-content-search/vendor/<platform>-<arch>/`, for `win32-x64` and the packing machine's
+  platform, and stops the pack if a file's SHA-256 is not the one pinned in `RIPGREP_ASSETS`. The
+  binary is never committed. The plugin host tells a plugin no folder path, so the daemon looks for
+  the binary under its builtin plugins folder at start (`packages/server/src/irix/ripgrep.ts`, called
+  from `edition.ts`) and sets `IRIX_RG_PATH`; a value already set is kept. The plugin resolves the
+  binary once, when it loads (`resolveRgBinary()` in `contribute`, `index.server.ts`): `IRIX_RG_PATH`,
+  then the first `rg` in an absolute `PATH` entry (a relative one would resolve against the
+  workspace). A source checkout uses the `rg` on `PATH` and without one gets "ripgrep (rg) was not
+  found". The executable bit survives the copy into `dist/server/builtin-plugins`, `npm pack` and
+  `npm install` (checked on macOS). What is not verified on Windows is under "Known gaps". Replace is
+  milestone 2 and is not built.
 
 ## License and attribution
 
@@ -557,8 +594,15 @@ What we do about the conditions of §4 and §6:
 - **Trademarks (§6):** the product name, logo and icons are Irix's own; do not reintroduce
   Paseo's logo or name as the product's. Internal identifiers (`PASEO_*`, `~/.paseo`) are
   technical and stay for cheap merges.
-- **Third-party code** (npm dependencies, bundled web UI libraries) keeps its own licenses. We add
-  none and remove none. The python-gitlab config file format is read, but no python-gitlab code is used or installed.
+- **Third-party code** (npm dependencies, bundled web UI libraries, the vendored binaries below)
+  keeps its own licenses; we change and remove none of them. The python-gitlab config file format is
+  read, but no python-gitlab code is used or installed.
+- **Vendored binaries:** `@irix/server` ships ripgrep's release binaries (MIT or Unlicense; they
+  link PCRE2, BSD-3-Clause with the PCRE2 exception) for content search. `add-license.mjs` appends
+  their license texts, kept verbatim in `irix/licenses/`, to the server's `NOTICE`, and
+  `fetch-ripgrep.mjs` puts ripgrep's own license files beside the binary. `irix/scripts/vendored.json`
+  lists them for `license-audit.mjs`; a new vendored binary gets an entry there and a section in
+  the NOTICE.
 
 Obligations apply on redistribution. Internal use is not that; handing tarballs to contractors or
 another company, or publishing to a public npm registry, is. Before either: legal review, the
@@ -658,7 +702,10 @@ files you changed**, never the whole suite, use the npm scripts for lint and for
 6. If you added a dependency, a copied snippet, a file from elsewhere or an asset: apply "Rules for
    every change" under License and attribution, and run
    `node irix/scripts/license-audit.mjs` (exit 1 means something shipped is `blocked`).
-7. Commit with a message that says why (and where an asset or snippet came from); push to
+7. **Keep both docs in sync:** every change that adds, alters or removes Irix behaviour or touches
+   an upstream file must update this file (`IRIX.md`) and
+   [irix/docs/changes-from-upstream.md](irix/docs/changes-from-upstream.md) in the same commit.
+8. Commit with a message that says why (and where an asset or snippet came from); push to
    `origin irix`.
 
 ## Syncing with upstream: the SOP
@@ -721,18 +768,19 @@ workflow cannot judge the things in step 4; a person or agent must.
 5. **Verify**, in the worktree: `node scripts/npm-retry.mjs ci --ignore-scripts`, `npm run postinstall`,
    `npm run build:server` (it also compiles `packages/server/scripts`), `npm run typecheck`,
    `npm run lint`, `npm run format:check`, `node --test "irix/scripts/*.test.mjs"`, the Irix
-   tests (`packages/server`: `src/irix`; `plugins`: `irix-gitlab irix-devin-usage`;
+   tests (`packages/server`: `src/irix`; `plugins`: `irix-gitlab irix-devin-usage irix-claude-usage irix-context-hint irix-content-search`;
    `packages/app`: `src/irix src/usage`), and the footprint script. Do not run the whole suite.
 6. **Package and smoke test.** `node irix/scripts/pack-local.mjs`, install the
    tarballs into a temp `--prefix`, then start that daemon on a temp home and port. Check:
-   `irix --version`; only `claude` and `devin` providers; `irix-gitlab` and
-   `irix-devin-usage` loaded; no `Irix blocked` line in `daemon.log` at startup; the page
+   `irix --version`; only `claude` and `devin` providers; the five bundled plugins (`irix-gitlab`,
+   `irix-devin-usage`, `irix-claude-usage`, `irix-context-hint`, `irix-content-search`) loaded; no `Irix blocked` line in `daemon.log` at startup; the page
    title is Irix. Anything you changed by hand in step 3 gets a real run, not just tests.
 7. **Land it.** Push the sync branch and merge it into `irix` with a merge commit (PR, or a
    local `--no-ff` merge). Then fast-forward nothing else: `main` is the workflow's to mirror.
 8. **Finish.** Tag the result (`irix-<date>`, annotated, naming the upstream version), repack
-   into `~/irix-dist` with the same `pack-local` command, update the upstream-files table here
-   if the footprint changed, and tell the team to update with `windows-update.ps1`.
+   into `~/irix-dist` with the same `pack-local` command, update `IRIX.md` and
+   `irix/docs/changes-from-upstream.md` if the footprint or behaviour changed, and tell the team to
+   update with `windows-update.ps1`.
 
 **If it goes wrong.** More conflicts than expected, or upstream rewrote a subsystem we hook: stop,
 leave `irix` alone, and settle it in the worktree; never force-push. A build failure that is
@@ -757,8 +805,9 @@ Not verified, so do not claim otherwise:
   of `@irix/server` under Anthropic's own terms ("SEE LICENSE IN ..."), not an open-source
   license. npm installs it for the user; we do not redistribute it. The company's agreement with
   Anthropic should cover using it. `license-audit.mjs` lists it as `review`; no other shipped
-  package is `review` or `blocked` (325 shipped packages checked from the lockfile's license
-  fields, which are what each package declares about itself).
+  package is `review` or `blocked` (337 shipped packages checked: 335 from the lockfile's license
+  fields, which are what each package declares about itself, and 2 from
+  `irix/scripts/vendored.json`: ripgrep and the PCRE2 inside it).
 - No third-party license notices ship with the web UI bundle (the libraries compiled into it,
   mostly MIT or Apache-2.0, ask for theirs to be kept). Upstream ships the same bundle; for any
   distribution beyond the company we need a generated third-party notices file.
@@ -777,6 +826,16 @@ Not verified, so do not claim otherwise:
 - Claude usage comes from `irix-claude-usage` (spend cap and a month-end forecast, see above); it
   was run against one real enterprise account, not a Pro or Max one, and its calendar-month reset
   is an assumption. Upstream's `claude-usage-source` is not enabled.
+- Content search's Windows x64 `rg.exe` has not been run on a company machine, so allow-listing or
+  antivirus, `windowsHide` and killing the child on Windows are unverified. Do not hand tarballs to
+  the team before a person without administrator rights runs `rg.exe --version` and one search on
+  a company machine.
+- The Rust crates compiled into `rg` ship no license notices of their own (only ripgrep's and
+  PCRE2's are in the NOTICE). This needs legal review before any distribution outside the company.
+- Content search performance has one measurement: on a Mac, with this repository (about 6300
+  files) in a browser, the first results arrived after about 290 ms and a result capped at 500
+  matches in 98 files after about 450 ms; the longest browser main-thread stall was 2.5 ms. There is
+  no Windows measurement and none on a larger repository.
 - Settings has "Enable terminal agent hooks", which edits the user's agent config files. It is
   upstream's and installs hooks only when switched on (unset means off). Keep it off while Paseo
   is installed beside Irix, or both write hooks into the same Claude config.

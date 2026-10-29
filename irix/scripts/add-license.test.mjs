@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { addLicense, buildNotice, NOTICE, PACKAGES } from "./add-license.mjs";
+import { addLicense, buildNotice, NOTICE, PACKAGES, ripgrepNotice } from "./add-license.mjs";
+import { RIPGREP_VERSION } from "./fetch-ripgrep.mjs";
+
+const REPO = path.resolve(import.meta.dirname, "..", "..");
+const read = (file) => readFileSync(path.join(REPO, file), "utf8");
 
 const APACHE = "Copyright (c) someone\n\n  Apache License\n  Version 2.0, January 2004\n";
 
@@ -31,7 +35,10 @@ test("gives every package the license, the notice and an Apache-2.0 field", () =
     for (const name of PACKAGES) {
       const dir = path.join(root, "packages", name);
       assert.equal(readFileSync(path.join(dir, "LICENSE"), "utf8"), APACHE);
-      assert.equal(readFileSync(path.join(dir, "NOTICE"), "utf8"), NOTICE);
+      const notice = readFileSync(path.join(dir, "NOTICE"), "utf8");
+      assert.ok(notice.startsWith(NOTICE));
+      // Only the server ships ripgrep, so only its NOTICE carries ripgrep's licenses.
+      assert.equal(notice === NOTICE, name !== "server", name);
       assert.equal(manifest(root, name).license, "Apache-2.0");
       assert.deepEqual(manifest(root, name).files, ["dist", "NOTICE"]);
     }
@@ -92,6 +99,7 @@ test("carries over a NOTICE that upstream adds later (Apache-2.0 4d), after ours
     for (const name of PACKAGES) {
       const text = readFileSync(path.join(root, "packages", name, "NOTICE"), "utf8");
       assert.ok(text.startsWith(NOTICE));
+      if (name === "server") assert.ok(text.endsWith(ripgrepNotice()));
       assert.match(
         text,
         /Notice carried over from Paseo's NOTICE file:\n\nPaseo\nIncludes software from Example Corp\./,
@@ -99,6 +107,29 @@ test("carries over a NOTICE that upstream adds later (Apache-2.0 4d), after ours
     }
     assert.equal(buildNotice("  \n"), NOTICE);
     assert.equal(buildNotice(undefined), NOTICE);
+  } finally {
+    cleanup();
+  }
+});
+
+test("the server's NOTICE carries ripgrep's and PCRE2's license texts verbatim", () => {
+  const { root, cleanup } = checkout();
+  try {
+    addLicense({ root });
+    const notice = readFileSync(path.join(root, "packages", "server", "NOTICE"), "utf8");
+    assert.equal(notice, `${NOTICE}\n${ripgrepNotice()}`);
+    assert.match(notice, new RegExp(`ripgrep ${RIPGREP_VERSION.replaceAll(".", "\\.")}`));
+    assert.match(notice, /https:\/\/github\.com\/BurntSushi\/ripgrep/);
+    for (const file of [
+      "irix/licenses/ripgrep/COPYING",
+      "irix/licenses/ripgrep/LICENSE-MIT",
+      "irix/licenses/ripgrep/UNLICENSE",
+      "irix/licenses/pcre2/LICENCE",
+    ]) {
+      assert.ok(notice.includes(read(file)), file);
+    }
+    assert.match(read("irix/licenses/ripgrep/LICENSE-MIT"), /Copyright \(c\) 2015 Andrew Gallant/);
+    assert.match(read("irix/licenses/pcre2/LICENCE"), /BSD-3-Clause WITH PCRE2-exception/);
   } finally {
     cleanup();
   }

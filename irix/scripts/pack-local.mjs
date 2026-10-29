@@ -19,6 +19,8 @@ import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { packTargets } from "./fetch-ripgrep.mjs";
+
 const PACKAGES = ["highlight", "relay", "protocol", "client", "plugin", "server", "cli"];
 const SCOPE_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 
@@ -152,6 +154,18 @@ export function makeZip(zipFile, directory, members) {
   throw new Error("Could not write the zip: none of tar, zip or PowerShell worked");
 }
 
+/**
+ * The fetch-ripgrep run for the throwaway checkout: Windows x64 is what Irix ships to, and this
+ * machine's platform is added so a local smoke test finds a binary too.
+ */
+export function ripgrepStepArgs(platform = process.platform, arch = process.arch) {
+  return [
+    "irix/scripts/fetch-ripgrep.mjs",
+    "plugins/irix-content-search",
+    ...packTargets(platform, arch),
+  ];
+}
+
 function removeTree(directory) {
   rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }
@@ -217,6 +231,9 @@ export function main(argv) {
     run(node, ["irix/scripts/brand.mjs"], inWork);
     // Upstream's web UI build cannot start npm on Windows; fixed in this checkout only.
     run(node, ["irix/scripts/build-fixes.mjs"], inWork);
+    // Content search runs the ripgrep shipped in its plugin folder; the server build copies
+    // plugins/ into dist/server/builtin-plugins. A checksum mismatch stops the pack here.
+    run(node, ripgrepStepArgs(), inWork);
 
     run(
       node,

@@ -10,11 +10,19 @@
 //   node irix/scripts/license-audit.mjs [--since <ref>] [--lock package-lock.json]
 //
 // --since lists only packages the lockfile gained since <ref> (what a change or sync added).
+// Binaries we vendor are not in the lockfile; they are listed in vendored.json beside this script
+// (one entry per component, with its version) and audited with the rest.
 // Exits 1 if any shipped package is `blocked`.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+const VENDORED_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), "vendored.json");
+/** Vendored binaries and what is compiled into them: `{ name, version, license, source }`. */
+export const VENDORED = existsSync(VENDORED_FILE)
+  ? JSON.parse(readFileSync(VENDORED_FILE, "utf8"))
+  : [];
 
 export const SHIPPED = ["highlight", "relay", "protocol", "client", "plugin", "server", "cli"];
 const PERMISSIVE = new Set([
@@ -43,7 +51,8 @@ export function classify(expression) {
     const rank = new Set(text.split(/\sOR\s/u).map((part) => classify(part)));
     return ["ok", "review", "blocked"].find((level) => rank.has(level));
   }
-  const parts = text.split(/\sAND\s/u).map((part) => part.trim());
+  // `X WITH <exception>`: an exception only adds permissions, so X decides.
+  const parts = text.split(/\sAND\s/u).map((part) => part.replace(/\sWITH\s.*$/u, "").trim());
   const levels = new Set(
     parts.map((part) => {
       if (BLOCKED.test(part) && !part.startsWith("LGPL")) return "blocked";
@@ -86,7 +95,7 @@ export function shippedPackages(lock) {
   return [...seen].filter(([key]) => key.includes("node_modules/"));
 }
 
-export function audit(lock, since) {
+export function audit(lock, since, vendored = [], sinceVendored = []) {
   const sinceKeys = since ? new Set(Object.keys(since.packages)) : null;
   const rows = [];
   for (const [key, entry] of shippedPackages(lock)) {
@@ -98,6 +107,16 @@ export function audit(lock, since) {
       version: entry.version,
       license: license ?? "(none)",
       level: classify(license),
+    });
+  }
+  const known = new Set(sinceVendored.map((entry) => `${entry.name}@${entry.version}`));
+  for (const entry of vendored) {
+    if (since && known.has(`${entry.name}@${entry.version}`)) continue;
+    rows.push({
+      name: entry.name,
+      version: entry.version,
+      license: entry.license,
+      level: classify(entry.license),
     });
   }
   return rows.sort((a, b) => a.name.localeCompare(b.name));
@@ -121,11 +140,31 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         }),
       )
     : null;
-  const rows = audit(lock, since);
+  const show = (file) =>
+    execFileSync("git", ["show", `${ref}:${file}`], {
+      cwd: repo,
+      encoding: "utf8",
+      maxBuffer: 1 << 28,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  let sinceVendored = [];
+  if (ref) {
+    try {
+      sinceVendored = JSON.parse(show("irix/scripts/vendored.json"));
+    } catch {
+      // Not there at <ref>: everything vendored is new.
+    }
+  }
+  const rows = audit(lock, since, VENDORED, sinceVendored);
   const count = (level) => rows.filter((row) => row.level === level).length;
   console.log(
     `${ref ? `new since ${ref}: ` : ""}${rows.length} shipped packages: ${count("ok")} ok, ${count("review")} review, ${count("blocked")} blocked`,
   );
+  // Vendored binaries are few and easy to forget, so they are listed whatever their level.
+  const vendoredNames = new Set(VENDORED.map((entry) => entry.name));
+  for (const row of rows.filter((entry) => vendoredNames.has(entry.name))) {
+    console.log(`  vendored ${row.level.padEnd(7)} ${row.name}@${row.version}  ${row.license}`);
+  }
   for (const level of ["blocked", "review"]) {
     for (const row of rows.filter((entry) => entry.level === level)) {
       console.log(`  ${level.padEnd(7)} ${row.name}@${row.version}  ${row.license}`);

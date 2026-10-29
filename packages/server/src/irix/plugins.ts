@@ -18,6 +18,7 @@ export const IRIX_BUILTIN_PLUGINS: readonly string[] = [
   "irix-devin-usage",
   "irix-claude-usage",
   "irix-context-hint",
+  "irix-content-search",
 ];
 
 export function irixBuiltinPlugins(
