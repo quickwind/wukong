@@ -24,6 +24,9 @@ export interface SubagentApprovalQuestion {
 /** Resolves true when the human allows the subagent. Rejecting or throwing denies it. */
 export type SubagentApprover = (question: SubagentApprovalQuestion) => Promise<boolean>;
 
+/** Seconds Devin waits for the hook: the approval wait (10 minutes) and a minute more. */
+export const HOOK_TIMEOUT_SECONDS = 11 * 60;
+
 const approvers = new Map<string, SubagentApprover>();
 let server: Promise<{ port: number; token: string }> | null = null;
 
@@ -165,7 +168,13 @@ export function buildGatedDevinConfig(
       ...userHooks,
       PreToolUse: [
         ...existing,
-        { matcher: "run_subagent", hooks: [{ type: "command", command: hookCommand }] },
+        {
+          matcher: "run_subagent",
+          // Seen with Devin 3000.11: with no timeout on the hook, the subagent ran while its card was
+          // still waiting (nobody had clicked). With this one it stayed held for over three minutes.
+          // Longer than the approval wait.
+          hooks: [{ type: "command", command: hookCommand, timeout: HOOK_TIMEOUT_SECONDS }],
+        },
       ],
     },
   };

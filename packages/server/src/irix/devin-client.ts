@@ -41,6 +41,7 @@ import { getAgentToolsChannel } from "./agent-tools-setting.js";
 import { isIrixActive } from "./policy.js";
 import { isBypassModeId, isIrixRestricted } from "./restrictions.js";
 import { DevinCompaction } from "./devin-compaction.js";
+import { formatApprovalForm, previewForApproval } from "./approval-form.js";
 import { DevinSubagentCards } from "./devin-subagent-card.js";
 import {
   ensureSubagentGateRunning,
@@ -305,6 +306,15 @@ export function attachDevinSubagentApprovalGate(
           description:
             "Devin is requesting to spawn an internal subagent. Human approval is required.",
           input: { ...(toolUseId ? { toolUseId } : {}), ...toolInput },
+          detail: {
+            type: "plain_text",
+            text: formatApprovalForm([
+              ["Title", toolInput.title],
+              ["Profile", toolInput.profile],
+              ["Background", toolInput.is_background],
+              ["Task", previewForApproval(toolInput.task)],
+            ]),
+          },
         };
         return new Promise<boolean>((resolve) => {
           const entry: SubagentGateEntry = {

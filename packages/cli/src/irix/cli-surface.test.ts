@@ -4,7 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCli } from "../cli.js";
 import { createCliParseArgv } from "../run.js";
 import { markIrixCli } from "./defaults.js";
-import { isCliSubagentApprovalRequired, promptCliSubagentApproval } from "./surface.js";
+import {
+  isCliSubagentApprovalRequired,
+  promptCliSubagentApproval,
+  resolveCliApproval,
+  setCliApprovalPromptForTests,
+} from "./surface.js";
+
+function answering(value: boolean) {
+  return vi.fn(async () => value);
+}
 
 describe("Irix CLI surface", () => {
   const unused = ["clone", "onboard", "pair", "hub", "speech", "host"];
@@ -164,5 +173,43 @@ describe("Irix CLI surface", () => {
     );
     inputNo.write("invalid\nno\n");
     await expect(rejectPromise).resolves.toBe(false);
+  });
+
+  describe("who approves a run", () => {
+    const summary = { provider: "claude", cwd: "/tmp", prompt: "fix bug" };
+
+    afterEach(() => setCliApprovalPromptForTests(null));
+
+    it("leaves an agent's run to the daemon and never prompts", async () => {
+      const prompt = answering(true);
+      setCliApprovalPromptForTests(prompt);
+      await expect(
+        resolveCliApproval({ callerAgentId: "agent-1", interactive: true, summary }),
+      ).resolves.toBeUndefined();
+      await expect(
+        resolveCliApproval({ callerAgentId: "agent-1", interactive: false, summary }),
+      ).resolves.toBeUndefined();
+      expect(prompt).not.toHaveBeenCalled();
+    });
+
+    it("prompts a person at a terminal when no agent is calling", async () => {
+      setCliApprovalPromptForTests(answering(true));
+      await expect(
+        resolveCliApproval({ callerAgentId: undefined, interactive: true, summary }),
+      ).resolves.toBeUndefined();
+      setCliApprovalPromptForTests(answering(false));
+      await expect(
+        resolveCliApproval({ callerAgentId: undefined, interactive: true, summary }),
+      ).rejects.toMatchObject({ code: "SUBAGENT_APPROVAL_REJECTED" });
+    });
+
+    it("refuses without a terminal or a calling agent, and does not read stdin", async () => {
+      const prompt = answering(true);
+      setCliApprovalPromptForTests(prompt);
+      await expect(
+        resolveCliApproval({ callerAgentId: undefined, interactive: false, summary }),
+      ).rejects.toMatchObject({ code: "SUBAGENT_APPROVAL_REQUIRED" });
+      expect(prompt).not.toHaveBeenCalled();
+    });
   });
 });

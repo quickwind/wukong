@@ -27,6 +27,7 @@ const ScheduleCreateTargetSchema = z.discriminatedUnion("type", [
 export const ScheduleCreateRequestSchema = z.object({
   type: z.literal("schedule/create"),
   requestId: z.string(),
+  callerAgentId: z.string().optional(), // Irix: the agent whose shell sent it
   prompt: z.string().min(1),
   name: z.string().optional(),
   cadence: ScheduleCadenceSchema,
@@ -62,6 +63,7 @@ export const SchedulePauseRequestSchema = z.object({
 export const ScheduleResumeRequestSchema = z.object({
   type: z.literal("schedule/resume"),
   requestId: z.string(),
+  callerAgentId: z.string().optional(), // Irix: the agent whose shell sent it
   scheduleId: z.string(),
 });
 
@@ -74,6 +76,7 @@ export const ScheduleDeleteRequestSchema = z.object({
 export const ScheduleRunOnceRequestSchema = z.object({
   type: z.literal("schedule/run-once"),
   requestId: z.string(),
+  callerAgentId: z.string().optional(), // Irix: the agent whose shell sent it
   scheduleId: z.string(),
 });
 
@@ -90,6 +93,7 @@ const ScheduleUpdateNewAgentConfigSchema = z.object({
 export const ScheduleUpdateRequestSchema = z.object({
   type: z.literal("schedule/update"),
   requestId: z.string(),
+  callerAgentId: z.string().optional(), // Irix: the agent whose shell sent it
   scheduleId: z.string(),
   name: z.string().nullable().optional(),
   prompt: z.string().min(1).optional(),

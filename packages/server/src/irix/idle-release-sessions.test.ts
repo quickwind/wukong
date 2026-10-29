@@ -137,6 +137,19 @@ describe("installIdleReleaseSessionHooks", () => {
     expect(sessions.acpCreate.translateMessageToEvents).toBe(acpTranslate);
   });
 
+  it("puts the subagent ask hook on Claude's real session, and not on a Devin one", async () => {
+    const hooks = () => ({ PreToolUse: [{ hooks: [] }] });
+    const claude = Object.assign(sessions.claudeCreate, { buildSubagentEffortHooks: hooks });
+    const devin = Object.assign(sessions.acpCreate, { buildSubagentEffortHooks: hooks });
+    installIdleReleaseSessionHooks();
+    await claudeProto.createSession.call({}, {}, { agentId: "c" });
+    await acpProto.createSession.call({}, {}, { agentId: "d" });
+    expect(claude.buildSubagentEffortHooks).not.toBe(hooks);
+    expect(devin.buildSubagentEffortHooks).toBe(hooks);
+    const built = claude.buildSubagentEffortHooks() as { PreToolUse: Array<{ matcher?: string }> };
+    expect(built.PreToolUse[0]!.matcher).toBe("Task|Agent");
+  });
+
   it("installs once however often it is called", async () => {
     installIdleReleaseSessionHooks();
     const wrapped = claudeProto.createSession;

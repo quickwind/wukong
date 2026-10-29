@@ -98,6 +98,20 @@ function subagentApprovalSection(options: AgentGuideOptions): string[] {
     return [];
   }
   const workaround = options.channel === "cli" ? "`irix run`" : "the create_agent tool";
+  return [
+    ...subagentPolicy(options, workaround),
+    ...(options.channel === "cli" ? [PENDING_RUN_ADVICE] : []),
+  ];
+}
+
+// `irix run` waits one short window for the human, then exits; see cli/src/irix/pending-run.ts.
+const PENDING_RUN_ADVICE =
+  "If `irix run` or `irix agent run` exits saying the subagent is waiting for approval, the person has " +
+  "not answered yet: run exactly the same command again to keep waiting (the request stays open for 10 " +
+  "minutes), without changing its arguments and without starting the work yourself. If it says the " +
+  "request was rejected, stop.";
+
+function subagentPolicy(options: AgentGuideOptions, workaround: string): string[] {
   return options.provider === "devin"
     ? [
         "POLICY - MANDATORY SUBAGENT APPROVAL: every `run_subagent` call waits for a human to approve " +

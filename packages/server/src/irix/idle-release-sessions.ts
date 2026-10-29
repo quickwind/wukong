@@ -10,6 +10,7 @@ import { ACPAgentClient } from "../server/agent/providers/acp-agent.js";
 import { ClaudeAgentClient } from "../server/agent/providers/claude/agent.js";
 import { trackClaudeBackgroundShells } from "./idle-release-busy.js";
 import { isIrixActive } from "./policy.js";
+import { attachClaudeSessionSubagentGate } from "./subagent-approval.js";
 
 const rawSessions = new Map<string, WeakRef<object>>();
 
@@ -76,6 +77,15 @@ function hookFactory(
           trackClaudeBackgroundShells(session);
         } catch {
           // An untracked Claude session counts as busy.
+        }
+      }
+      if (trackShells) {
+        // The facade the registry hands the manager has none of the session's members, so the
+        // subagent gate (a hook that makes Claude ask before Task/Agent) goes on the real session.
+        try {
+          attachClaudeSessionSubagentGate(session as Record<string, unknown>);
+        } catch {
+          // A hook error must never fail session creation.
         }
       }
     }
