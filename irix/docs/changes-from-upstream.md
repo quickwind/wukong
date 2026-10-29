@@ -32,7 +32,7 @@ Paths are under `packages/server/src/irix/` unless they say otherwise.
 
 8. **Idle release.** The provider process of a Claude or Devin agent that has been idle for the
    configured time (15 minutes by default) is released, and the agent resumes on its next open or
-   prompt (`idle-release*.ts`, setting in `packages/app/src/irix/idle-release-setting.tsx`).
+   prompt (`idle-release*.ts`, setting in `packages/app/src/irix/idle-release-setting.tsx`). Upstream 0.14.0 has its own collector (one hour, `agents.idleRuntimeCleanup`); Irix homes set that to false so only this one runs (`packages/cli/src/irix/defaults.ts`).
 9. **Agent guide.** When a session starts, Claude and Devin are taught the `irix` command line and
    the `IRIX_RG_PATH` ripgrep search binary by a guide built from the host's settings (`agent-guide.ts`,
    `claude-agent-guide.ts`).

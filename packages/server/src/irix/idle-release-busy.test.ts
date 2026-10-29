@@ -152,7 +152,7 @@ describe("trackClaudeBackgroundShells", () => {
   });
   it("pins the upstream method and its this. call site", () => {
     const src = upstream("claude/agent.ts");
-    expect(src).toContain("private translateMessageToEvents(");
+    expect(src).toContain("private async translateMessageToEvents(");
     expect(src).toContain("this.translateMessageToEvents(message");
   });
 });

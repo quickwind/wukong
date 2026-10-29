@@ -616,10 +616,10 @@ describe("idle release with a real agent manager", () => {
   // KNOWN UPSTREAM HAZARD (residual after the two-tick rule). An agent that is loaded and was
   // already a candidate on the previous tick (here: viewed, then no longer viewed) is closed on
   // the next tick; a prompt that reaches `startAgentRun` before that close runs in the lifecycle
-  // lane is recorded and sent, then the agent ends `closed` with no reply. Upstream `closeAgent`
+  // lane reaches the provider, then the agent ends `closed` with no reply (since 0.14.0 the prompt is not in the saved timeline either). Upstream `closeAgent`
   // has no only-if-idle check inside the lane, and `startAgentRun` does not wait for an
   // in-flight close. When upstream fixes it, this test fails: rewrite it to expect a reply.
-  test("residual hazard: a prompt to a loaded candidate on its closing tick is recorded and not answered", async () => {
+  test("residual hazard: a prompt to a loaded candidate on its closing tick is reaches the provider and is not answered", async () => {
     const agentId = "00000000-0000-4000-8000-000000000905";
     const harness = await setup(agentId);
     try {
@@ -642,11 +642,9 @@ describe("idle release with a real agent manager", () => {
 
       await ensureAgentLoaded(agentId, { agentManager: manager, agentStorage: storage, logger });
       const timeline = manager.getTimeline(agentId);
-      const lastUser = timeline.findLastIndex((item) => item.type === "user_message");
-      expect(timeline[lastUser]).toMatchObject({ type: "user_message", text: "again" });
-      expect(
-        timeline.slice(lastUser + 1).filter((item) => item.type === "assistant_message"),
-      ).toEqual([]);
+      // Upstream 0.14.0 no longer records the prompt in the timeline either: the provider got
+      // it, the saved conversation has neither it nor an answer.
+      expect(timeline.map((item) => item.type)).toEqual(["user_message", "assistant_message"]);
     } finally {
       await harness.cleanup();
     }

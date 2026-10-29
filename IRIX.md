@@ -339,6 +339,14 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   Claude Code. The Providers page and Add provider catalog are hidden. Claude starts disabled when
   its command is not found at daemon start (`detectIrixProviders` in `irix/providers.ts`); an
   explicit enabled setting wins, and installing Claude later takes effect at the next start.
+- **Upstream's idle collector is off** (upstream 0.14.0, #7782): it releases idle runtimes after a fixed
+  hour and has its own settings card. Irix keeps its own release (below; 15 minutes, tuned for Devin's
+  memory on Windows), so `applyIrixDefaults` (`packages/cli/src/irix/defaults.ts`) writes
+  `agents.idleRuntimeCleanup: false` into a new home's `config.json`, and into an existing one that has no
+  value; a value the user set is kept. Upstream's card in Settings → host still shows and is off. Upstream's
+  `startAgentRun` now waits for a close in flight, but the known gap below remains: Irix closes through the
+  public `closeAgent`, with no only-if-idle check; since 0.14.0 the racing prompt also is not in the saved
+  timeline. If upstream's collector should replace Irix's, drop `idle-release*` and this default.
 - **Idle release** (`irix/idle-release*.ts`, setting UI in `app/src/irix/idle-release-setting.tsx`):
   upstream keeps an idle agent's provider process for as long as the daemon runs
   (`docs/agent-lifecycle.md`, "Runtime residency"). On Windows each idle `devin acp` grew past 170 MB,
