@@ -146,7 +146,9 @@ async function renderPane(options: { irix: boolean }): Promise<() => void> {
 const tree = () => screen.queryByTestId("file-explorer-tree-scroll");
 const panel = () => screen.queryByTestId("irix-content-search-panel");
 
-describe("Files panel content search", () => {
+// Every case imports the whole Files panel again after resetModules; a cold import alone can pass
+// the 5 s default.
+describe("Files panel content search", { timeout: 30_000 }, () => {
   it("adds no search button in an upstream build", async () => {
     await renderPane({ irix: false });
     expect(screen.getByTestId("files-new-folder")).toBeTruthy();
