@@ -6,6 +6,7 @@ const PLUGIN_ID = "irix-content-search";
 const START_METHOD = "irix.search.content.start";
 const POLL_METHOD = "irix.search.content.poll";
 const CANCEL_METHOD = "irix.search.content.cancel";
+const REPLACE_METHOD = "irix.search.content.replace";
 
 const MatchSchema = z.object({
   path: z.string(),
@@ -13,6 +14,8 @@ const MatchSchema = z.object({
   column: z.number().int().positive(),
   text: z.string(),
   ranges: z.array(z.object({ start: z.number().int(), end: z.number().int() })),
+  mtimeMs: z.number().optional(),
+  size: z.number().int().optional(),
 });
 export type Match = z.infer<typeof MatchSchema>;
 
@@ -61,4 +64,41 @@ export async function pollSearch(
 
 export async function cancelSearch(client: ContentSearchClient, id: string): Promise<void> {
   await client.invokePluginRpc(PLUGIN_ID, CANCEL_METHOD, { id });
+}
+
+export interface ReplaceFile {
+  path: string;
+  mtimeMs: number;
+  size: number;
+  lines: number[];
+}
+
+export interface ReplaceRequest {
+  cwd: string;
+  query: string;
+  caseSensitive: boolean;
+  regex: boolean;
+  wholeWord: boolean;
+  replacement: string;
+  files: ReplaceFile[];
+}
+
+const ReplaceResultSchema = z.object({
+  results: z.array(
+    z.object({
+      path: z.string(),
+      status: z.enum(["replaced", "skipped"]),
+      count: z.number().int(),
+      reason: z.string().nullable(),
+    }),
+  ),
+});
+export type ReplaceResult = z.infer<typeof ReplaceResultSchema>["results"][number];
+
+export async function replaceMatches(
+  client: ContentSearchClient,
+  request: ReplaceRequest,
+): Promise<ReplaceResult[]> {
+  return ReplaceResultSchema.parse(await client.invokePluginRpc(PLUGIN_ID, REPLACE_METHOD, request))
+    .results;
 }

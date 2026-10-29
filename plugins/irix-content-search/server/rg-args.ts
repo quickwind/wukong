@@ -26,3 +26,30 @@ export function buildRgArgs(options: Omit<SearchOptions, "cwd">): string[] {
   args.push("--regexp", options.query, ".");
   return args;
 }
+
+/**
+ * Arguments for `rg` to report, as JSON, each match in one file with the text that replaces it.
+ * ripgrep computes the replacement, so a capture group means what it means in the search.
+ */
+export function buildRgReplaceArgs(
+  options: {
+    query: string;
+    caseSensitive: boolean;
+    regex: boolean;
+    wholeWord: boolean;
+    replacement: string;
+  },
+  file: string,
+): string[] {
+  const args = ["--json", "--no-config", "--crlf"];
+  args.push(options.caseSensitive ? "--case-sensitive" : "--ignore-case");
+  if (!options.regex) args.push("--fixed-strings");
+  if (options.wholeWord) args.push("--word-regexp");
+  // Without a regex the replacement is literal; ripgrep would still expand "$1" in it.
+  const replacement = options.regex
+    ? options.replacement
+    : options.replacement.split("$").join("$$");
+  args.push(`--replace=${replacement}`);
+  args.push("--regexp", options.query, "--", file);
+  return args;
+}

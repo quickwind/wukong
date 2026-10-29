@@ -567,8 +567,23 @@ attachment`), so neither the protocol nor the daemon changed. `dispatchComposerA
   then the first `rg` in an absolute `PATH` entry (a relative one would resolve against the
   workspace). A source checkout uses the `rg` on `PATH` and without one gets "ripgrep (rg) was not
   found". The executable bit survives the copy into `dist/server/builtin-plugins`, `npm pack` and
-  `npm install` (checked on macOS). What is not verified on Windows is under "Known gaps". Replace is
-  milestone 2 and is not built.
+  `npm install` (checked on macOS). What is not verified on Windows is under "Known gaps".
+  **Replace** (milestone 2) is a fourth RPC, `irix.search.content.replace`, behind the pencil
+  button in the search panel. The panel previews each match struck out with the replacement after
+  it, lets a line or a whole file be left out, replaces one match or one file at once from a check button on its row, asks before Replace all, and sends the kept lines of each file with the
+  modification time and size the search recorded for it. The daemon (`server/replace.ts`) skips a
+  file, and reports why, when its time or size differ, when a line no longer matches, when the
+  bytes at a match are not the ones found, or when it is not valid UTF-8. Otherwise it asks `rg
+--json --replace` for the replacement text of every match on the kept lines, so `$1` means in
+  replace what it means in search (in a search without the regex switch the text is literal), and
+  changes only those bytes: line endings and a BOM stay as they were. The file is checked once
+  more just before the write. Files are done one by one, a skipped one does not stop the rest, and
+  the panel searches again afterwards. **Not built:** skipping a file with unsaved edits in the
+  editor of this client. Doing it needs the file editor to register its buffer, which is an
+  upstream edit. Today an open editor with unsaved text is not changed on disk by the check but
+  is not detected either: its next save meets the file handle's conflict check and the editor
+  shows its conflict callout, so no edit is lost silently. Changes that the editor has already
+  autosaved (after 800 ms) are caught by the disk check.
 
 ## License and attribution
 

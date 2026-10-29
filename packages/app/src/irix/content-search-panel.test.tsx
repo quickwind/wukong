@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Match } from "./content-search";
@@ -8,6 +8,8 @@ import type { SearchState } from "./content-search-state";
 const fake = vi.hoisted(() => ({
   state: null as unknown as SearchState,
   inputs: [] as Array<{ cwd: string | null; options: Record<string, unknown> }>,
+  client: null as null | { invokePluginRpc: ReturnType<typeof vi.fn> },
+  confirm: vi.fn(),
 }));
 
 vi.mock("./use-content-search", () => ({
@@ -18,8 +20,10 @@ vi.mock("./use-content-search", () => ({
 }));
 
 vi.mock("@/runtime/host-runtime", () => ({
-  useHostRuntimeClient: () => null,
+  useHostRuntimeClient: () => fake.client,
 }));
+
+vi.mock("@/utils/confirm-dialog", () => ({ confirmDialog: fake.confirm }));
 
 import { displayLine, IrixContentSearchPanel } from "./content-search-panel";
 
@@ -51,6 +55,20 @@ const found = state({
   matchCount: 3,
 });
 
+const foundVersioned = state({
+  groups: [
+    {
+      path: "src/app.ts",
+      matches: [
+        { ...first, mtimeMs: 1, size: 1 },
+        { ...second, mtimeMs: 1, size: 1 },
+      ],
+    },
+    { path: "README.md", matches: [{ ...third, mtimeMs: 1, size: 1 }] },
+  ],
+  matchCount: 3,
+});
+
 function renderPanel(onOpenMatch = vi.fn()) {
   render(
     <IrixContentSearchPanel
@@ -66,6 +84,8 @@ function renderPanel(onOpenMatch = vi.fn()) {
 afterEach(() => {
   cleanup();
   fake.inputs = [];
+  fake.client = null;
+  fake.confirm.mockReset();
 });
 
 describe("displayLine", () => {
@@ -241,5 +261,80 @@ describe("IrixContentSearchPanel", () => {
     });
 
     expect(fake.inputs.at(-1)?.options).toMatchObject({ include: "*.ts", exclude: "dist/**" });
+  });
+
+  it("previews the replacement and lets a line or a file be left out", () => {
+    fake.state = foundVersioned;
+    renderPanel();
+    expect(screen.queryByTestId("content-search-preview")).toBeNull();
+    expect(screen.queryByTestId("content-search-exclude-match")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("content-search-replace-toggle"));
+    fireEvent.change(screen.getByTestId("content-search-replace-input"), {
+      target: { value: "bar" },
+    });
+
+    expect(screen.getAllByTestId("content-search-preview")[0]?.textContent).toBe(
+      "const foobar = 1;",
+    );
+    expect(screen.getByTestId("content-search-replace-plan").textContent).toBe(
+      "Replace 3 in 2 files",
+    );
+
+    fireEvent.click(screen.getAllByTestId("content-search-exclude-match")[0]!);
+    fireEvent.click(screen.getAllByTestId("content-search-exclude-file")[1]!);
+    expect(screen.getByTestId("content-search-replace-plan").textContent).toBe(
+      "Replace 1 in 1 file",
+    );
+  });
+
+  function sentFiles(invoke: ReturnType<typeof vi.fn>, call: number): unknown {
+    const request = invoke.mock.calls[call]?.[2] as { files: unknown } | undefined;
+    return request?.files;
+  }
+
+  function replaceClient() {
+    const invokePluginRpc = vi.fn().mockResolvedValue({ results: [] });
+    fake.client = { invokePluginRpc };
+    return invokePluginRpc;
+  }
+
+  it("asks before replacing everything, and only then writes", async () => {
+    const invoke = replaceClient();
+    fake.state = foundVersioned;
+    renderPanel();
+    fireEvent.click(screen.getByTestId("content-search-replace-toggle"));
+
+    fake.confirm.mockResolvedValueOnce(false);
+    fireEvent.click(screen.getByTestId("content-search-replace-all"));
+    await waitFor(() => expect(fake.confirm).toHaveBeenCalledTimes(1));
+    expect(invoke).not.toHaveBeenCalled();
+
+    fake.confirm.mockResolvedValueOnce(true);
+    fireEvent.click(screen.getByTestId("content-search-replace-all"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    const request = invoke.mock.calls[0]?.[2] as { files: { path: string; lines: number[] }[] };
+    expect(request.files.map((f) => [f.path, f.lines])).toEqual([
+      ["src/app.ts", [3, 9]],
+      ["README.md", [1]],
+    ]);
+  });
+
+  it("replaces one match or one file at once, without asking", async () => {
+    const invoke = replaceClient();
+    fake.state = foundVersioned;
+    renderPanel();
+    fireEvent.click(screen.getByTestId("content-search-replace-toggle"));
+
+    fireEvent.click(screen.getAllByTestId("content-search-replace-match")[1]!);
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    expect(sentFiles(invoke, 0)).toMatchObject([{ path: "src/app.ts", lines: [9] }]);
+    // The next replace waits until this one has finished.
+    await screen.findByTestId("content-search-replace-summary");
+
+    fireEvent.click(screen.getAllByTestId("content-search-replace-file")[1]!);
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
+    expect(sentFiles(invoke, 1)).toMatchObject([{ path: "README.md", lines: [1] }]);
+    expect(fake.confirm).not.toHaveBeenCalled();
   });
 });

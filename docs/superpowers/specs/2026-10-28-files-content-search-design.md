@@ -121,6 +121,10 @@ the search results have to carry). Milestone 2 may add its own messages behind i
 
 ## Replace (milestone 2)
 
+Built as `irix.search.content.replace` (see IRIX.md, "Content search in the Files panel"). One gap
+against this section: a file with unsaved edits in the editor of this client is not detected, so it is
+not skipped; the editor's own conflict check catches it on its next save.
+
 - Flow: preview, per-match and per-file exclusion, then write. Nothing is written until the user
   presses Replace.
 - **Conflicts (user's decision):** a file with unsaved edits in the editor of this client, or one that
