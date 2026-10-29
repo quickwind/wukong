@@ -234,8 +234,12 @@ function SearchStatusLine({ search }: { search: SearchState }) {
   return null;
 }
 
-function ToggleGlyph({ text }: { text: string }) {
-  return <Text style={styles.toggleGlyph}>{text}</Text>;
+// The shared button chrome marks "on" with the same faint fill as hover, which is too weak for a
+// toggle the search depends on, so an on toggle also gets the foreground glyph and a border.
+function ToggleGlyph({ text, selected }: { text: string; selected: boolean }) {
+  return (
+    <Text style={[styles.toggleGlyph, selected ? styles.toggleGlyphSelected : null]}>{text}</Text>
+  );
 }
 
 function ContentSearchBody({
@@ -285,32 +289,35 @@ function ContentSearchBody({
             <ToolbarButton
               label="Match case"
               selected={caseSensitive}
+              style={caseSensitive ? styles.toggleSelected : undefined}
               compact={isCompact}
               hitSlop={4}
               testID="content-search-case"
               onPress={toggleCase}
             >
-              <ToggleGlyph text="Aa" />
+              <ToggleGlyph text="Aa" selected={caseSensitive} />
             </ToolbarButton>
             <ToolbarButton
               label="Match whole word"
               selected={wholeWord}
+              style={wholeWord ? styles.toggleSelected : undefined}
               compact={isCompact}
               hitSlop={4}
               testID="content-search-word"
               onPress={toggleWord}
             >
-              <ToggleGlyph text="ab" />
+              <ToggleGlyph text="ab" selected={wholeWord} />
             </ToolbarButton>
             <ToolbarButton
               label="Use regular expression (Rust regex syntax)"
               selected={regex}
+              style={regex ? styles.toggleSelected : undefined}
               compact={isCompact}
               hitSlop={4}
               testID="content-search-regex"
               onPress={toggleRegex}
             >
-              <ToggleGlyph text=".*" />
+              <ToggleGlyph text=".*" selected={regex} />
             </ToolbarButton>
             <ToolbarButton
               label="Files to include and exclude"
@@ -394,6 +401,13 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.medium,
+  },
+  toggleGlyphSelected: {
+    color: theme.colors.foreground,
+  },
+  toggleSelected: {
+    borderWidth: theme.borderWidth[1],
+    borderColor: theme.colors.borderAccent,
   },
   hint: {
     color: theme.colors.foregroundMuted,

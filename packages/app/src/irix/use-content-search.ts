@@ -17,6 +17,25 @@ import {
 
 const UNAVAILABLE = "Search is not available on this host. Update the host.";
 
+// What the daemon says when the plugin or one of its RPCs is missing: runtime.ts `invoke`,
+// plugin-process.ts for an unknown method, and session.ts when the host has no plugin service.
+const UNKNOWN_PLUGIN_OR_METHOD = [
+  /^Plugin is not available: /,
+  / does not contribute RPC /,
+  /^Unknown RPC method: /,
+  /^Plugin service is unavailable$/,
+];
+
+/** The text to show for a failed start or poll, without the daemon's request wrapping. */
+export function describeSearchFailure(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  if (error.name !== "DaemonRpcError") return error.message;
+  const message = error.message
+    .replace(/ requestType=\S+(?: code=\S+)?$/, "")
+    .replace(/^Request failed: /, "");
+  return UNKNOWN_PLUGIN_OR_METHOD.some((pattern) => pattern.test(message)) ? UNAVAILABLE : message;
+}
+
 const IDLE: SearchState = {
   requestKey: "",
   status: "idle",
@@ -80,22 +99,14 @@ export function useContentSearch(input: {
       dispatch({
         type: "failed",
         requestKey,
-        message: error instanceof Error ? error.message : String(error),
+        message: describeSearchFailure(error),
       });
     };
 
     timer = setTimeout(() => {
       dispatch({ type: "reset", requestKey });
       const begin = async (): Promise<void> => {
-        let startedId: string;
-        try {
-          startedId = await startSearch(client, options);
-        } catch (error) {
-          fail(
-            error instanceof Error && error.name === "ZodError" ? error : new Error(UNAVAILABLE),
-          );
-          return;
-        }
+        const startedId = await startSearch(client, options);
         if (cancelled) {
           cancelRunning(startedId);
           return;

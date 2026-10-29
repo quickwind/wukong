@@ -200,10 +200,6 @@ describe("Files panel content search", () => {
       }),
     );
     expect(fake.revealWorkspaceTab).toHaveBeenCalledWith("server:workspace", "tab-1");
-    // Leave the open state as it was for the next test; it lives at module scope.
-    act(() => {
-      fireEvent.click(screen.getByTestId("files-search"));
-    });
   });
 
   it("says the host is offline instead of asking for a longer query", async () => {

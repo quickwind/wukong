@@ -200,6 +200,33 @@ describe("IrixContentSearchPanel", () => {
     expect(screen.getByText("Rust regex syntax")).toBeTruthy();
   });
 
+  it.each([
+    ["content-search-case", "Aa"],
+    ["content-search-word", "ab"],
+    ["content-search-regex", ".*"],
+  ])("draws %s differently once it is on", (testID, glyph) => {
+    fake.state = state({ status: "idle" });
+    renderPanel();
+    const button = screen.getByTestId(testID);
+    const off = {
+      glyph: getComputedStyle(screen.getByText(glyph)).color,
+      border: getComputedStyle(button).borderTopColor,
+    };
+
+    fireEvent.click(button);
+    const on = {
+      glyph: getComputedStyle(screen.getByText(glyph)).color,
+      border: getComputedStyle(screen.getByTestId(testID)).borderTopColor,
+    };
+
+    // react-native-web drops ToolbarButton's accessibilityState.selected on a button, so the test
+    // reads the drawn state. The glyph turns from the muted colour to the foreground, and the button gets a border.
+    expect(off.glyph).toBe("rgb(102, 102, 102)");
+    expect(on.glyph).toBe("rgb(17, 17, 17)");
+    expect(on.border).toBe("rgba(161,161,170,1.00)");
+    expect(off.border).not.toBe(on.border);
+  });
+
   it("reveals the include and exclude inputs on demand", () => {
     fake.state = state({ status: "idle" });
     renderPanel();
