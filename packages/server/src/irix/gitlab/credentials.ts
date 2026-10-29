@@ -1,3 +1,4 @@
+/* oxlint-disable paseo/no-sync-io -- Irix: small config/credential reads outside the request path. */
 // Irix: the team already has a python-gitlab config (`~/.python-gitlab.cfg`), so the REST client
 // reads its token from there, the way python-gitlab does:
 //

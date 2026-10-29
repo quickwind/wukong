@@ -81,6 +81,7 @@ vi.mock("@/stores/session-store", async (importOriginal) => {
   return { ...actual, useSessionStore: (selector: (value: unknown) => unknown) => selector(state) };
 });
 
+vi.mock("@/stores/session-store-hooks", () => ({ useWorkspaceFields: () => null }));
 vi.mock("@/hooks/use-file-explorer-actions", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/use-file-explorer-actions")>();
   return {

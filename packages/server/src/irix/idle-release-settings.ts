@@ -1,3 +1,4 @@
+/* oxlint-disable paseo/no-sync-io -- Irix: small config/credential reads outside the request path. */
 // Irix edition: idle release setting (close the provider process of long-idle agents).
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";

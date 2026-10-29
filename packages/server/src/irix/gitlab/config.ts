@@ -1,3 +1,4 @@
+/* oxlint-disable paseo/no-sync-io -- Irix: small config/credential reads outside the request path. */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";

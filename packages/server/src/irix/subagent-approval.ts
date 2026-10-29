@@ -1,3 +1,4 @@
+/* oxlint-disable paseo/no-sync-io -- Irix: small config/credential reads outside the request path. */
 // Irix edition: global mandatory human approval for subagent creation and delegation.
 
 import { randomUUID } from "node:crypto";

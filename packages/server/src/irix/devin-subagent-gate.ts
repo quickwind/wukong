@@ -1,3 +1,4 @@
+/* oxlint-disable paseo/no-sync-io -- Irix: small config/credential reads outside the request path. */
 // Irix edition: blocks Devin's `run_subagent` tool until a human approves it.
 //
 // Devin auto-approves `run_subagent` in its default permission mode, so it never sends an ACP

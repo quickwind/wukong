@@ -1,3 +1,4 @@
+/* oxlint-disable paseo/no-sync-io -- Irix: small config/credential reads outside the request path. */
 // Irix edition: where the bundled ripgrep is. The content search plugin runs `rg`, and an Irix
 // machine has none on PATH. Packing (`irix/scripts/fetch-ripgrep.mjs`) puts the binary in the
 // plugin's `vendor/<platform>-<arch>/` folder, but the plugin host tells a plugin no folder path,

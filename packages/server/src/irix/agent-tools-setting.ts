@@ -1,3 +1,4 @@
+/* oxlint-disable paseo/no-sync-io -- Irix: small config/credential reads outside the request path. */
 // Irix edition: how Claude and Devin agents reach Paseo's agent tools. Company machines may bar
 // both from MCP servers a client passes in, and they drop them without a word, so the daemon cannot
 // find out. The answer is a setting: "cli" (the default) teaches the agent the `irix` command line,

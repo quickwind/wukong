@@ -10,11 +10,11 @@ import { isIrixActive } from "./policy.js";
  * Whether anything in `cwd` would run on its own: worktree setup or teardown commands, terminals,
  * or scripts. A paseo.json that cannot be read counts as "yes", so the block stays.
  */
-export function hasWorkspaceAutomation(cwd: string): boolean {
+export async function hasWorkspaceAutomation(cwd: string): Promise<boolean> {
   if (!isIrixActive()) {
     return true;
   }
-  const result = readPaseoConfig(cwd);
+  const result = await readPaseoConfig(cwd);
   if (!result.ok) {
     return true;
   }

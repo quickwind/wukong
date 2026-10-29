@@ -16,30 +16,36 @@ describe("hasWorkspaceAutomation", () => {
   let deactivate: (() => void) | undefined;
   afterEach(() => deactivate?.());
 
-  it("keeps Paseo's behaviour (always blocks) until Irix is active", () => {
-    expect(hasWorkspaceAutomation(checkout())).toBe(true);
+  it("keeps Paseo's behaviour (always blocks) until Irix is active", async () => {
+    expect(await hasWorkspaceAutomation(checkout())).toBe(true);
   });
 
-  it("is false for a checkout with no paseo.json or one with nothing to run", () => {
+  it("is false for a checkout with no paseo.json or one with nothing to run", async () => {
     deactivate = activateIrixPolicy();
-    expect(hasWorkspaceAutomation(checkout())).toBe(false);
-    expect(hasWorkspaceAutomation(checkout('{"worktree":{"setup":[]},"scripts":{}}'))).toBe(false);
-  });
-
-  it("is true for setup, teardown, terminals or scripts", () => {
-    deactivate = activateIrixPolicy();
-    expect(hasWorkspaceAutomation(checkout('{"worktree":{"setup":"npm i"}}'))).toBe(true);
-    expect(hasWorkspaceAutomation(checkout('{"worktree":{"teardown":["rm -rf x"]}}'))).toBe(true);
-    expect(
-      hasWorkspaceAutomation(checkout('{"worktree":{"terminals":[{"command":"npm run dev"}]}}')),
-    ).toBe(true);
-    expect(hasWorkspaceAutomation(checkout('{"scripts":{"web":{"command":"npm start"}}}'))).toBe(
-      true,
+    expect(await hasWorkspaceAutomation(checkout())).toBe(false);
+    expect(await hasWorkspaceAutomation(checkout('{"worktree":{"setup":[]},"scripts":{}}'))).toBe(
+      false,
     );
   });
 
-  it("keeps the block when paseo.json cannot be read", () => {
+  it("is true for setup, teardown, terminals or scripts", async () => {
     deactivate = activateIrixPolicy();
-    expect(hasWorkspaceAutomation(checkout("{ not json"))).toBe(true);
+    expect(await hasWorkspaceAutomation(checkout('{"worktree":{"setup":"npm i"}}'))).toBe(true);
+    expect(await hasWorkspaceAutomation(checkout('{"worktree":{"teardown":["rm -rf x"]}}'))).toBe(
+      true,
+    );
+    expect(
+      await hasWorkspaceAutomation(
+        checkout('{"worktree":{"terminals":[{"command":"npm run dev"}]}}'),
+      ),
+    ).toBe(true);
+    expect(
+      await hasWorkspaceAutomation(checkout('{"scripts":{"web":{"command":"npm start"}}}')),
+    ).toBe(true);
+  });
+
+  it("keeps the block when paseo.json cannot be read", async () => {
+    deactivate = activateIrixPolicy();
+    expect(await hasWorkspaceAutomation(checkout("{ not json"))).toBe(true);
   });
 });

@@ -1,3 +1,4 @@
+/* oxlint-disable paseo/no-sync-io -- Irix: small config/credential reads outside the request path. */
 // Irix: company GitLab servers are usually signed by a company CA that is installed in the
 // operating system's trust store (Windows certificate store, macOS keychain, /etc/ssl) and not in
 // Node's bundled list. Node reads the system store only when asked, so the daemon adds it to its
