@@ -536,25 +536,33 @@ attachment`), so neither the protocol nor the daemon changed. `dispatchComposerA
 - **Content search in the Files panel** (`plugins/irix-content-search`, app side in
   `packages/app/src/irix/content-search*.ts(x)`, `use-content-search.ts` and `open-search-match.ts`): the magnifier in the Files toolbar shows a search
   panel in place of the tree, with match case, whole word, regex (Rust syntax) and include/exclude
-  globs, and results grouped by file. A click opens the file at the match line. It is a bundled
+  globs, and results grouped by file. A click opens the file at the match line. Closing the search
+  mounts the tree again, so its scroll position is lost: keeping it mounted would leave New file and
+  New folder editing a hidden tree, and fixing that needs an upstream line. It is a bundled
   plugin that runs `rg --json` in the workspace folder through three plugin RPCs,
   `irix.search.content.start`, `.poll` and `.cancel`. Plugin RPCs time out after 30 s, so a search is
   started and then polled, and results show as each poll returns them. The protocol is unchanged and
-  there is no `server_info` feature flag; a host without the plugin gets "Search is not available on
-  this host. Update the host." A search stops at 500 matches or 100 files, and a line is trimmed to 240 characters
-  around the match. The start RPC only searches inside a folder the daemon lists as a workspace.
+  there is no `server_info` feature flag; when the daemon says the plugin or the RPC is unknown the
+  panel says "Search is not available on this host. Update the host.", and any other error is shown
+  as the daemon gave it. A search stops at 500 matches or 100 files, and a line is trimmed to 240
+  characters around the match. A running search that gets no poll for 30 s is stopped, and at most
+  four run at once on a daemon (a fifth stops the oldest). The start RPC only searches inside a
+  folder the daemon lists as a workspace. `.git` is never searched, whatever the include globs say
+  (`-g !.git` comes last; ripgrep lets the last matching glob win), and an exclude may be written
+  with or without a leading `!`.
   **The bundled `rg`:** packing downloads ripgrep 15.2.0 (`irix/scripts/fetch-ripgrep.mjs`, run by
   `pack-local.mjs` after the brand step) into the throwaway checkout's
   `plugins/irix-content-search/vendor/<platform>-<arch>/`, for `win32-x64` and the packing machine's
   platform, and stops the pack if a file's SHA-256 is not the one pinned in `RIPGREP_ASSETS`. The
   binary is never committed. The plugin host tells a plugin no folder path, so the daemon looks for
   the binary under its builtin plugins folder at start (`packages/server/src/irix/ripgrep.ts`, called
-  from `edition.ts`) and sets `IRIX_RG_PATH`; a value already set is kept. The plugin uses
-  `IRIX_RG_PATH`, then `PATH`, read once when the daemon starts, so a source checkout uses the `rg` on
-  `PATH` and without one gets "ripgrep (rg) was not found". The executable bit survives the copy into
-  `dist/server/builtin-plugins`, `npm pack` and `npm install` (checked on macOS). Open point: the
-  Windows binary has not yet been confirmed to run on a company machine. Replace is milestone 2 and
-  is not built.
+  from `edition.ts`) and sets `IRIX_RG_PATH`; a value already set is kept. The plugin resolves the
+  binary once, when it loads (`resolveRgBinary()` in `contribute`, `index.server.ts`): `IRIX_RG_PATH`,
+  then the first `rg` in an absolute `PATH` entry (a relative one would resolve against the
+  workspace). A source checkout uses the `rg` on `PATH` and without one gets "ripgrep (rg) was not
+  found". The executable bit survives the copy into `dist/server/builtin-plugins`, `npm pack` and
+  `npm install` (checked on macOS). What is not verified on Windows is under "Known gaps". Replace is
+  milestone 2 and is not built.
 
 ## License and attribution
 
@@ -580,8 +588,9 @@ What we do about the conditions of §4 and §6:
 - **Trademarks (§6):** the product name, logo and icons are Irix's own; do not reintroduce
   Paseo's logo or name as the product's. Internal identifiers (`PASEO_*`, `~/.paseo`) are
   technical and stay for cheap merges.
-- **Third-party code** (npm dependencies, bundled web UI libraries) keeps its own licenses. We add
-  none and remove none. The python-gitlab config file format is read, but no python-gitlab code is used or installed.
+- **Third-party code** (npm dependencies, bundled web UI libraries, the vendored binaries below)
+  keeps its own licenses; we change and remove none of them. The python-gitlab config file format is
+  read, but no python-gitlab code is used or installed.
 - **Vendored binaries:** `@irix/server` ships ripgrep's release binaries (MIT or Unlicense; they
   link PCRE2, BSD-3-Clause with the PCRE2 exception) for content search. `add-license.mjs` appends
   their license texts, kept verbatim in `irix/licenses/`, to the server's `NOTICE`, and
@@ -786,8 +795,9 @@ Not verified, so do not claim otherwise:
   of `@irix/server` under Anthropic's own terms ("SEE LICENSE IN ..."), not an open-source
   license. npm installs it for the user; we do not redistribute it. The company's agreement with
   Anthropic should cover using it. `license-audit.mjs` lists it as `review`; no other shipped
-  package is `review` or `blocked` (325 shipped packages checked from the lockfile's license
-  fields, which are what each package declares about itself).
+  package is `review` or `blocked` (337 shipped packages checked: 335 from the lockfile's license
+  fields, which are what each package declares about itself, and 2 from
+  `irix/scripts/vendored.json`: ripgrep and the PCRE2 inside it).
 - No third-party license notices ship with the web UI bundle (the libraries compiled into it,
   mostly MIT or Apache-2.0, ask for theirs to be kept). Upstream ships the same bundle; for any
   distribution beyond the company we need a generated third-party notices file.
@@ -806,6 +816,16 @@ Not verified, so do not claim otherwise:
 - Claude usage comes from `irix-claude-usage` (spend cap and a month-end forecast, see above); it
   was run against one real enterprise account, not a Pro or Max one, and its calendar-month reset
   is an assumption. Upstream's `claude-usage-source` is not enabled.
+- Content search's Windows x64 `rg.exe` has not been run on a company machine, so allow-listing or
+  antivirus, `windowsHide` and killing the child on Windows are unverified. Do not hand tarballs to
+  the team before a person without administrator rights runs `rg.exe --version` and one search on
+  a company machine.
+- The Rust crates compiled into `rg` ship no license notices of their own (only ripgrep's and
+  PCRE2's are in the NOTICE). This needs legal review before any distribution outside the company.
+- Content search performance has one measurement: on a Mac, with this repository (about 6300
+  files) in a browser, the first results arrived after about 290 ms and a result capped at 500
+  matches in 98 files after about 450 ms; the longest browser main-thread stall was 2.5 ms. There is
+  no Windows measurement and none on a larger repository.
 - Settings has "Enable terminal agent hooks", which edits the user's agent config files. It is
   upstream's and installs hooks only when switched on (unset means off). Keep it off while Paseo
   is installed beside Irix, or both write hooks into the same Claude config.
