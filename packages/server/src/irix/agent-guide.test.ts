@@ -42,13 +42,22 @@ describe("the agent guide follows the host's switches", () => {
       "irix wait",
       "irix run",
       "irix script ls",
+      "IRIX_RG_PATH",
     ]) {
       expect(guide).toContain(command);
     }
     expect(guide).toContain("abc-123");
     expect(guide).toContain("MCP tools are not available");
     expect(guide).toContain("the Task or Agent tool");
+    expect(guide).toContain("ripgrep");
     expect(guide).not.toContain("run_subagent");
+  });
+
+  it("tells the agent about ripgrep via IRIX_RG_PATH", () => {
+    const guide = irixAgentGuide({ provider: "claude", channel: "cli" });
+    expect(guide).toContain("IRIX_RG_PATH");
+    expect(guide).toContain("ripgrep");
+    expect(guide).toContain("Fast file and content search");
   });
 
   it("leaves out sending, and says how to hand work over, while messages between agents are off", () => {

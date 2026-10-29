@@ -58,6 +58,9 @@ function commandLineSection(options: AgentGuideOptions): string[] {
       "`typecheck` or a dev server. It runs under the app's supervision, so the user sees it in the Scripts menu",
     "The script commands act on the workspace of your current directory; add `--workspace <id>` if that is ambiguous. " +
       "To see a script's output, read its terminal in the app; `start` only starts it.",
+    "- Fast file and content search: ripgrep is available via the `IRIX_RG_PATH` environment variable " +
+      '(e.g. `"$IRIX_RG_PATH" <pattern> [path]`, or `& $env:IRIX_RG_PATH <pattern> [path]` in PowerShell). ' +
+      "Use it whenever you need fast search across files or directories.",
     ...(maySchedule
       ? [
           '- `irix schedule create "<prompt>" --every <duration>` (for example 30m or 1h) or `--cron "<expr>"`: ' +
