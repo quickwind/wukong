@@ -27,12 +27,12 @@ commit.**
 
 We want to merge upstream often and cheaply. Every line changed in an upstream file is a future
 merge conflict. An earlier attempt (the `internal-edition` branch, kept only for reference) edited
-126 upstream files and was abandoned for exactly that reason. This branch edits **61 upstream files, 528 lines** (`upstream-footprint.mjs`, against v0.14.0). The
-budget is 61 files and 535 lines. It was 40 and 400. Every raise is recorded here, with its
+126 upstream files and was abandoned for exactly that reason. This branch edits **61 upstream files, 540 lines** (`upstream-footprint.mjs`, against v0.14.0). The
+budget is 61 files and 545 lines. It was 40 and 400. Every raise is recorded here, with its
 reason: the Name + Create bar (the New workspace screen and the new chat tab are upstream code, so no
 Irix-owned file can replace them) took it to 45 files and 420 lines, hiding a plugin-managed
 project from the sidebar (same reason) took the lines to 440, and Devin's skills in the ACP command
-list (one line in `acp-agent.ts`) took them to 447, which moved the budget to 450. The plugin `Markdown` component was carried by hand for a while (upstream 995ad2f87, #7579); v0.13.0 ships it and the copy is gone. Later work (schedules and agent messaging switched off, subagent approval, bypass modes, the CLI and daemon hooks) took it to 462. Fork checkouts then needed `upstream` in the source picker (branches, background fetch, pasted links), which took it to 484, and the setup block for a merge request from another project (below) to 488. Comments on lines of a file (below) took it to 56 files and 506, and the budget to 56 and 510. Content search in the Files panel (below) took it to 57 files and 515, and the budget to 57 and 515. Irix workspace scripts in `paseo.json` (below) took it to 58 files and 543 lines, and the budget to 58 and 550. Approval for agent-started agents and schedules (below) took it to 60 files and 559 lines, and the budget to 60 and 560. Idle release moved onto upstream's collector (below): the collector's idle period and its viewed-agent check took it to 61 files and 553 lines (the old `idle-release*` files were Irix-owned, so removing them gave nothing back), and the budget to 61 and 560. Moving the Irix scripts out of `paseo.json` into `.irix.json` (below) put `paseo.json` back to upstream's text (-28 lines, -1 file) at the cost of two lines in `paseo-config-file.ts`: 61 files, 528 lines, and the budget came down to 61 and 535. The two lists of
+list (one line in `acp-agent.ts`) took them to 447, which moved the budget to 450. The plugin `Markdown` component was carried by hand for a while (upstream 995ad2f87, #7579); v0.13.0 ships it and the copy is gone. Later work (schedules and agent messaging switched off, subagent approval, bypass modes, the CLI and daemon hooks) took it to 462. Fork checkouts then needed `upstream` in the source picker (branches, background fetch, pasted links), which took it to 484, and the setup block for a merge request from another project (below) to 488. Comments on lines of a file (below) took it to 56 files and 506, and the budget to 56 and 510. Content search in the Files panel (below) took it to 57 files and 515, and the budget to 57 and 515. Irix workspace scripts in `paseo.json` (below) took it to 58 files and 543 lines, and the budget to 58 and 550. Approval for agent-started agents and schedules (below) took it to 60 files and 559 lines, and the budget to 60 and 560. Idle release moved onto upstream's collector (below): the collector's idle period and its viewed-agent check took it to 61 files and 553 lines (the old `idle-release*` files were Irix-owned, so removing them gave nothing back), and the budget to 61 and 560. Moving the Irix scripts out of `paseo.json` into `.irix.json` (below) put `paseo.json` back to upstream's text (-28 lines, -1 file) at the cost of `paseo-config-file.ts`, where the project config editor and its Setup tab also have to use `.irix.json` (`resolvePaseoConfigPath` became async: 15 lines): 61 files, 540 lines, and the budget came down to 61 and 545. The two lists of
 changes were merged, so the numbers above are measured on the merge, not the sum of the two
 branches. Prefer new files; an upstream edit that raises the budget again gets its line here.
 
@@ -62,31 +62,31 @@ node irix/scripts/upstream-footprint.mjs     # lists every upstream file we modi
 ```
 
 It fails if an upstream file is deleted or renamed, if a modified upstream file has no `Irix`
-marker in the lines added, or if the totals pass the budget (61 files, 535 lines; change with
+marker in the lines added, or if the totals pass the budget (61 files, 545 lines; change with
 `--max-files`/`--max-lines`). **Run it before every commit that touches upstream files** and when
 you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
 ## Where Irix lives
 
-| Path                           | What                                                                                                                                                                                                                                        |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IRIX.md`                      | This guide                                                                                                                                                                                                                                  |
-| `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide                                                                                                                                                           |
-| `irix/AGENTS.md`               | Windows build recipe and the traps that cost time when packaging                                                                                                                                                                            |
-| `irix/docs/`                   | Changes from upstream (numbered list); agent fork: mechanism guide, and staff training notes                                                                                                                                                |
-| `irix/README.md`               | Configuration, GitLab setup, building, publishing                                                                                                                                                                                           |
-| `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins                                                                                                                                                                   |
-| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                                                                                                                                                               |
-| `packages/cli/src/irix/`       | `irix` command defaults (home, port, ignore Paseo's environment); `irix` has no clone, onboard, pair, hub or speech command                                                                                                                 |
-| `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                                                                                                                                                                              |
-| `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin, Open in File Explorer                                                                                                          |
-| `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                                                                                                                                                   |
-| `plugins/irix-claude-usage/`   | Bundled plugin: Claude monthly spend cap (and session/weekly windows where a plan has them)                                                                                                                                                 |
-| `plugins/irix-context-hint/`   | Bundled plugin: composer pill when an agent's context window passes a threshold; compact or start a new session                                                                                                                             |
-| `plugins/irix-content-search/` | Bundled plugin: content search in the Files panel (`rg --json` behind start, poll and cancel RPCs)                                                                                                                                          |
-| `irix/scripts/test-irix.mjs`   | One command for every Irix test (clean environment, final table, seam hint); `irix/docs/test-plan.md` says why                                                                                                                              |
-| `irix/e2e/`                    | Browser acceptance suite (Playwright) against the built web UI and a real daemon in a temp home                                                                                                                                             |
-| `.github/workflows/irix-*.yml` | `irix-publish.yml`: verify jobs on Linux and Windows on every push to `irix` (publishing switched off); `irix-sync-upstream.yml`: weekly sync. Neither has run on GitHub yet. There is no workflow for `test-irix`: run it yourself (below) |
+| Path                           | What                                                                                                                                      |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `IRIX.md`                      | This guide                                                                                                                                |
+| `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide                                                         |
+| `irix/AGENTS.md`               | Windows build recipe and the traps that cost time when packaging                                                                          |
+| `irix/docs/`                   | Changes from upstream (numbered list); agent fork: mechanism guide, and staff training notes                                              |
+| `irix/README.md`               | Configuration, GitLab setup, building, publishing                                                                                         |
+| `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins                                                                 |
+| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                                                             |
+| `packages/cli/src/irix/`       | `irix` command defaults (home, port, ignore Paseo's environment); `irix` has no clone, onboard, pair, hub or speech command               |
+| `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                                                                            |
+| `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin, Open in File Explorer        |
+| `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                                                 |
+| `plugins/irix-claude-usage/`   | Bundled plugin: Claude monthly spend cap (and session/weekly windows where a plan has them)                                               |
+| `plugins/irix-context-hint/`   | Bundled plugin: composer pill when an agent's context window passes a threshold; compact or start a new session                           |
+| `plugins/irix-content-search/` | Bundled plugin: content search in the Files panel (`rg --json` behind start, poll and cancel RPCs)                                        |
+| `irix/scripts/test-irix.mjs`   | One command for every Irix test (clean environment, final table, seam hint); `irix/docs/test-plan.md` says why                            |
+| `irix/e2e/`                    | Browser acceptance suite (Playwright) against the built web UI and a real daemon in a temp home                                           |
+| (no workflows)                 | Irix has no GitHub Actions workflow of its own: nothing builds, tests or syncs on its own. Run `node irix/scripts/test-irix.mjs` yourself |
 
 ## Upstream files we touch (the whole list)
 
@@ -338,21 +338,19 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
   resent request, a request that outlives its connection); `create-approval.test.ts` covers the timeout,
   the mark, the stored prompt, joining and remembered refusals; `caller-routing.test.ts` and
   `pending-run.test.ts` cover the CLI routing and the window.
-- **`.irix.json`** (`irix/project-config.ts`, one hook in `utils/paseo-config-file.ts`): a project can keep
-  its Irix workspace scripts in `.irix.json` next to `paseo.json`. Upstream's `readPaseoConfig` (every
-  runtime reader: the scripts list, worktree setup, the untrusted-source check, the metadata prompt)
-  hands its result to `withIrixProjectConfig`, which merges `.irix.json` over it, so **`.irix.json` has
-  priority**: a script with the same name comes from `.irix.json`, scripts with other names come from
-  both files, and a top-level key it sets (`worktree`) replaces `paseo.json`'s. Only `.irix.json` or only
-  `paseo.json` behaves as before, and nothing happens outside the Irix edition. A broken `paseo.json` is
-  reported as it is; a broken `.irix.json` is reported under its own path. It is cached by mtime and size
-  and read through `fs/promises`, like upstream's own reader. Not covered: upstream's editor and Setup
-  tab (`readPaseoConfigForEdit`, write) still see only `paseo.json`, so `.irix.json` is edited by hand;
-  `seedPaseoConfigFile` copies only `paseo.json` into a new worktree (a committed `.irix.json` arrives
-  with the checkout). The point of the file: Irix's own scripts (`irix:test`, `irix:test:browser`,
-  `irix:check:budget`, `irix:build:package`, ...) used to sit in `paseo.json`, an upstream file that cost
-  28 footprint lines and a merge conflict risk; now `paseo.json` is upstream's text. The scripts are single
-  `node` commands, with no `&&`, so they run in PowerShell, cmd and POSIX shells alike;
+- **`.irix.json`** (`irix/project-config.ts`, hooks in `utils/paseo-config-file.ts`): a project can keep
+  its workspace config (worktree setup and teardown, terminals, scripts) in `.irix.json` next to
+  `paseo.json`. When the Irix edition is on and `.irix.json` exists it **is** the config: upstream's
+  `resolvePaseoConfigPath` (made async for this; it asks `irixConfigPath`) returns it, and every reader and the
+  writer use that path, so the scripts list, worktree setup, the untrusted-source check, the project config
+  editor and its Setup tab all see and save `.irix.json`, and `paseo.json` is **not read at all**. With no
+  `.irix.json` nothing changes, and nothing changes outside the Irix edition. A broken `.irix.json` is
+  reported under its own path; a broken `paseo.json` is ignored while `.irix.json` exists. Not covered:
+  `seedPaseoConfigFile` still copies only `paseo.json` into a new worktree (a committed `.irix.json`
+  arrives with the checkout). Why: Irix's own scripts (`irix:test`, `irix:test:browser`,
+  `irix:check:budget`, `irix:build:package`, ...) used to sit in `paseo.json`, an upstream file that
+  cost 28 footprint lines and a merge-conflict risk; now `paseo.json` is upstream's text. The scripts are
+  single `node` commands, with no `&&`, so they run in PowerShell, cmd and POSIX shells alike;
   `test-irix.mjs` starts `npx` through a shell on Windows.
 - **Providers:** removed from the registry, not merely disabled. Terminal profiles are fixed to
   Claude Code. The Providers page and Add provider catalog are hidden. Claude starts disabled when
@@ -679,9 +677,9 @@ distribution.
 What we do about the conditions of §4 and §6:
 
 - **Copy of the license (§4a):** `irix/scripts/add-license.mjs` runs at pack time (in
-  `pack-local.mjs` and the publish workflow) and puts upstream's `LICENSE` and a `NOTICE` in each of
+  `pack-local.mjs`) and puts upstream's `LICENSE` and a `NOTICE` in each of
   the seven packages and sets `license: Apache-2.0`. It refuses if `LICENSE` stops being Apache 2.0.
-  The workflow's smoke test checks the installed packages. Without it the tarballs ship no license.
+  The smoke test in the sync SOP (step 6) checks the installed packages. Without it the tarballs ship no license.
 - **Notice of changes (§4b):** every modified upstream file carries an `Irix` comment
   (`upstream-footprint.mjs` enforces it) and git history shows the rest. The `NOTICE` summarises
   the changes.
@@ -776,7 +774,7 @@ to an unofficial Devin endpoint is acceptable under the company's agreement with
   ENOENT"), so `irix/scripts/build-fixes.mjs` patches it in the throwaway pack checkout. Add a
   rule there (not an upstream edit) for the next upstream script that breaks on Windows. GitHub's
   Windows runner runs steps in Git Bash, whose GNU tar reads `C:\...` as host:file: give `tar` bare
-  names and a `cwd`. **Look at CI after every push**; the Windows job once failed for days unseen.
+  names and a `cwd`. Run `node irix/scripts/test-irix.mjs` on Windows too: a Windows-only break is invisible from a Mac.
 - **Never kill processes by name** (`pkill`, `pgrep | kill`): the user's main Paseo daemon on 6767 is
   titled "Paseo Daemon" too, and so was the Irix trial instance on 6890. Stop what you started with
   `irix daemon stop` on your own `IRIX_HOME`, or by the PID the start printed. When testing against
@@ -818,10 +816,9 @@ with the gap. Reference points: the first sync (92 upstream commits) had 4 text 
 took most of a day to check; a later one (13 commits, 100 files) merged clean and only one file
 we touch had changed upstream.
 
-**Who does what.** `irix-sync-upstream.yml` (Mondays, or run it by hand) mirrors `main` to
-upstream, merges upstream into `sync/upstream-<date>`, builds, runs the Irix checks and opens a
-PR, or opens an issue naming the conflicting files. A green PR is **not** a reviewed merge. The
-workflow cannot judge the things in step 4; a person or agent must.
+**Who does what.** A person or an agent does every step below by hand; nothing runs the sync for
+you. (A scheduled GitHub workflow used to open the sync pull request. It was removed because it
+started by itself.) A green build is not a reviewed merge: step 4 is judgement.
 
 **Rules that never bend**
 
@@ -882,7 +879,7 @@ workflow cannot judge the things in step 4; a person or agent must.
    `irix-devin-usage`, `irix-claude-usage`, `irix-context-hint`, `irix-content-search`) loaded; no `Irix blocked` line in `daemon.log` at startup; the page
    title is Irix. Anything you changed by hand in step 3 gets a real run, not just tests.
 7. **Land it.** Push the sync branch and merge it into `irix` with a merge commit (PR, or a
-   local `--no-ff` merge). Then fast-forward nothing else: `main` is the workflow's to mirror.
+   local `--no-ff` merge). Do not commit Irix work to `main`.
 8. **Finish.** Tag the result (`irix-<date>`, annotated, naming the upstream version), repack
    into `~/irix-dist` with the same `pack-local` command, update `IRIX.md` and
    `irix/docs/changes-from-upstream.md` if the footprint or behaviour changed, and tell the team to
@@ -893,9 +890,6 @@ leave `irix` alone, and settle it in the worktree; never force-push. A build fai
 upstream's own: fix it with the smallest marked change and consider sending it upstream. A step
 you could not run goes into "Known gaps" below; do not report the sync as verified without it.
 
-**What the workflow covers.** Steps 1, 2, most of 5 (brand tests, build, typecheck, lint, a subset
-of the Irix tests, the footprint check; not `test-irix` itself, which nobody runs in CI) and opening the PR or issue. It does not do 3, 4, 6, 7 or 8.
-
 ## Known gaps (as of this writing)
 
 Not verified, so do not claim otherwise:
@@ -905,8 +899,9 @@ Not verified, so do not claim otherwise:
   `docs/internal-edition.md` on the old `internal-edition` branch.
 - Devin usage was checked against the real service only through a probe and the team's use;
   `GetUserStatus` is unofficial and may change.
-- The GitHub workflows (publish, sync, the Windows job) have never run on GitHub; nothing has been
-  published to npm. `irix/scripts/disable-upstream-workflows.sh` has not been run.
+- Irix has no GitHub workflow; nothing has been published to npm. Upstream's own workflows (`ci.yml`
+  and the others) are still in the repository and would run on GitHub unless turned off with
+  `irix/scripts/disable-upstream-workflows.sh`, which has not been run.
 - The package `@anthropic-ai/claude-agent-sdk` (and its platform binaries) is a runtime dependency
   of `@irix/server` under Anthropic's own terms ("SEE LICENSE IN ..."), not an open-source
   license. npm installs it for the user; we do not redistribute it. The company's agreement with
@@ -942,13 +937,16 @@ Not verified, so do not claim otherwise:
   files) in a browser, the first results arrived after about 290 ms and a result capped at 500
   matches in 98 files after about 450 ms; the longest browser main-thread stall was 2.5 ms. There is
   no Windows measurement and none on a larger repository.
-- `node irix/scripts/test-irix.mjs`: the `app` step runs `src/usage`, whose `*.browser.test.tsx` files
-  use vitest's browser mode and need the Chromium build the installed Playwright expects
-  (`npx playwright install chromium`; on the macOS dev machine only an older build was cached, so
-  that one file failed to start while its 271 neighbours passed). The `irix/e2e` suite falls back to the
-  newest cached Chromium instead. Nothing here has been run on Windows: the scripts are plain `node`
-  commands, `test-irix.mjs` starts `npx` through a shell on `win32`, and the daemon helpers use
-  `node:path`, but a person on a company Windows machine should run `irix:test` once.
+- `node irix/scripts/test-irix.mjs`: the `app` step runs `src/usage`, whose `*.browser.test.tsx` files use
+  vitest's browser mode and need the Chromium build the installed Playwright expects (1208 for
+  Playwright 1.58). `npx playwright install chromium` downloaded it but then hung at "extracting
+  archive" twice, on Node 26.11.1 / macOS; the zips were unpacked by hand into
+  `~/Library/Caches/ms-playwright/chromium-1208` and `chromium_headless_shell-1208` with an
+  `INSTALLATION_COMPLETE` file in each (the zips come from `cdn.playwright.dev/builds/cft/<version>/`).
+  The first launch of a freshly unpacked browser was slow enough to fail one test file; the second run
+  was green. Nothing here has been run on Windows: the scripts are plain `node` commands,
+  `test-irix.mjs` starts `npx` through a shell on `win32`, and the daemon helpers use `node:path`, but a
+  person on a company Windows machine should run `irix:test` once.
 - Settings has "Enable terminal agent hooks", which edits the user's agent config files. It is
   upstream's and installs hooks only when switched on (unset means off). Keep it off while Paseo
   is installed beside Irix, or both write hooks into the same Claude config.

@@ -3,7 +3,7 @@ import { open, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import pLimit from "p-limit";
 import { withTimeout } from "./promise-timeout.js";
-import { withIrixProjectConfig } from "../irix/project-config.js"; // Irix
+import { irixConfigPath } from "../irix/project-config.js"; // Irix
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
 import {
@@ -40,8 +40,8 @@ export interface WritePaseoConfigForEditInput {
   expectedRevision: PaseoConfigRevision | null;
 }
 
-export function resolvePaseoConfigPath(repoRoot: string): string {
-  return join(repoRoot, PASEO_CONFIG_FILE_NAME);
+export async function resolvePaseoConfigPath(repoRoot: string): Promise<string> {
+  return (await irixConfigPath(repoRoot)) ?? join(repoRoot, PASEO_CONFIG_FILE_NAME); // Irix: .irix.json first
 }
 
 function revision(stats: Stats): PaseoConfigRevision {
@@ -50,7 +50,7 @@ function revision(stats: Stats): PaseoConfigRevision {
 
 async function inspect(repoRoot: string): Promise<Stats | null> {
   try {
-    return await stat(resolvePaseoConfigPath(repoRoot));
+    return await stat(await resolvePaseoConfigPath(repoRoot));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
@@ -191,7 +191,7 @@ class ProjectConfigOwner {
       // O_NONBLOCK prevents a regular-file -> FIFO replacement between stat and open
       // from waiting for a writer. Check the opened descriptor again before any read.
       const handle = await open(
-        resolvePaseoConfigPath(root),
+        await resolvePaseoConfigPath(root),
         constants.O_RDONLY | constants.O_NONBLOCK,
       );
       try {
@@ -215,7 +215,7 @@ class ProjectConfigOwner {
           return this.remember(root, {
             fingerprint: key,
             edit: { ok: false, error: { code: "invalid_project_config" } },
-            runtime: { ok: false, configPath: resolvePaseoConfigPath(root), error },
+            runtime: { ok: false, configPath: await resolvePaseoConfigPath(root), error },
           });
         }
         if (fingerprint(openedStats) !== key) {
@@ -261,7 +261,7 @@ class ProjectConfigOwner {
         }
         // Serialized against daemon edits. External writers still have the existing
         // optimistic stat/rename race; revision tokens remain mtime + size.
-        await rename(tempPath, resolvePaseoConfigPath(root));
+        await rename(tempPath, await resolvePaseoConfigPath(root));
         this.snapshots.delete(root);
         return { ok: true, config: parsed.data, revision: savedRevision };
       } catch {
@@ -284,9 +284,9 @@ export function resolveProjectConfigRoot(
 
 export async function readPaseoConfig(repoRoot: string): Promise<ReadPaseoConfigResult> {
   try {
-    return await withIrixProjectConfig(repoRoot, (await projectConfig.read(repoRoot)).runtime); // Irix: also .irix.json
+    return (await projectConfig.read(repoRoot)).runtime;
   } catch (error) {
-    return { ok: false, configPath: resolvePaseoConfigPath(repoRoot), error };
+    return { ok: false, configPath: await resolvePaseoConfigPath(repoRoot), error };
   }
 }
 

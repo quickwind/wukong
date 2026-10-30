@@ -7,17 +7,17 @@ fork. Everything Irix adds lives in a few directories so that syncing with upstr
 Maintainers and AI agents: read [IRIX.md](../IRIX.md) first. It holds the rules (keep upstream edits
 minimal), the design decisions, the checks to run, and the known gaps. This file covers set-up.
 
-| Where                          | What                                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------- |
-| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy         |
-| `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, "Add project from GitLab", "Open a local folder" |
-| `plugins/irix-devin-usage/`    | Bundled plugin: Devin usage queries and status                                        |
-| `plugins/irix-claude-usage/`   | Bundled plugin: Claude monthly spend cap and usage windows                            |
-| `plugins/irix-context-hint/`   | Bundled plugin: context-window warning pill with compact / new session                |
-| `packages/app/src/irix/`       | Web UI switches and the Add Project redirect                                          |
-| `irix/`                        | Brand assets, brand/publish scripts (this directory)                                  |
-| `irix/scripts/diagnostics/`    | Read-only Windows scripts that collect process and crash evidence                     |
-| `.github/workflows/irix-*.yml` | CI checks (the publish job is off), sync with upstream                                |
+| Where                        | What                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------ |
+| `packages/server/src/irix/`  | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                    |
+| `plugins/irix-gitlab/`       | Bundled plugin: GitLab setup screen, "Add project from GitLab", "Open a local folder"            |
+| `plugins/irix-devin-usage/`  | Bundled plugin: Devin usage queries and status                                                   |
+| `plugins/irix-claude-usage/` | Bundled plugin: Claude monthly spend cap and usage windows                                       |
+| `plugins/irix-context-hint/` | Bundled plugin: context-window warning pill with compact / new session                           |
+| `packages/app/src/irix/`     | Web UI switches and the Add Project redirect                                                     |
+| `irix/`                      | Brand assets, brand/publish scripts (this directory)                                             |
+| `irix/scripts/diagnostics/`  | Read-only Windows scripts that collect process and crash evidence                                |
+| `irix/e2e/`                  | Browser acceptance tests (Playwright); run with `node irix/scripts/test-irix.mjs --only browser` |
 
 Upstream files Irix touches are marked `// Irix:`: `rg "// Irix"` lists every one of them.
 They are a handful of one-line hooks, not rewrites.
@@ -152,14 +152,9 @@ installs, builds (including the web UI) and writes seven `irix-*.tgz` files to `
 
 ## Publishing
 
-**The publish job is switched off.** `irix-publish.yml` runs its checks on every push to `irix`
-and publishes nothing: the `publish` job has `if: ${{ false }}`. Build packages locally with
-`node irix/scripts/pack-local.mjs` (see above). The rest of this section describes what the job
-does once it is switched back on, by changing that condition to `${{ vars.NPM_SCOPE != '' }}`.
-
-`irix-publish.yml` runs on every push to `irix`. It verifies, then (once `NPM_SCOPE` is set)
-rewrites the npm scope and the brand in a throwaway checkout, builds with `EXPO_PUBLIC_IRIX=1`,
-publishes `<version>-irix.<run>` for the seven packages and keeps the tarballs as an artifact.
+**There is no publish workflow.** Build the packages locally with `node irix/scripts/pack-local.mjs`
+(see above). `irix/scripts/publish.mjs` is what a future workflow would call once someone decides
+to publish; nothing runs it on its own. The steps below describe what publishing needs.
 
 1. Choose the registry and scope (GitHub Packages, npmjs or an internal registry).
 2. Repository variables: `NPM_SCOPE` (required), `NPM_REGISTRY`, `NPM_ACCESS` (`restricted` by
@@ -178,15 +173,14 @@ irix daemon start        # http://127.0.0.1:6890, data in ~/.irix
 ```
 
 Tag releases with a prefix other than `v` (for example `irix-20261010`): upstream's release
-workflows trigger on `v*`.
+workflows (still in the repository) trigger on `v*`.
 
 ## Staying in sync
 
-`main` mirrors upstream; `irix` is `main` plus Irix. `irix-sync-upstream.yml` runs weekly,
-fast-forwards `main`, merges it into a `sync/upstream-*` branch, runs the brand and Irix tests
-and the typecheck, and opens a pull request. A conflict opens an issue naming the files. Run the
-same merge locally with `git config rerere.enabled true` and a conflict you resolved once is
-resolved the same way next time.
+Syncing is done by hand; the steps are in the "Syncing with upstream" section of
+[IRIX.md](../IRIX.md). Run the merge in a throwaway worktree with `git config rerere.enabled true`,
+so a conflict you resolved once is resolved the same way next time, then run
+`node irix/scripts/test-irix.mjs` and read the seam failures first.
 
 Three tests fail loudly when an upstream change needs attention, instead of letting a build ship
 half-adapted:

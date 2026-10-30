@@ -457,7 +457,7 @@ describe(
 );
 
 describe("Irix acceptance: project config", { timeout: 60_000 }, () => {
-  it("A-config scripts in .irix.json are listed with paseo.json's, and .irix.json has priority", async () => {
+  it("A-config when .irix.json exists only it is read, paseo.json is not", async () => {
     stubIrixEnv({});
     resetSubagentApprovalCacheForTests(null);
     resetAgentToolsForTests();
@@ -492,6 +492,6 @@ describe("Irix acceptance: project config", { timeout: 60_000 }, () => {
     const names = (listed.scripts ?? [])
       .map((script: { scriptName: string }) => script.scriptName)
       .sort();
-    expect(names).toEqual(["only_irix", "only_paseo", "shared"]);
+    expect(names).toEqual(["only_irix", "shared"]);
   });
 });

@@ -63,21 +63,21 @@ const CLI_COMMANDS =
   "restart|reload|pair|agent|daemon|hub|terminal|script|schedule|heartbeat|permit|provider|usage|" +
   "plugin|speech|project|workspace|<cmd>|--help|--version";
 // Upstream wording that is wrong in Irix: the idle time is 15 minutes (not an hour) and the only
-// providers are Claude Code and Devin.
+// providers are Devin and Claude Code (Devin first).
 const EN_TEXT_FIXES = [
   {
     pattern: /hint: "Free up memory after an hour of inactivity\."/gu,
     replacement:
-      'hint: "Free up memory after 15 minutes of inactivity (the host can change the time with IRIX_IDLE_MINUTES)."',
+      'hint: "Free up memory after 15 minutes of inactivity. The daemon reads the time from its IRIX_IDLE_MINUTES environment variable; restart the daemon after changing it."',
   },
   {
     pattern:
       /description: "Open a Claude Code, Codex or other session you started in a terminal"/gu,
-    replacement: 'description: "Open a Claude Code or Devin session you started in a terminal"',
+    replacement: 'description: "Open a Devin or Claude Code session you started in a terminal"',
   },
   {
     pattern: /description: "Configure Claude Code, Codex, and more"/gu,
-    replacement: 'description: "Configure Claude Code and Devin"',
+    replacement: 'description: "Configure Devin and Claude Code"',
   },
 ];
 

@@ -14,14 +14,14 @@ test("the Open project page offers no pairing", async ({ page }) => {
   await expectNotShown(page.getByTestId("open-project-pair-device"));
 });
 
-test("the Open project page names only Claude Code and Devin (branded build)", async ({ page }) => {
+test("the Open project page names only Devin and Claude Code (branded build)", async ({ page }) => {
   test.skip(process.env.IRIX_E2E_TITLE !== "Irix", "needs the branded build");
   await page.goto(baseUrl());
   await expect(page.getByTestId("open-project-setup-providers")).toContainText(
-    "Configure Claude Code and Devin",
+    "Configure Devin and Claude Code",
   );
   await expect(page.getByTestId("open-project-import-session")).toContainText(
-    "Claude Code or Devin session",
+    "Devin or Claude Code session",
   );
   await expectNotShown(page.getByText(/codex/i));
 });

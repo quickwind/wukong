@@ -84,11 +84,14 @@ test("English strings that name removed or changed things are corrected", () => 
   const en = read(root, "packages/app/src/i18n/resources/en.ts");
 
   assert.doesNotMatch(en, /after an hour of inactivity/);
-  assert.match(en, /Free up memory after 15 minutes of inactivity/);
+  assert.match(
+    en,
+    /Free up memory after 15 minutes of inactivity\. The daemon reads the time from its IRIX_IDLE_MINUTES environment variable; restart the daemon after changing it/,
+  );
   assert.doesNotMatch(en, /Open a Claude Code, Codex or other session/);
-  assert.match(en, /Open a Claude Code or Devin session you started in a terminal/);
+  assert.match(en, /Open a Devin or Claude Code session you started in a terminal/);
   assert.doesNotMatch(en, /Configure Claude Code, Codex, and more/);
-  assert.match(en, /Configure Claude Code and Devin/);
+  assert.match(en, /Configure Devin and Claude Code/);
 });
 
 test("the web app manifest lists all mark-only PWA icons once", () => {
