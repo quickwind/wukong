@@ -157,11 +157,8 @@ installs, builds (including the web UI) and writes seven `irix-*.tgz` files to `
 to publish; nothing runs it on its own. The steps below describe what publishing needs.
 
 1. Choose the registry and scope (GitHub Packages, npmjs or an internal registry).
-2. Repository variables: `NPM_SCOPE` (required), `NPM_REGISTRY`, `NPM_ACCESS` (`restricted` by
-   default).
-3. Create the `npm-publish` environment and add `NPM_TOKEN` (not needed for GitHub Packages).
-4. Run `irix/scripts/disable-upstream-workflows.sh <owner/repo>` once to turn off upstream
-   workflows that cannot work in the fork.
+2. Pass the scope and registry to `irix/scripts/publish.mjs` (see its header for the options) and have
+   an `NPM_TOKEN` ready (not needed for GitHub Packages).
 
 Install all seven packages together, otherwise npm pulls the upstream versions from the public
 registry:
@@ -172,8 +169,8 @@ npm install -g @<scope>/cli @<scope>/server @<scope>/client @<scope>/protocol @<
 irix daemon start        # http://127.0.0.1:6890, data in ~/.irix
 ```
 
-Tag releases with a prefix other than `v` (for example `irix-20261010`): upstream's release
-workflows (still in the repository) trigger on `v*`.
+Tag releases with `irix-` and the date (for example `irix-20261010`), so they cannot be taken for
+upstream's `v*` release tags.
 
 ## Staying in sync
 

@@ -1,5 +1,5 @@
 // Internal edition: publishes the seven npm packages as tarballs, in dependency order.
-// The release workflow packs them first (so the web UI is built once), then calls this.
+// `pack-local.mjs` packs them first (so the web UI is built once); this publishes the tarballs.
 //
 // Usage: node scripts/publish-internal-edition.mjs --dir <tarball dir> --scope <scope>
 //          [--registry <url>] [--access public|restricted] [--tag latest] [--dry-run]

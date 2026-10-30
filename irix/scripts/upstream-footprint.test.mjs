@@ -75,6 +75,25 @@ test("flags a deleted or renamed upstream file", () => {
   }
 });
 
+test("deleting upstream's GitHub workflows is not a problem and is not counted", () => {
+  const { dir, cleanup } = repo(({ write }) => {
+    write(".github/workflows/ci.yml", "name: ci\n");
+  });
+  try {
+    // The workflow is in HEAD; the base for this check is that commit, then it is deleted.
+    const withWorkflow = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: dir,
+      encoding: "utf8",
+    }).trim();
+    execFileSync("git", ["rm", "-q", ".github/workflows/ci.yml"], { cwd: dir });
+    const { problems, modified } = footprint({ cwd: dir, base: withWorkflow });
+    assert.deepEqual(problems, []);
+    assert.deepEqual(modified, []);
+  } finally {
+    cleanup();
+  }
+});
+
 test("fails when the totals pass the budget", () => {
   const { dir, base, cleanup } = repo(({ write }) => {
     write("a.ts", "// Irix\nx\ny\nz\n");

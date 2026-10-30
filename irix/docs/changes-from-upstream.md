@@ -107,9 +107,10 @@ Paths are under `packages/server/src/irix/` unless they say otherwise.
     the About page gets a License row naming Paseo (`add-license.mjs`, `brand.mjs`).
 33. **Packaging.** `pack-local.mjs` builds seven tarballs, and `license-audit.mjs` checks what ships.
 34. **Footprint check.** `upstream-footprint.mjs` keeps the edits to upstream files within budget.
-35. **No GitHub workflows of its own.** Irix has none: nothing builds, tests or syncs on its own
-    (the publish and weekly-sync workflows were removed). Run `node irix/scripts/test-irix.mjs`;
-    the same commands are workspace scripts in `.irix.json` (item 40).
+35. **No GitHub workflows.** All of upstream's workflows are deleted (`.github/workflows/`, and the
+    one test that reads them, `scripts/ci-workflow.test.mjs`), and Irix adds none: nothing builds,
+    tests, syncs or publishes by itself. Run `node irix/scripts/test-irix.mjs`; the same commands are
+    workspace scripts in `.irix.json` (item 40). `upstream-footprint.mjs` does not count these deletions.
 36. **Windows scripts and probes.** Update, autostart and diagnostics, plus Devin ACP, MCP and usage
     probes, under `irix/scripts/`.
 37. **Runs beside Paseo.** Own `irix` command, `~/.irix` home and port 6890; the CLI ignores
