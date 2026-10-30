@@ -108,10 +108,9 @@ Paths are under `packages/server/src/irix/` unless they say otherwise.
 33. **Packaging.** `pack-local.mjs` builds seven tarballs, and `license-audit.mjs` checks what ships.
 34. **Footprint check.** `upstream-footprint.mjs` keeps the edits to upstream files within budget.
 35. **CI and workspace scripts.** `irix-publish.yml` verifies every push to `irix` on Linux and
-    Windows (its publish job is switched off), `irix-checks.yml` runs build, typecheck, lint, format
-    and the whole Irix suite on pushes and PRs to `irix` (plus the browser suite, not blocking yet),
-    and `irix-sync-upstream.yml` syncs weekly. None has run on GitHub yet. `paseo.json` has Irix
-    scripts for packing, verifying and probing.
+    Windows (its publish job is switched off) and `irix-sync-upstream.yml` syncs weekly. Neither has
+    run on GitHub yet. There is no workflow for the Irix test suite; run `node irix/scripts/test-irix.mjs`.
+    The suite is also in the project's workspace scripts, in `.irix.json` (item 40).
 36. **Windows scripts and probes.** Update, autostart and diagnostics, plus Devin ACP, MCP and usage
     probes, under `irix/scripts/`.
 37. **Runs beside Paseo.** Own `irix` command, `~/.irix` home and port 6890; the CLI ignores
@@ -122,6 +121,13 @@ Paths are under `packages/server/src/irix/` unless they say otherwise.
     the Irix tests of every package in a clean environment (seam tests, unit tests, daemon
     acceptance e2e, and with `--browser` the Playwright suite in `irix/e2e`); plan in
     `irix/docs/test-plan.md`.
+40. **`.irix.json`.** A project can keep its Irix scripts in `.irix.json` next to `paseo.json`. Irix
+    reads both and `.irix.json` has priority: a script with the same name comes from it, other
+    scripts from both files, and a top-level key such as `worktree` that it sets replaces
+    `paseo.json`'s. A project with only one of them behaves as before; upstream's editor still
+    writes only `paseo.json`. This repository keeps its Irix scripts (`irix:test`, `irix:test:browser`,
+    `irix:check:budget`, ...) there, so `paseo.json` is upstream's text again
+    (`packages/server/src/irix/project-config.ts`, one hook in `utils/paseo-config-file.ts`).
 
 ## B. Changes made because of company restrictions
 

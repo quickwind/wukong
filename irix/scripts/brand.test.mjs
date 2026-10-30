@@ -78,6 +78,19 @@ test("brands the name, metadata, logo and CLI alias", () => {
   });
 });
 
+test("English strings that name removed or changed things are corrected", () => {
+  const root = copyTree();
+  applyBrand({ root });
+  const en = read(root, "packages/app/src/i18n/resources/en.ts");
+
+  assert.doesNotMatch(en, /after an hour of inactivity/);
+  assert.match(en, /Free up memory after 15 minutes of inactivity/);
+  assert.doesNotMatch(en, /Open a Claude Code, Codex or other session/);
+  assert.match(en, /Open a Claude Code or Devin session you started in a terminal/);
+  assert.doesNotMatch(en, /Configure Claude Code, Codex, and more/);
+  assert.match(en, /Configure Claude Code and Devin/);
+});
+
 test("the web app manifest lists all mark-only PWA icons once", () => {
   const root = copyTree();
   applyBrand({ root });

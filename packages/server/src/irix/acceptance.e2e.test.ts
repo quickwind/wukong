@@ -2,7 +2,7 @@
 // through the public client against a real in-process daemon. Every IRIX_* variable a test needs is
 // set and restored with vi.stubEnv, so the result does not depend on the runner's shell.
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import net from "node:net";
@@ -455,3 +455,43 @@ describe(
     });
   },
 );
+
+describe("Irix acceptance: project config", { timeout: 60_000 }, () => {
+  it("A-config scripts in .irix.json are listed with paseo.json's, and .irix.json has priority", async () => {
+    stubIrixEnv({});
+    resetSubagentApprovalCacheForTests(null);
+    resetAgentToolsForTests();
+    ctx = await createDaemonTestContext();
+    deactivate = activateIrixPolicy();
+    cwd = mkdtempSync(path.join(tmpdir(), "irix-acceptance-"));
+    writeFileSync(
+      path.join(cwd, "paseo.json"),
+      JSON.stringify({
+        scripts: {
+          shared: { command: "node from-paseo.js" },
+          only_paseo: { command: "node a.js" },
+        },
+      }),
+    );
+    writeFileSync(
+      path.join(cwd, ".irix.json"),
+      JSON.stringify({
+        scripts: { shared: { command: "node from-irix.js" }, only_irix: { command: "node b.js" } },
+      }),
+    );
+    const agent = await ctx.client.createAgent({
+      config: { ...getAskModeConfig("codex"), cwd },
+      initialPrompt: "Say done.",
+    });
+    await ctx.client.waitForFinish(agent.id, 10000);
+    const fetched = await ctx.client.fetchAgent(agent.id);
+    const workspaceId = fetched?.agent.workspaceId;
+    expect(typeof workspaceId).toBe("string");
+
+    const listed = await ctx.client.listWorkspaceScripts(workspaceId as string);
+    const names = (listed.scripts ?? [])
+      .map((script: { scriptName: string }) => script.scriptName)
+      .sort();
+    expect(names).toEqual(["only_irix", "only_paseo", "shared"]);
+  });
+});

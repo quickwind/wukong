@@ -11,7 +11,7 @@
 // The server step includes the *.e2e.test.ts files (the daemon's `test:unit` excludes them)
 // and takes a few minutes. See irix/docs/test-plan.md.
 
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,6 +70,48 @@ export function scrubbedKeys(env) {
     .sort();
 }
 
+function git(...args) {
+  return execFileSync("git", args, {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
+}
+
+/**
+ * The last upstream state this checkout merged. A sync merges either `upstream/main` or a release
+ * tag, and a tag is not always an ancestor of `main`, so neither alone is right: take whichever
+ * is nearer to HEAD. Returns undefined when git cannot say (then the footprint script's own default
+ * applies).
+ */
+export function lastMergedUpstreamBase(run = git) {
+  const candidates = [];
+  try {
+    candidates.push(run("merge-base", "HEAD", "upstream/main"));
+  } catch {
+    // no upstream remote
+  }
+  try {
+    candidates.push(run("describe", "--tags", "--match", "v[0-9]*", "--abbrev=0", "HEAD"));
+  } catch {
+    // no release tag reachable
+  }
+  let best;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const ref of candidates) {
+    try {
+      const distance = Number(run("rev-list", "--count", `${ref}..HEAD`));
+      if (distance < bestDistance) {
+        best = ref;
+        bestDistance = distance;
+      }
+    } catch {
+      // ignore an unusable ref
+    }
+  }
+  return best;
+}
+
 export function buildSteps({ base } = {}) {
   return [
     {
@@ -78,6 +120,7 @@ export function buildSteps({ base } = {}) {
       command: "node",
       args: ["irix/scripts/upstream-footprint.mjs", ...(base ? ["--base", base] : [])],
     },
+    { name: "license", cwd: ".", command: "node", args: ["irix/scripts/license-audit.mjs"] },
     { name: "scripts", cwd: ".", command: "node", args: ["--test", "irix/scripts/*.test.mjs"] },
     {
       name: "server",
@@ -223,6 +266,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     console.error(`test-irix: ${options.error}`);
     return 2;
   }
+  if (!options.base) options.base = lastMergedUpstreamBase();
   const steps = selectSteps(options);
   const cleanEnv = scrubEnv(env);
 

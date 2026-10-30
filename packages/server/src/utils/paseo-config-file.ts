@@ -3,6 +3,7 @@ import { open, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import pLimit from "p-limit";
 import { withTimeout } from "./promise-timeout.js";
+import { withIrixProjectConfig } from "../irix/project-config.js"; // Irix
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
 import {
@@ -283,7 +284,7 @@ export function resolveProjectConfigRoot(
 
 export async function readPaseoConfig(repoRoot: string): Promise<ReadPaseoConfigResult> {
   try {
-    return (await projectConfig.read(repoRoot)).runtime;
+    return await withIrixProjectConfig(repoRoot, (await projectConfig.read(repoRoot)).runtime); // Irix: also .irix.json
   } catch (error) {
     return { ok: false, configPath: resolvePaseoConfigPath(repoRoot), error };
   }

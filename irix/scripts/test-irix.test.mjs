@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  lastMergedUpstreamBase,
   buildSteps,
   exitCodeFor,
   extractSeamFailures,
@@ -45,7 +46,7 @@ test("scrubEnv removes every PASEO_* and IRIX_* variable and keeps the rest", ()
 test("steps run in the documented order, browser only when asked", () => {
   assert.deepEqual(
     selectSteps({}).map((s) => s.name),
-    ["footprint", "scripts", "server", "cli", "app", "plugins"],
+    ["footprint", "license", "scripts", "server", "cli", "app", "plugins"],
   );
   assert.equal(selectSteps({ browser: true }).at(-1).name, "browser");
   assert.deepEqual(
@@ -117,4 +118,28 @@ test("main returns 2 on a usage error", async () => {
   } finally {
     console.error = original;
   }
+});
+
+test("the footprint base is whichever of merge-base and release tag is nearer to HEAD", () => {
+  const distance = { mb111: 40, v1: 3 };
+  const run = (...args) => {
+    if (args[0] === "merge-base") return "mb111";
+    if (args[0] === "describe") return "v1";
+    if (args[0] === "rev-list") return String(distance[args[2].split("..")[0]]);
+    throw new Error("unexpected");
+  };
+  assert.equal(lastMergedUpstreamBase(run), "v1");
+  assert.equal(
+    lastMergedUpstreamBase((...args) => {
+      if (args[0] === "describe") throw new Error("no tag");
+      return run(...args);
+    }),
+    "mb111",
+  );
+  assert.equal(
+    lastMergedUpstreamBase(() => {
+      throw new Error("no git");
+    }),
+    undefined,
+  );
 });

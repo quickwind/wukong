@@ -1,0 +1,48 @@
+{
+  "scripts": {
+    "irix:test": {
+      "command": "node irix/scripts/test-irix.mjs",
+      "description": "Irix: every Irix test group, in order, with a clean environment (no browser)"
+    },
+    "irix:test:browser": {
+      "command": "node irix/scripts/test-irix.mjs --only browser",
+      "description": "Irix: browser acceptance suite against the Irix web UI (builds it on first run)"
+    },
+    "irix:test:server": {
+      "command": "node irix/scripts/test-irix.mjs --only server",
+      "description": "Irix: server tests, seam tests and daemon acceptance e2e"
+    },
+    "irix:test:cli": {
+      "command": "node irix/scripts/test-irix.mjs --only cli",
+      "description": "Irix: command line tests"
+    },
+    "irix:test:app": {
+      "command": "node irix/scripts/test-irix.mjs --only app",
+      "description": "Irix: web UI unit tests"
+    },
+    "irix:test:plugins": {
+      "command": "node irix/scripts/test-irix.mjs --only plugins",
+      "description": "Irix: bundled plugin tests"
+    },
+    "irix:test:scripts": {
+      "command": "node irix/scripts/test-irix.mjs --only scripts",
+      "description": "Irix: brand, pack, license and footprint script tests"
+    },
+    "irix:check:budget": {
+      "command": "node irix/scripts/test-irix.mjs --only footprint",
+      "description": "Irix: upstream footprint against the file and line budget"
+    },
+    "irix:check:license": {
+      "command": "node irix/scripts/test-irix.mjs --only license",
+      "description": "Irix: dependency license audit"
+    },
+    "irix:build:package": {
+      "command": "node irix/scripts/pack-local.mjs",
+      "description": "Irix: build the seven npm tarballs (see irix/AGENTS.md for Windows)"
+    },
+    "irix:probe:devin:usage": {
+      "command": "node irix/scripts/devin-usage-probe.mjs",
+      "description": "Irix: probe live Devin ACU quota and consumption directly from the Devin API"
+    }
+  }
+}

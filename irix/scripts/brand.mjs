@@ -62,6 +62,25 @@ const CLI_COMMANDS =
   "ls|run|import|clone|attach|logs|stop|delete|send|inspect|wait|archive|onboard|start|hooks|status|" +
   "restart|reload|pair|agent|daemon|hub|terminal|script|schedule|heartbeat|permit|provider|usage|" +
   "plugin|speech|project|workspace|<cmd>|--help|--version";
+// Upstream wording that is wrong in Irix: the idle time is 15 minutes (not an hour) and the only
+// providers are Claude Code and Devin.
+const EN_TEXT_FIXES = [
+  {
+    pattern: /hint: "Free up memory after an hour of inactivity\."/gu,
+    replacement:
+      'hint: "Free up memory after 15 minutes of inactivity (the host can change the time with IRIX_IDLE_MINUTES)."',
+  },
+  {
+    pattern:
+      /description: "Open a Claude Code, Codex or other session you started in a terminal"/gu,
+    replacement: 'description: "Open a Claude Code or Devin session you started in a terminal"',
+  },
+  {
+    pattern: /description: "Configure Claude Code, Codex, and more"/gu,
+    replacement: 'description: "Configure Claude Code and Devin"',
+  },
+];
+
 const SKILL_COMMAND = new RegExp(`\\bpaseo (?=(?:${CLI_COMMANDS})(?![\\w-]))`, "gu");
 const SKILLS_WITH_COMMANDS = new Set(["paseo", "paseo-help", "paseo-plugin"]);
 
@@ -119,6 +138,14 @@ function textRules(root) {
     ...i18n,
     ...skills,
     ...cliHints,
+    // Strings that name things Irix changed or removed. English only: that is the only language
+    // Irix ships. Each rule fails the build when its anchor moves, like the others.
+    ...EN_TEXT_FIXES.map(({ pattern, replacement }) => ({
+      file: "packages/app/src/i18n/resources/en.ts",
+      pattern,
+      replacement,
+      applied: replacement,
+    })),
     {
       file: "packages/app/public/manifest.json",
       pattern: /"(name|short_name)": "Paseo"/gu,
