@@ -67,3 +67,12 @@ Failures leave a trace and a screenshot in `irix/e2e/.output/test-results/`. The
 - Prefer `testID`s and roles over text. React Native Web renders `testID` as `data-testid`, and a
   Switch as a `role="switch"` element with `aria-checked` and `aria-disabled`.
 - Do not edit `packages/app/e2e`; it belongs to upstream.
+
+## One run at a time
+
+`irix/e2e/.output/` and the daemon state file are shared by every run in a checkout. Two runs at
+once (two terminals, or an agent and a person) overwrite each other's state: one run's teardown
+removes the file and stops the daemon the other is using, and a stopped run can leave its
+`irix daemon run` process behind. Start the suite only when no other run is going. Leftover
+daemons are recognisable by `--home .../irix-e2e-*` in their command line; stop one by its PID,
+never by name.
