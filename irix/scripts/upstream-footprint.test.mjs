@@ -75,7 +75,7 @@ test("flags a deleted or renamed upstream file", () => {
   }
 });
 
-test("deleting upstream's GitHub workflows is not a problem and is not counted", () => {
+test("deleting upstream's .github folder is not a problem and is not counted", () => {
   const { dir, cleanup } = repo(({ write }) => {
     write(".github/workflows/ci.yml", "name: ci\n");
   });

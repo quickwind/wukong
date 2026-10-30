@@ -32,9 +32,10 @@ export function resolveBase(cwd, base) {
   }
 }
 
-// Irix has no GitHub workflows, so upstream's are deleted on purpose, with the one test that reads
-// them. A deletion here is not a problem and is not counted.
-const REMOVED_ON_PURPOSE = [/^\.github\/workflows\//, /^scripts\/ci-workflow\.test\.mjs$/];
+// Irix has no GitHub workflows, issue templates or funding file, so the whole `.github/` folder is
+// deleted on purpose, with the one test that reads the workflows. A deletion here is not a problem
+// and is not counted.
+const REMOVED_ON_PURPOSE = [/^\.github\//, /^scripts\/ci-workflow\.test\.mjs$/];
 
 export function footprint({ cwd = process.cwd(), base, to, maxFiles = 61, maxLines = 545 } = {}) {
   const from = resolveBase(cwd, base);
