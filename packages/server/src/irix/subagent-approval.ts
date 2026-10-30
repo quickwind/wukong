@@ -9,7 +9,6 @@ import type {
   AgentPermissionRequest,
   AgentPermissionResponse,
   AgentSessionConfig,
-  AgentStreamEvent,
 } from "../server/agent/agent-sdk-types.js";
 import { agentToolsFields, wrapAgentToolsConfigStore } from "./agent-tools-setting.js";
 import { rememberAgentManagerForGuide } from "./agent-tools-resume.js";
@@ -125,7 +124,7 @@ export function setSubagentApprovalRequired(
 ): boolean {
   if (isSubagentApprovalLocked(env)) {
     if (!enabled) {
-      throw new Error("强制子代理人工审批已被锁定，无法关闭。");
+      throw new Error("Mandatory subagent approval is locked and cannot be turned off.");
     }
     return true;
   }
@@ -213,14 +212,13 @@ interface ManagedAgentInternal {
 interface AgentManagerInternal {
   agents?: Map<string, ManagedAgentInternal>;
   clients?: Map<string, unknown>;
-  emit?: (event: unknown) => void;
   notifyAgentState?: (agentId: string) => void;
   respondToPermission: (
     agentId: string,
     requestId: string,
     response: AgentPermissionResponse,
   ) => Promise<void>;
-  interruptAgent?: (agentId: string) => Promise<boolean>;
+  cancelAgentRun?: (agentId: string) => Promise<unknown>;
   closeAgent?: (agentId: string) => Promise<void>;
 }
 
@@ -244,15 +242,8 @@ function settleSyntheticApproval(
   const agent = manager.agents?.get(entry.agentId);
   agent?.pendingPermissions?.delete(requestId);
 
-  manager.emit?.({
-    type: "permission_resolved",
-    agentId: entry.agentId,
-    provider: entry.provider,
-    requestId,
-    resolution: response,
-  });
-  // The event alone does not refresh the pending list of an agent that is idle: the app kept the
-  // card, with its button spinning, until it was reloaded.
+  // `AgentManager` has no public `emit`: the state notification is what refreshes the pending list
+  // of an idle agent (without it the app kept the card, with its button spinning, until reload).
   manager.notifyAgentState?.(entry.agentId);
 
   entry.resolve(response.behavior === "allow");
@@ -466,11 +457,12 @@ export function attachIrixAgentManager(managerInput: unknown): void {
     return originalRespond(agentId, requestId, response);
   };
 
-  if (typeof manager.interruptAgent === "function") {
-    const originalInterrupt = manager.interruptAgent.bind(manager);
-    manager.interruptAgent = async (agentId: string): Promise<boolean> => {
+  // Upstream's interrupt path is `cancelAgentRun` (Session.interruptAgentIfRunning calls it).
+  if (typeof manager.cancelAgentRun === "function") {
+    const originalCancel = manager.cancelAgentRun.bind(manager);
+    manager.cancelAgentRun = async (agentId: string): Promise<unknown> => {
       cancelSyntheticApprovalsForAgent(manager, agentId);
-      return originalInterrupt(agentId);
+      return originalCancel(agentId);
     };
   }
 
@@ -550,12 +542,6 @@ export async function requestSyntheticSubagentApproval(input: {
     input.signal?.addEventListener("abort", onAbort, { once: true });
   }
 
-  manager.emit?.({
-    type: "permission_requested",
-    agentId: input.targetAgentId,
-    provider,
-    request,
-  } satisfies Partial<AgentStreamEvent> & Record<string, unknown>);
   manager.notifyAgentState?.(input.targetAgentId);
 
   return promise;

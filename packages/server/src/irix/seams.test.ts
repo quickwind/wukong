@@ -512,26 +512,16 @@ describe("seam 5: other private upstream members Irix reads by name", () => {
     expect(typeof AgentManager.prototype.notifyAgentState).toBe("function");
   });
 
-  // KNOWN BUG, present since 0.13.0: upstream's interrupt path is `cancelAgentRun`, so the Irix
-  // wrapper on `interruptAgent` is never installed and an interrupted parent leaves its synthetic
-  // subagent approval pending until the ten-minute timeout. `it.fails` keeps this green while the
-  // bug stands and turns red once it is fixed (wrap `cancelAgentRun`), at which point drop `.fails`.
-  it.fails("AgentManager.prototype.interruptAgent exists so the synthetic-approval interrupt hook is installed", () => {
-    // Irix wraps manager.interruptAgent to cancel pending synthetic approvals when a parent is
-    // interrupted. It skips the wrap when the method is missing, so the rename fails silently.
-    // Upstream's interrupt path is now cancelAgentRun (see session.ts interruptAgentIfRunning).
-    expect(typeof (AgentManager.prototype as { interruptAgent?: unknown }).interruptAgent).toBe(
-      "function",
-    );
+  it("AgentManager.prototype.cancelAgentRun exists: the Irix subagent gate wraps it on interrupt", () => {
+    // Session.interruptAgentIfRunning calls cancelAgentRun; the Irix wrapper cancels the parent's
+    // pending synthetic approvals there. The old hook sat on `interruptAgent`, which upstream does
+    // not have, so it was never installed.
+    expect(typeof AgentManager.prototype.cancelAgentRun).toBe("function");
+    expect((AgentManager.prototype as { interruptAgent?: unknown }).interruptAgent).toBeUndefined();
   });
 
-  // KNOWN BUG, present since 0.13.0: `AgentManager` has no `emit`, so `manager.emit?.(...)` in
-  // subagent-approval.ts is a silent no-op and `permission_resolved` is never published; the card
-  // still refreshes through `notifyAgentState`. Drop `.fails` when this is fixed.
-  it.fails("AgentManager.prototype.emit exists so settled synthetic approvals publish permission_resolved", () => {
-    // settleSyntheticApproval calls manager.emit?.(...). AgentManager has no emit, so the event is
-    // never published (events go through subscribe/dispatchStream).
-    expect(typeof (AgentManager.prototype as { emit?: unknown }).emit).toBe("function");
+  it("AgentManager has no public emit: cards reach the app through pendingPermissions and notifyAgentState", () => {
+    expect((AgentManager.prototype as { emit?: unknown }).emit).toBeUndefined();
   });
 
   it("a real Claude session has the members the subagent gate patches", async () => {

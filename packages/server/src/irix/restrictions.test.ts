@@ -178,9 +178,23 @@ describe("Irix restrictions", () => {
       pendingPermissions: new Map(),
     };
     const emitted: Array<Record<string, unknown>> = [];
+    // AgentManager has no `emit`: a card is an entry in the agent's pendingPermissions.
+    const recordedSet = parentAgent.pendingPermissions.set.bind(parentAgent.pendingPermissions);
+    parentAgent.pendingPermissions.set = (key: unknown, value: unknown) => {
+      emitted.push({ type: "permission_requested", agentId: "parent-1", request: value });
+      return recordedSet(key, value);
+    };
+    const recordedDelete = parentAgent.pendingPermissions.delete.bind(
+      parentAgent.pendingPermissions,
+    );
+    parentAgent.pendingPermissions.delete = (key: unknown) => {
+      if (parentAgent.pendingPermissions.has(key)) {
+        emitted.push({ type: "permission_resolved", agentId: "parent-1", requestId: key });
+      }
+      return recordedDelete(key);
+    };
     const fakeAgentManager = {
       agents: new Map([["parent-1", parentAgent]]),
-      emit: (event: Record<string, unknown>) => emitted.push(event),
       respondToPermission: async () => {},
     };
     const tools = new Map<
@@ -245,9 +259,14 @@ describe("Irix restrictions", () => {
       pendingPermissions: new Map(),
     };
     const emitted: Array<Record<string, unknown>> = [];
+    // AgentManager has no `emit`: a card is an entry in the agent's pendingPermissions.
+    const recordedSet = parentAgent.pendingPermissions.set.bind(parentAgent.pendingPermissions);
+    parentAgent.pendingPermissions.set = (key: unknown, value: unknown) => {
+      emitted.push({ type: "permission_requested", agentId: "parent-1", request: value });
+      return recordedSet(key, value);
+    };
     const fakeAgentManager = {
       agents: new Map([["parent-1", parentAgent]]),
-      emit: (event: Record<string, unknown>) => emitted.push(event),
       respondToPermission: async () => {},
     };
     process.env.IRIX_UNRESTRICTED = "1";

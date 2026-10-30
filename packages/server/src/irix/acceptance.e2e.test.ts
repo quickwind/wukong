@@ -112,7 +112,7 @@ describe("Irix acceptance: daemon config", { timeout: 60_000 }, () => {
 
     // The refusal text is the daemon's own (Chinese) message; it is matched as-is.
     expect(await refusalOf(client.patchDaemonConfig({ requireSubagentApproval: false }))).toContain(
-      "强制子代理人工审批已被锁定",
+      "Mandatory subagent approval is locked",
     );
     const read = await client.getDaemonConfig();
     expect(read.config.requireSubagentApproval).toBe(true);

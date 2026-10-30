@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { getFullAccessConfig } from "../server/daemon-e2e/agent-configs.js";
 import {
@@ -21,6 +21,10 @@ let deactivate: () => void;
 const tempRoots: string[] = [];
 
 beforeEach(async () => {
+  // The caller runs in a bypass mode, which Irix hides unless this is set.
+  vi.stubEnv("IRIX_ALLOW_BYPASS_MODES", "1");
+  // Some tests turn the approval setting off, which Irix allows only with this.
+  vi.stubEnv("IRIX_ALLOW_SUBAGENT_APPROVAL_CONTROL", "1");
   // The daemon is built first: with the policy on, the provider registry loses the fake provider.
   ctx = await createDaemonTestContext();
   deactivate = activateIrixPolicy();
@@ -28,6 +32,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await ctx.cleanup();
   deactivate();
   resetSubagentApprovalCacheForTests(null);

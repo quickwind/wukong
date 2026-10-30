@@ -13,17 +13,31 @@ import { resetSubagentApprovalCacheForTests } from "./subagent-approval.js";
 
 function fakeManager(agentIds: string[]) {
   const emitted: Array<Record<string, unknown>> = [];
+  // AgentManager has no `emit`: a card is an entry in the agent's pendingPermissions.
+  const pending = (agentId: string) =>
+    new (class extends Map {
+      override set(key: string, value: unknown) {
+        emitted.push({ type: "permission_requested", agentId, request: value });
+        return super.set(key, value);
+      }
+      override delete(key: string) {
+        if (super.has(key)) {
+          emitted.push({ type: "permission_resolved", agentId, requestId: key });
+        }
+        return super.delete(key);
+      }
+    })();
   const notified: string[] = [];
   const manager = {
     notifyAgentState: (agentId: string) => notified.push(agentId),
     agents: new Map(
       agentIds.map((id) => [
         id,
-        { id, config: { provider: "claude", cwd: "/tmp" }, pendingPermissions: new Map() },
+        { id, config: { provider: "claude", cwd: "/tmp" }, pendingPermissions: pending(id) },
       ]),
     ),
-    emit: (event: Record<string, unknown>) => emitted.push(event),
     respondToPermission: async (..._args: unknown[]) => {},
+    cancelAgentRun: async (_agentId: string) => ({ cancelled: true }),
   };
   const requests = () => emitted.filter((event) => event.type === "permission_requested");
   // The approval hook wraps respondToPermission when it first sees the manager.
@@ -55,12 +69,16 @@ describe("Irix creation and schedule approval", () => {
   let deactivate: () => void;
 
   beforeEach(() => {
+    vi.stubEnv("IRIX_ALLOW_SCHEDULES", "1");
+    // Some tests turn the approval setting off, which Irix allows only with this.
+    vi.stubEnv("IRIX_ALLOW_SUBAGENT_APPROVAL_CONTROL", "1");
     deactivate = activateIrixPolicy();
     resetSubagentApprovalCacheForTests(true);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
     deactivate();
     resetSubagentApprovalCacheForTests(null);
     resetIrixApprovalHostForTests();
@@ -91,6 +109,18 @@ describe("Irix creation and schedule approval", () => {
       assertIrixCreateApproved(manager, "agent", { requestId: "r1", callerAgentId: "ghost" }),
     ).rejects.toThrow(/could not be shown to calling agent ghost/);
     expect(requests()).toHaveLength(0);
+  });
+
+  it("denies a pending card when the calling agent is interrupted (cancelAgentRun)", async () => {
+    const { manager, requests } = fakeManager(["caller"]);
+    const asked = assertIrixCreateApproved(manager, "agent", {
+      requestId: "r1",
+      callerAgentId: "caller",
+    });
+    await vi.waitFor(() => expect(requests()).toHaveLength(1));
+    const rejected = expect(asked).rejects.toThrow();
+    await manager.cancelAgentRun("caller");
+    await rejected;
   });
 
   it("does not ask without a calling agent or with the setting off", async () => {
