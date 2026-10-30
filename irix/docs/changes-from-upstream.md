@@ -107,15 +107,21 @@ Paths are under `packages/server/src/irix/` unless they say otherwise.
     the About page gets a License row naming Paseo (`add-license.mjs`, `brand.mjs`).
 33. **Packaging.** `pack-local.mjs` builds seven tarballs, and `license-audit.mjs` checks what ships.
 34. **Footprint check.** `upstream-footprint.mjs` keeps the edits to upstream files within budget.
-35. **CI and workspace scripts.** Workflows for checks on every push to `irix` and the weekly
-    upstream sync (the publish job is switched off); `paseo.json` has Irix scripts for packing,
-    verifying and probing.
+35. **CI and workspace scripts.** `irix-publish.yml` verifies every push to `irix` on Linux and
+    Windows (its publish job is switched off), `irix-checks.yml` runs build, typecheck, lint, format
+    and the whole Irix suite on pushes and PRs to `irix` (plus the browser suite, not blocking yet),
+    and `irix-sync-upstream.yml` syncs weekly. None has run on GitHub yet. `paseo.json` has Irix
+    scripts for packing, verifying and probing.
 36. **Windows scripts and probes.** Update, autostart and diagnostics, plus Devin ACP, MCP and usage
     probes, under `irix/scripts/`.
 37. **Runs beside Paseo.** Own `irix` command, `~/.irix` home and port 6890; the CLI ignores
     `PASEO_HOME`/`PASEO_HOST` and shows its help when run with no arguments; no daemon console
     window on Windows.
 38. **Web UI served by the daemon**, on by default, since Irix has no desktop app.
+39. **Irix test suite.** `node irix/scripts/test-irix.mjs` runs the footprint check, script tests and
+    the Irix tests of every package in a clean environment (seam tests, unit tests, daemon
+    acceptance e2e, and with `--browser` the Playwright suite in `irix/e2e`); plan in
+    `irix/docs/test-plan.md`.
 
 ## B. Changes made because of company restrictions
 

@@ -12,6 +12,16 @@ import { createDaemonTestContext, type DaemonTestContext } from "../server/test-
 import { resetAgentToolsForTests } from "./agent-tools-setting.js";
 import { EgressBlockedError, installEgressGuard } from "./egress-guard.js";
 import { activateIrixPolicy } from "./policy.js";
+import { ForgeRegistry } from "../services/forge-registry.js";
+import { createIrixGitLabAdapter, irixForgeEntries } from "./gitlab/adapter.js";
+import {
+  assertIrixModeAllowed,
+  irixFeatures,
+  irixServerFeatures,
+  isIrixToolBlocked,
+  withoutIrixBypassModes,
+} from "./restrictions.js";
+import { getAskModeConfig } from "../server/daemon-e2e/agent-configs.js";
 import { resetSubagentApprovalCacheForTests } from "./subagent-approval.js";
 
 // Every variable that changes an Irix restriction. Each test states the ones it needs; the rest
@@ -52,6 +62,28 @@ async function startIrixDaemon(
   ctx = await createDaemonTestContext();
   cwd = mkdtempSync(path.join(tmpdir(), "irix-acceptance-"));
   return ctx;
+}
+
+/**
+ * For paths that need a live agent. The daemon is built before the policy is switched on: with the
+ * policy on, the provider registry loses the fake provider ("codex" in the test harness), and
+ * Claude/Devin would need real CLIs. Restrictions are read per request, so they still apply.
+ */
+async function startIrixDaemonWithFakeProvider(
+  on: Partial<Record<(typeof IRIX_ENV_NAMES)[number], string>> = {},
+): Promise<{ ctx: DaemonTestContext; agentId: string }> {
+  stubIrixEnv(on);
+  resetSubagentApprovalCacheForTests(null);
+  resetAgentToolsForTests();
+  ctx = await createDaemonTestContext();
+  deactivate = activateIrixPolicy();
+  cwd = mkdtempSync(path.join(tmpdir(), "irix-acceptance-"));
+  const agent = await ctx.client.createAgent({
+    config: { ...getAskModeConfig("codex"), cwd },
+    initialPrompt: "Say done.",
+  });
+  await ctx.client.waitForFinish(agent.id, 10000);
+  return { ctx, agentId: agent.id };
 }
 
 beforeEach(() => {
@@ -248,3 +280,178 @@ describe("Irix acceptance: egress guard", () => {
     expect(error.message).toContain("Irix blocked a connection to 203.0.113.1:443");
   });
 });
+
+describe(
+  "Irix acceptance: agent messaging, bypass modes, cloud features, forges",
+  {
+    timeout: 90_000,
+  },
+  () => {
+    // Real daemon path: Session.handleSendAgentMessageRequest calls assertIrixAgentMessagingAllowed
+    // with the request's sourceAgentId, which is what `irix send` sets when an agent calls it.
+    it("B10 agent messaging: a message sent on behalf of an agent is refused, a person's is not", async () => {
+      const { ctx: daemon, agentId } = await startIrixDaemonWithFakeProvider();
+
+      const refusal = await refusalOf(
+        daemon.client.sendAgentMessage(agentId, "hello from another agent", {
+          sourceAgentId: "some-calling-agent",
+        }),
+      );
+      expect(refusal).toContain("Messages between agents are not available on this daemon.");
+
+      await daemon.client.sendAgentMessage(agentId, "hello from a person");
+      await daemon.client.waitForFinish(agentId, 10000);
+    });
+
+    it("B10 agent messaging: IRIX_ALLOW_AGENT_MESSAGING lifts the refusal", async () => {
+      const { ctx: daemon, agentId } = await startIrixDaemonWithFakeProvider({
+        IRIX_ALLOW_AGENT_MESSAGING: "1",
+      });
+
+      const refusal = await refusalOf(
+        daemon.client.sendAgentMessage(agentId, "hello", { sourceAgentId: "some-calling-agent" }),
+      );
+      expect(refusal).not.toContain("Messages between agents");
+    });
+
+    // The agent tool gate (what the MCP/agent tool list is filtered with) is a pure function of the
+    // environment; the daemon only calls it while building a tool list for an agent.
+    it("B10 agent tools: the tool gate hides send_agent_prompt, schedule and host tools by default", async () => {
+      await startIrixDaemon();
+
+      for (const tool of [
+        "send_agent_prompt",
+        "create_schedule",
+        "create_heartbeat",
+        "list_schedules",
+        "list_hosts",
+      ]) {
+        expect(isIrixToolBlocked(tool), tool).toBe(true);
+      }
+      expect(isIrixToolBlocked("list_agents")).toBe(false);
+    });
+
+    it("B10 agent tools: IRIX_UNRESTRICTED lifts messaging and schedule blocks, not connected hosts", async () => {
+      await startIrixDaemon({ IRIX_UNRESTRICTED: "1" });
+
+      expect(isIrixToolBlocked("send_agent_prompt")).toBe(false);
+      expect(isIrixToolBlocked("create_schedule")).toBe(false);
+      expect(isIrixToolBlocked("list_hosts")).toBe(true);
+    });
+
+    // Through the daemon: setAgentMode runs assertIrixModeAllowed before the provider is touched, so
+    // a bypass id that the provider's catalog does list ("full-access" in the fake provider) reaches
+    // the Irix check itself instead of being filtered out as an unknown mode.
+    it("B11 bypass modes: assertIrixModeAllowed refuses a catalog bypass mode and auto_accept via the daemon", async () => {
+      const { ctx: daemon, agentId } = await startIrixDaemonWithFakeProvider();
+
+      expect(await refusalOf(daemon.client.setAgentMode(agentId, "full-access"))).toContain(
+        "Bypass permission modes are not available on this daemon.",
+      );
+      expect(
+        await refusalOf(daemon.client.setAgentFeature(agentId, "auto_accept", true)),
+      ).toContain("Bypass permission modes are not available on this daemon.");
+    });
+
+    it("B11 bypass modes: IRIX_ALLOW_BYPASS_MODES lets the same requests past the Irix check", async () => {
+      const { ctx: daemon, agentId } = await startIrixDaemonWithFakeProvider({
+        IRIX_ALLOW_BYPASS_MODES: "1",
+      });
+
+      expect(await refusalOf(daemon.client.setAgentMode(agentId, "full-access"))).not.toContain(
+        "Bypass permission modes",
+      );
+    });
+
+    it("B11 bypass modes: assertIrixModeAllowed and the mode and feature lists, called in-process", async () => {
+      await startIrixDaemon();
+
+      for (const modeId of [
+        "bypassPermissions",
+        "yolo",
+        "full-access",
+        "dangerously-skip-permissions",
+      ]) {
+        expect(() => assertIrixModeAllowed({ modeId }), modeId).toThrow(/Bypass permission modes/);
+      }
+      expect(() => assertIrixModeAllowed({ featureValues: { auto_accept: true } })).toThrow(
+        /Bypass permission modes/,
+      );
+      expect(() => assertIrixModeAllowed({ modeId: "default" })).not.toThrow();
+      expect(() => assertIrixModeAllowed({ featureValues: { auto_accept: false } })).not.toThrow();
+
+      expect(
+        withoutIrixBypassModes([
+          { id: "default" },
+          { id: "bypassPermissions" },
+          { id: "plan" },
+        ])?.map((mode) => mode.id),
+      ).toEqual(["default", "plan"]);
+      // The ACP/Claude "Auto accept" feature is left out of the feature list when restricted.
+      expect(irixFeatures({ id: "auto_accept" })).toEqual([]);
+    });
+
+    it("B11 bypass modes: nothing is refused or hidden with IRIX_ALLOW_BYPASS_MODES", async () => {
+      await startIrixDaemon({ IRIX_ALLOW_BYPASS_MODES: "1" });
+
+      expect(() => assertIrixModeAllowed({ modeId: "bypassPermissions" })).not.toThrow();
+      expect(() => assertIrixModeAllowed({ featureValues: { auto_accept: true } })).not.toThrow();
+      expect(irixFeatures({ id: "auto_accept" })).toEqual([{ id: "auto_accept" }]);
+    });
+
+    // The code sets only these flags; relay, pairing, hub and speech have no server_info flag in
+    // irixServerFeatures, so there is nothing to assert for them here.
+    it("B2/B3 cloud features: server_info carries every flag irixServerFeatures sets", async () => {
+      const { client, daemon } = await startIrixDaemon();
+
+      const features = client.getLastServerInfoMessage()?.features;
+      expect(features?.connectedHosts).toBe(false);
+      expect(features?.hostMultiplexing).toBe(false);
+      expect(features?.schedulesDisabled).toBe(true);
+      expect(features?.subagentApprovalLocked).toBe(true);
+      expect(features?.requireSubagentApproval).toBe(true);
+      expect(irixServerFeatures()).toEqual({
+        connectedHosts: false,
+        hostMultiplexing: false,
+        schedulesDisabled: true,
+        subagentApprovalLocked: true,
+        requireSubagentApproval: true,
+      });
+      expect(daemon).toBeTruthy();
+    });
+
+    it("B2/B3 cloud features: IRIX_ALLOW_SCHEDULES and IRIX_ENABLE_CONNECTED_HOSTS drop their flags", async () => {
+      await startIrixDaemon({ IRIX_ALLOW_SCHEDULES: "1", IRIX_ENABLE_CONNECTED_HOSTS: "1" });
+
+      const features = irixServerFeatures();
+      expect(features.schedulesDisabled).toBeUndefined();
+      expect(features.connectedHosts).toBeUndefined();
+      expect(features.hostMultiplexing).toBeUndefined();
+    });
+
+    // In-process: the daemon's default registry is built when the module loads, before any test
+    // switches the policy on, so it cannot be inspected through the daemon in this harness.
+    it("B6/B7 forges: with Irix active the registry knows only GitLab and github.com is not a forge", async () => {
+      await startIrixDaemon();
+      const upstream = [
+        [
+          "github",
+          { createService: () => ({}) as never, matchesHost: (h: string) => h === "github.com" },
+        ],
+        ["gitea", { createService: () => ({}) as never }],
+      ] as const;
+
+      const registry = new ForgeRegistry(
+        irixForgeEntries(
+          [...upstream],
+          createIrixGitLabAdapter(() => null),
+        ),
+      );
+
+      expect(registry.ids()).toEqual(["gitlab"]);
+      expect(registry.has("github")).toBe(false);
+      expect(registry.matchHost("github.com")).toBeNull();
+      expect(registry.create("github")).toBeNull();
+    });
+  },
+);

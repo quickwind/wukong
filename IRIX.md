@@ -68,23 +68,25 @@ you add one, add it to the table below. `rg "Irix:"` finds every marker.
 
 ## Where Irix lives
 
-| Path                           | What                                                                                                                               |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `IRIX.md`                      | This guide                                                                                                                         |
-| `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide                                                  |
-| `irix/AGENTS.md`               | Windows build recipe and the traps that cost time when packaging                                                                   |
-| `irix/docs/`                   | Changes from upstream (numbered list); agent fork: mechanism guide, and staff training notes                                       |
-| `irix/README.md`               | Configuration, GitLab setup, building, publishing                                                                                  |
-| `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins                                                          |
-| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                                                      |
-| `packages/cli/src/irix/`       | `irix` command defaults (home, port, ignore Paseo's environment); `irix` has no clone, onboard, pair, hub or speech command        |
-| `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                                                                     |
-| `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin, Open in File Explorer |
-| `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                                          |
-| `plugins/irix-claude-usage/`   | Bundled plugin: Claude monthly spend cap (and session/weekly windows where a plan has them)                                        |
-| `plugins/irix-context-hint/`   | Bundled plugin: composer pill when an agent's context window passes a threshold; compact or start a new session                    |
-| `plugins/irix-content-search/` | Bundled plugin: content search in the Files panel (`rg --json` behind start, poll and cancel RPCs)                                 |
-| `.github/workflows/irix-*.yml` | CI checks on every push to `irix` (the publish job is switched off); weekly sync with upstream                                     |
+| Path                           | What                                                                                                                                                                                                                                                                                                              |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IRIX.md`                      | This guide                                                                                                                                                                                                                                                                                                        |
+| `irix/`                        | Brand assets, scripts (pack, publish, brand, sync helpers), README, install guide                                                                                                                                                                                                                                 |
+| `irix/AGENTS.md`               | Windows build recipe and the traps that cost time when packaging                                                                                                                                                                                                                                                  |
+| `irix/docs/`                   | Changes from upstream (numbered list); agent fork: mechanism guide, and staff training notes                                                                                                                                                                                                                      |
+| `irix/README.md`               | Configuration, GitLab setup, building, publishing                                                                                                                                                                                                                                                                 |
+| `irix/INSTALL-WINDOWS.md`      | What the team does on Windows: install, update, first run, usage, plugins                                                                                                                                                                                                                                         |
+| `packages/server/src/irix/`    | Daemon policy: egress guard, providers, plugins, GitLab adapter, clone policy                                                                                                                                                                                                                                     |
+| `packages/cli/src/irix/`       | `irix` command defaults (home, port, ignore Paseo's environment); `irix` has no clone, onboard, pair, hub or speech command                                                                                                                                                                                       |
+| `packages/app/src/irix/`       | Web UI switches (`IRIX_BUILD`, `upstreamOnly`, hiding helpers)                                                                                                                                                                                                                                                    |
+| `plugins/irix-gitlab/`         | Bundled plugin: GitLab setup screen, Add project from GitLab, Fork clone, Open folder dialog, Open in Devin, Open in File Explorer                                                                                                                                                                                |
+| `plugins/irix-devin-usage/`    | Bundled plugin: Devin ACU usage, forecast                                                                                                                                                                                                                                                                         |
+| `plugins/irix-claude-usage/`   | Bundled plugin: Claude monthly spend cap (and session/weekly windows where a plan has them)                                                                                                                                                                                                                       |
+| `plugins/irix-context-hint/`   | Bundled plugin: composer pill when an agent's context window passes a threshold; compact or start a new session                                                                                                                                                                                                   |
+| `plugins/irix-content-search/` | Bundled plugin: content search in the Files panel (`rg --json` behind start, poll and cancel RPCs)                                                                                                                                                                                                                |
+| `irix/scripts/test-irix.mjs`   | One command for every Irix test (clean environment, final table, seam hint); `irix/docs/test-plan.md` says why                                                                                                                                                                                                    |
+| `irix/e2e/`                    | Browser acceptance suite (Playwright) against the built web UI and a real daemon in a temp home                                                                                                                                                                                                                   |
+| `.github/workflows/irix-*.yml` | `irix-publish.yml`: verify jobs on Linux and Windows on every push to `irix` (publishing switched off); `irix-checks.yml`: build, typecheck, lint, format and `test-irix` on push and PRs to `irix`, plus the browser suite (not blocking yet); `irix-sync-upstream.yml`: weekly sync. None has run on GitHub yet |
 
 ## Upstream files we touch (the whole list)
 
@@ -772,8 +774,12 @@ Follow upstream's rules (`CLAUDE.md`: lint and typecheck after every change, **r
 files you changed**, never the whole suite, use the npm scripts for lint and format). Also:
 
 1. `npm run lint`, `npm run format:check`, `npm run typecheck:server` (and the `tsc -p` above).
-2. The Irix tests you touched: `npx vitest run <file>` in `packages/server`, `packages/app` or
-   `plugins`; `node --test "irix/scripts/*.test.mjs"`.
+2. The Irix tests: `node irix/scripts/test-irix.mjs` runs the footprint check, the script tests and
+   the Irix tests of the server (including its e2e files, a few minutes), CLI, app and plugins in a
+   clean environment (no `PASEO_*`/`IRIX_*` from your shell) and prints a table; add `--only
+<footprint|scripts|server|cli|app|plugins|browser>` to run one step, `--browser` for the
+   Playwright suite, `--dry-run` to see the commands. While iterating, run only the file you
+   touched (`npx vitest run <file>`).
 3. `node irix/scripts/upstream-footprint.mjs` if you touched an upstream file.
 4. For anything user-visible, run it for real: temp home, own port, never `6767` (the main Paseo
    daemon; do not restart it) and not `6890` if someone is using it.
@@ -822,6 +828,9 @@ workflow cannot judge the things in step 4; a person or agent must.
    or rewrote what a hook sat on (the forge registry, plugin loader, Add Project flow, usage), find
    the new place and go back down the ladder. Resolutions are remembered by rerere.
 4. **Review what a clean merge can still get wrong.**
+   - **Run `node irix/scripts/test-irix.mjs` and read the seam failures first.** A failure in
+     `packages/server/src/irix/seams.test.ts` means upstream changed something an Irix hook
+     depends on; the failing test names are the hooks to review. Then the other bullets.
    - Hooks intact: `node irix/scripts/upstream-footprint.mjs` passes, and the file count and
      `rg "Irix:"` still match the table above. A lost marker means a lost hook.
    - Files we hook that upstream also changed:
@@ -847,9 +856,9 @@ workflow cannot judge the things in step 4; a person or agent must.
    - Version bump? Check `pack-local` and the app config still accept the new version form.
 5. **Verify**, in the worktree: `node scripts/npm-retry.mjs ci --ignore-scripts`, `npm run postinstall`,
    `npm run build:server` (it also compiles `packages/server/scripts`), `npm run typecheck`,
-   `npm run lint`, `npm run format:check`, `node --test "irix/scripts/*.test.mjs"`, the Irix
-   tests (`packages/server`: `src/irix`; `plugins`: `irix-gitlab irix-devin-usage irix-claude-usage irix-context-hint irix-content-search`;
-   `packages/app`: `src/irix src/usage`), and the footprint script. Do not run the whole suite.
+   `npm run lint`, `npm run format:check`, then `node irix/scripts/test-irix.mjs` (footprint,
+   script tests and the Irix tests of every package; add `--browser` for the browser suite). Do not
+   run the whole suite.
 6. **Package and smoke test.** `node irix/scripts/pack-local.mjs`, install the
    tarballs into a temp `--prefix`, then start that daemon on a temp home and port. Check:
    `irix --version`; only `claude` and `devin` providers; the five bundled plugins (`irix-gitlab`,
@@ -867,8 +876,9 @@ leave `irix` alone, and settle it in the worktree; never force-push. A build fai
 upstream's own: fix it with the smallest marked change and consider sending it upstream. A step
 you could not run goes into "Known gaps" below; do not report the sync as verified without it.
 
-**What the workflow covers.** Steps 1, 2, most of 5 (brand tests, build, typecheck, lint, the
-Irix tests, the footprint check) and opening the PR or issue. It does not do 3, 4, 6, 7 or 8.
+**What the workflow covers.** Steps 1, 2, most of 5 (brand tests, build, typecheck, lint, a subset
+of the Irix tests, the footprint check; not yet `test-irix` itself, see `irix-checks.yml`, which
+a PR from the sync branch does not trigger because the workflow's token opens it) and opening the PR or issue. It does not do 3, 4, 6, 7 or 8.
 
 ## Known gaps (as of this writing)
 
@@ -879,7 +889,7 @@ Not verified, so do not claim otherwise:
   `docs/internal-edition.md` on the old `internal-edition` branch.
 - Devin usage was checked against the real service only through a probe and the team's use;
   `GetUserStatus` is unofficial and may change.
-- The GitHub workflows (publish, sync, the Windows job) have never run on GitHub; nothing has been
+- The GitHub workflows (publish, sync, the Windows job, `irix-checks.yml` and its browser job) have never run on GitHub; nothing has been
   published to npm. `irix/scripts/disable-upstream-workflows.sh` has not been run.
 - The package `@anthropic-ai/claude-agent-sdk` (and its platform binaries) is a runtime dependency
   of `@irix/server` under Anthropic's own terms ("SEE LICENSE IN ..."), not an open-source

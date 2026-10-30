@@ -1,0 +1,116 @@
+name: Irix checks
+
+# The whole Irix test suite in one place: build, typecheck, lint, formatting, then
+# `node irix/scripts/test-irix.mjs` (footprint, script tests, server incl. the e2e files, cli,
+# app, plugins). The browser suite runs in its own job. Nothing here publishes.
+#
+# `irix-publish.yml` keeps its own, smaller verify jobs (plus Windows and packing); this
+# workflow is the broad run. It is reusable (`workflow_call`) so the sync workflow could call it.
+# These workflows have not been run on GitHub yet.
+
+on:
+  push:
+    branches: [irix]
+  pull_request:
+    branches: [irix]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to check (default: the caller's ref)"
+        type: string
+        default: ""
+
+concurrency:
+  group: irix-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  ONNXRUNTIME_NODE_INSTALL: skip
+  UPSTREAM_URL: https://github.com/getpaseo/paseo.git
+
+jobs:
+  checks:
+    name: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || '' }}
+          fetch-depth: 0
+
+      # The footprint step compares against the merge base with upstream/main.
+      - name: Fetch upstream
+        run: |
+          git remote add upstream "$UPSTREAM_URL" || git remote set-url upstream "$UPSTREAM_URL"
+          git fetch upstream main --tags
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          node scripts/npm-retry.mjs ci --ignore-scripts --no-audit --no-fund
+          npm run postinstall
+
+      - name: Build server stack
+        run: npm run build:server
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Irix tests
+        run: node irix/scripts/test-irix.mjs
+
+  browser:
+    name: browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # The browser suite (irix/e2e) is new and has never run on GitHub. It reports here but
+    # does not block until it has passed a few runs; then remove this line.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || '' }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          node scripts/npm-retry.mjs ci --ignore-scripts --no-audit --no-fund
+          npm run postinstall
+
+      - name: Build server stack
+        run: npm run build:server
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Irix browser tests
+        run: node irix/scripts/test-irix.mjs --browser --only browser
+
+      - name: Keep the Playwright output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: irix-browser-output
+          path: irix/e2e/.output
+          if-no-files-found: ignore
+          retention-days: 7

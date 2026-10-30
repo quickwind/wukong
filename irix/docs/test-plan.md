@@ -43,10 +43,12 @@ tests used hand-written fakes shaped like the old upstream.
 | C. CLI and app unit | `packages/cli/src/irix/surface.test.ts`; `packages/app/src/irix/{build,managed-projects,plugin-source-field,schedules-disabled,agent-tools-setting,workspace-name}.test.ts(x)` | Commands removed per switch; hidden-by-edition components; managed project filter                                                                                                                                                                                                                                                                                                                               |
 | D. Acceptance e2e   | `packages/server/src/irix/acceptance.e2e.test.ts`                                                                                                                              | Layer 3, daemon half                                                                                                                                                                                                                                                                                                                                                                                            |
 
-## Phase 2 (after phase 1 is reviewed)
+## Phase 2 (in progress)
 
-- Browser acceptance spec against the built web UI (needs the Playwright setup in
-  `packages/app/e2e`), including file comments, content search, folder dialog, Name + Create bar.
-- One command, `node irix/scripts/test-irix.mjs`, that runs the Irix files in order, and a CI step in
-  the existing `irix-*` workflow that calls it (CI is where the broad runs happen).
-- Add "run `test-irix` and read the seam failures first" to the sync SOP in `IRIX.md`.
+- Browser acceptance spec against the built web UI, including file comments, content search,
+  folder dialog, Name + Create bar. In progress: `irix/e2e/` (Playwright config and support
+  exist; the specs are being written). Run with `node irix/scripts/test-irix.mjs --browser --only browser`.
+- Done: `node irix/scripts/test-irix.mjs` runs the Irix files in order, and
+  `.github/workflows/irix-checks.yml` calls it (plus a non-blocking browser job). Written and
+  checked locally only; neither workflow has run on GitHub.
+- Done: "run `test-irix` and read the seam failures first" is in the sync SOP in `IRIX.md`.
