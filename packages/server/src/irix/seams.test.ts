@@ -186,6 +186,25 @@ describe("seam 1: DaemonConfigStore under the Irix store wrappers", () => {
     await pending;
   });
 
+  it("store.patch(function) still applies: plugin install/remove/enable depend on it", async () => {
+    const home = tempHome();
+    const store = makeStore(home);
+    attachIrixWsServer(wsServerOn(home, store).wsServer);
+    const source = { source: "directory" as const, path: "/tmp/p", enabled: true };
+
+    await store.patch((current) => ({ plugins: { ...current.plugins, demo: source } }));
+    expect(store.get().plugins).toMatchObject({ demo: source });
+    expect(loadPersistedConfig(home).plugins).toMatchObject({ demo: source });
+
+    await store.patch((current) => {
+      const plugins = { ...current.plugins };
+      delete plugins.demo;
+      return { plugins };
+    });
+    expect(store.get().plugins?.demo).toBeUndefined();
+    expect(loadPersistedConfig(home).plugins?.demo).toBeUndefined();
+  });
+
   it("idleRuntimeCleanup resolves to the new value, reads back, and persists", async () => {
     const home = tempHome();
     const store = makeStore(home);

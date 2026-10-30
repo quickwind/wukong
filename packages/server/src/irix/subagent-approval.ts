@@ -643,7 +643,9 @@ interface WsServerInternal {
   daemonConfigStore?: {
     get: () => Record<string, unknown>;
     patch: (
-      patch: Record<string, unknown>,
+      patch:
+        | Record<string, unknown>
+        | ((current: Record<string, unknown>) => Record<string, unknown>),
     ) => Record<string, unknown> | Promise<Record<string, unknown>>;
   };
   agentManager?: unknown;
@@ -686,7 +688,9 @@ export function attachIrixWsServer(wsServerInput: unknown): void {
       };
     };
 
-    store.patch = async (patch: Record<string, unknown>) => {
+    store.patch = async (input) => {
+      // Upstream also passes a function of the current config (plugin remove/enable use it).
+      const patch = typeof input === "function" ? input(originalGet()) : input;
       if (typeof patch.requireSubagentApproval === "boolean") {
         setSubagentApprovalRequired(patch.requireSubagentApproval);
       }

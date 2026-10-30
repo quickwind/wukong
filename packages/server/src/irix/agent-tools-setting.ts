@@ -18,8 +18,14 @@ const AGENT_TOOLS_PROVIDER_IDS = ["claude", "devin"] as const;
 
 interface ConfigStoreLike {
   get(): object;
-  patch(p: Record<string, unknown>): object | Promise<object>;
+  patch(p: PatchArg): object | Promise<object>;
 }
+
+// Upstream's store takes either a patch or a function from the current config to a patch
+// (plugin install/remove/enable use the function form).
+type PatchArg =
+  | Record<string, unknown>
+  | ((current: Record<string, unknown>) => Record<string, unknown>);
 
 interface AgentToolsWsServer {
   paseoHome?: string;
@@ -174,7 +180,9 @@ export function wrapAgentToolsConfigStore(wsServer: AgentToolsWsServer): void {
 
   store.get = () => withoutMcpTools({ ...originalGet(), ...agentToolsFields() });
 
-  store.patch = async (patch: Record<string, unknown>) => {
+  store.patch = async (input: PatchArg) => {
+    const patch =
+      typeof input === "function" ? input(originalGet() as Record<string, unknown>) : input;
     const { agentTools, ...rest } = patch;
     const changed = agentTools !== undefined;
     if (changed) {
