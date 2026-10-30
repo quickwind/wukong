@@ -74,13 +74,14 @@ describe("how agents reach the agent tools", () => {
     expect(() => setAgentToolsChannel("both")).toThrow();
   });
 
-  it("travels in the daemon config, and a change is broadcast", () => {
+  it("travels in the daemon config, and a change is broadcast", async () => {
     process.env.IRIX_UNRESTRICTED = "1";
     const broadcastConfig = vi.fn();
     const broadcastCapabilities = vi.fn();
     const store = {
       get: (): object => ({ base: true }),
-      patch: (p: Record<string, unknown>): object => ({ base: true, ...p }),
+      // Upstream's `patch` returns a promise since 0.14.0.
+      patch: async (p: Record<string, unknown>): Promise<object> => ({ base: true, ...p }),
     };
     const ws = {
       daemonConfigStore: store,
@@ -95,11 +96,11 @@ describe("how agents reach the agent tools", () => {
       agentTools: "cli",
       agentToolsEditable: true,
     });
-    expect(store.patch({ agentTools: "mcp" })).toMatchObject({ agentTools: "mcp" });
+    expect(await store.patch({ agentTools: "mcp" })).toMatchObject({ agentTools: "mcp" });
     expect(broadcastConfig).toHaveBeenCalledTimes(1);
     expect(broadcastCapabilities).toHaveBeenCalledTimes(1);
 
-    store.patch({ other: 1 });
+    await store.patch({ other: 1 });
     expect(broadcastConfig).toHaveBeenCalledTimes(1);
   });
 

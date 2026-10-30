@@ -18,7 +18,7 @@ const AGENT_TOOLS_PROVIDER_IDS = ["claude", "devin"] as const;
 
 interface ConfigStoreLike {
   get(): object;
-  patch(p: Record<string, unknown>): object;
+  patch(p: Record<string, unknown>): object | Promise<object>;
 }
 
 interface AgentToolsWsServer {
@@ -174,13 +174,13 @@ export function wrapAgentToolsConfigStore(wsServer: AgentToolsWsServer): void {
 
   store.get = () => withoutMcpTools({ ...originalGet(), ...agentToolsFields() });
 
-  store.patch = (patch: Record<string, unknown>) => {
+  store.patch = async (patch: Record<string, unknown>) => {
     const { agentTools, ...rest } = patch;
     const changed = agentTools !== undefined;
     if (changed) {
       setAgentToolsChannel(agentTools);
     }
-    const merged = { ...originalPatch(rest), ...agentToolsFields() };
+    const merged = { ...(await originalPatch(rest)), ...agentToolsFields() };
     if (changed) {
       wsServer.broadcastCapabilitiesUpdate?.();
       wsServer.broadcastDaemonConfigChanged?.(merged);

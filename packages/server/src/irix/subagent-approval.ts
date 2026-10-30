@@ -656,7 +656,9 @@ interface WsServerInternal {
   paseoHome?: string;
   daemonConfigStore?: {
     get: () => Record<string, unknown>;
-    patch: (patch: Record<string, unknown>) => Record<string, unknown>;
+    patch: (
+      patch: Record<string, unknown>,
+    ) => Record<string, unknown> | Promise<Record<string, unknown>>;
   };
   agentManager?: unknown;
   broadcastCapabilitiesUpdate?: () => void;
@@ -698,11 +700,11 @@ export function attachIrixWsServer(wsServerInput: unknown): void {
       };
     };
 
-    store.patch = (patch: Record<string, unknown>) => {
+    store.patch = async (patch: Record<string, unknown>) => {
       if (typeof patch.requireSubagentApproval === "boolean") {
         setSubagentApprovalRequired(patch.requireSubagentApproval);
       }
-      const updated = originalPatch(patch);
+      const updated = await originalPatch(patch);
       const merged = {
         ...updated,
         requireSubagentApproval: isSubagentApprovalRequired(),
