@@ -941,6 +941,7 @@ class NodeServiceProxySubsystem implements ServiceProxySubsystem {
       return this.standaloneListenTarget ?? options.listenTarget;
     }
     const app = express();
+    app.disable("x-powered-by");
     app.set("trust proxy", true);
     app.use(this.middleware());
     app.use((_req, res) => {

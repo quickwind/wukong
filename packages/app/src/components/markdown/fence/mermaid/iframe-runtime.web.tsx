@@ -38,6 +38,7 @@ export function MermaidIframeRuntime({
       colorScheme: current.colorScheme,
       interactive: false,
     };
+    // The sandboxed srcDoc iframe runs with an opaque `null` origin, so targetOrigin must be "*".
     target.postMessage(message, "*");
   }, []);
 

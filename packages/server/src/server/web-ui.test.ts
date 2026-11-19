@@ -169,12 +169,13 @@ describe("daemon web UI route module", () => {
     const app = createApp({ enabled: true, distDir, publicDir });
 
     const res = await request(app, "GET", "/", {
-      host: "evil.test</script><script>alert(1)</script>",
+      host: "evil.test</script><script>alert(1)</script>$'",
     });
 
     expect(res.status).toBe(200);
     expect(res.body).toContain("evil.test\\u003C/script\\u003E");
     expect(res.body).not.toContain("evil.test</script>");
+    expect(res.body).toMatch(/<\/head><body>app<\/body><\/html>$/);
   });
 
   test("falls back to index.html for SPA deep links", async () => {

@@ -247,7 +247,9 @@ function serializeInlineScriptJson(value: unknown): string {
   return JSON.stringify(value)
     .replace(/</g, "\\u003C")
     .replace(/>/g, "\\u003E")
-    .replace(/&/g, "\\u0026");
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }
 
 /**
@@ -289,7 +291,7 @@ function injectConnectionHint(
   const script = `<script>window.__PASEO_INITIAL_DAEMON_CONNECTION__=${serializeInlineScriptJson(hint)}</script>`;
   const headClose = /<\/head>/i;
   if (headClose.test(html)) {
-    return html.replace(headClose, `${script}</head>`);
+    return html.replace(headClose, () => `${script}</head>`);
   }
   return script + html;
 }

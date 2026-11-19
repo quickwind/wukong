@@ -703,6 +703,7 @@ export async function createPaseoDaemon(
   const listenTarget = parseListenString(config.listen);
 
   const app = express();
+  app.disable("x-powered-by");
   app.set("trust proxy", resolveExpressTrustProxySetting(config));
   daemonConfigStore.onFieldChange("trustedProxies", (value) => {
     app.set("trust proxy", value ?? ["loopback"]);
